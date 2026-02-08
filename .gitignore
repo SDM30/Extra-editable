@@ -53,3 +53,39 @@ frontend/__screenshots__/
 
 .DS_Store
 Thumbs.db
+
+
+# ==========================
+# Backend
+# ==========================
+
+# Spring Boot/Maven generated files
+backend/HELP.md
+backend/target/
+backend/.mvn/wrapper/maven-wrapper.jar
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+
+### VS Code ###
+.vscode/
