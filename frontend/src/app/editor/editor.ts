@@ -1,4 +1,4 @@
-import { Component, Input } from '@angular/core';
+import { Component, Input, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CodeEditor } from '@acrodata/code-editor';
 import { Extension } from '@codemirror/state';
@@ -12,6 +12,7 @@ import { nord } from '@uiw/codemirror-theme-nord';
 import { kimbie } from '@uiw/codemirror-theme-kimbie';
 import { languages as cmLanguages } from '@codemirror/language-data';
 import type { LanguageDescription } from '@codemirror/language';
+import { CodigoFuenteServ } from '../services/codigo-fuente-serv';
 
 export type Theme = 'light' | 'dark' | Extension;
 
@@ -23,7 +24,9 @@ export type Theme = 'light' | 'dark' | Extension;
   styleUrl: './editor.css',
 })
 export class Editor {
+  private codigoService = inject(CodigoFuenteServ);
   value = `#include <iostream>\n\nint main() {\n    std::cout << "Hola C++" << std::endl;\n    return 0;\n}`;
+  resultado?: string;
 
   /** Opcion por defecto */
   @Input() theme: Theme = 'light';
@@ -42,4 +45,11 @@ export class Editor {
 
   languages: LanguageDescription[] = cmLanguages;
   language = 'cpp';
+
+  ejecutar() {
+    this.codigoService.ejecutarCodigo({ contenido: this.value }).subscribe({
+      next: (resp) => (this.resultado = resp.resultado ?? 'Respuesta recibida'),
+      error: (err) => (this.resultado = 'Error: ' + (err.message ?? err.status)),
+    });
+  }
 }

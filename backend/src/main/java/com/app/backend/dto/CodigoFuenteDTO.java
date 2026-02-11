@@ -12,7 +12,7 @@ import lombok.Setter;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CodigoFuenteDTO {
-    private long id;
+    private Long id;
     private String contenido;
     private LocalDate fecha;
     private String resultado;

@@ -10,4 +10,10 @@
 
   <code-editor [(ngModel)]="value" [theme]="theme" [languages]="languages" [language]="language">
   </code-editor>
+
+  <button type="button" (click)="ejecutar()">Ejecutar en backend</button>
+
+  @if (resultado) {
+    <p class="resultado">Backend: {{ resultado }}</p>
+  }
 </div>
