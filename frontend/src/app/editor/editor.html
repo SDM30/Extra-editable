@@ -5,10 +5,11 @@
   [language]="language"
   [languageOptions]="languageOptions"
   (languageChange)="language = $event"
+  (runCode)="onRunCode()"
 ></app-header>
 
 <app-code-section
-  [value]="value"
+  [(value)]="value"
   [theme]="theme"
   [language]="language"
 ></app-code-section>

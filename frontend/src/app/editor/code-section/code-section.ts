@@ -7,6 +7,7 @@ import { Extension } from '@codemirror/state';
 import { cpp } from '@codemirror/lang-cpp';
 import { javascript } from '@codemirror/lang-javascript';
 import { python } from '@codemirror/lang-python';
+import { execution } from '../../services/execution';
 
 export type Theme = 'light' | 'dark' | Extension;
 
