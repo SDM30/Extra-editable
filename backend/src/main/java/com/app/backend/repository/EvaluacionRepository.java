@@ -1,13 +1,10 @@
 package com.app.backend.repository;
 
-import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
 import com.app.backend.model.Evaluacion;
 
-
+@Repository
 public interface EvaluacionRepository extends JpaRepository<Evaluacion, Long> {
-    List<Evaluacion> findByEjercicioId(Long ejercicioId);
-
-    
 }
-

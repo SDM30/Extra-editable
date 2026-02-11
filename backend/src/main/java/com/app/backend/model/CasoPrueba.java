@@ -1,20 +1,25 @@
 package com.app.backend.model;
 
 import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Entity
 @Data
 @AllArgsConstructor
+@NoArgsConstructor
 public class CasoPrueba {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    private String desc;
+    private String descripcion;
     private String entrada;
-    private String salida;
+    private String salidaEsperada;
 
     // Dejar sin relaciones por el momento
 }
