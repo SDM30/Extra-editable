@@ -18,7 +18,5 @@ public class Evaluacion {
     private Long puntuacion;
     private String descripcion;
 
-    @OneToMany(mappedBy = "evaluacion")
-    private CasoPrueba casoPrueba;
-
+    // Dejar sin relaciones por el momento
 }
