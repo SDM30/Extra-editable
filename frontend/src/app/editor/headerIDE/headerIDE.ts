@@ -2,7 +2,7 @@ import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Extension } from '@codemirror/state';
 import { CodeSection } from '../code-section/code-section';
-import { execution } from '../../services/execution';
+import { ExecutionService } from '../../services/execution-service';
 
 export type Theme = 'light' | 'dark' | Extension;
 

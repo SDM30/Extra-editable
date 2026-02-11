@@ -9,7 +9,7 @@ import { dracula } from '@uiw/codemirror-theme-dracula';
 import { solarizedLight, solarizedDark } from '@uiw/codemirror-theme-solarized';
 import { nord } from '@uiw/codemirror-theme-nord';
 import { kimbie } from '@uiw/codemirror-theme-kimbie';
-import { execution } from '../services/execution';
+import { ExecutionService } from '../services/execution-service';
 
 export type Theme = 'light' | 'dark' | Extension;
 
@@ -43,7 +43,7 @@ export class Editor {
     { label: 'Python', value: 'python' },
   ];
 
-  constructor(private executionService: execution){}
+  constructor(private executionService: ExecutionService) { }
 
   onRunCode() {
     this.executionService.runCode(this.value);
