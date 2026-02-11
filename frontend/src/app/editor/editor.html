@@ -1,19 +1,15 @@
-<div class="editor-wrapper">
-  <div class="toolbar">
-    <label for="theme-selector">Tema: </label>
-    <select id="theme-selector" [(ngModel)]="theme">
-      @for (opt of themeOptions; track opt.label) {
-        <option [ngValue]="opt.value">{{ opt.label }}</option>
-      }
-    </select>
-  </div>
+<app-header
+  [theme]="theme"
+  [themeOptions]="themeOptions"
+  (themeChange)="theme = $event"
+  [language]="language"
+  [languageOptions]="languageOptions"
+  (languageChange)="language = $event"
+  (runCode)="onRunCode()"
+></app-header>
 
-  <code-editor [(ngModel)]="value" [theme]="theme" [languages]="languages" [language]="language">
-  </code-editor>
-
-  <button type="button" (click)="ejecutar()">Ejecutar en backend</button>
-
-  @if (resultado) {
-    <p class="resultado">Backend: {{ resultado }}</p>
-  }
-</div>
+<app-code-section
+  [(value)]="value"
+  [theme]="theme"
+  [language]="language"
+></app-code-section>

@@ -1,0 +1,39 @@
+<header class="ide-header">
+  <div class="header-left">
+    <div class="logo">MyIDE</div>
+  </div>
+
+  <div class="header-center">
+    <div class="selector-group">
+      <label for="language-selector">Lenguaje</label>
+      <select
+        id="language-selector"
+        [ngModel]="language"
+        (ngModelChange)="languageChange.emit($event)"
+      >
+        @for (lang of languageOptions; track lang.value) {
+          <option [ngValue]="lang.value">{{ lang.label }}</option>
+        }
+      </select>
+    </div>
+
+    <div class="selector-group">
+      <label for="theme-selector">Tema</label>
+      <select
+        id="theme-selector"
+        [ngModel]="theme"
+        (ngModelChange)="themeChange.emit($event)"
+      >
+        @for (opt of themeOptions; track opt.label) {
+          <option [ngValue]="opt.value">{{ opt.label }}</option>
+        }
+      </select>
+    </div>
+  </div>
+
+  <div class="header-right">
+    <div class="status idle">● Idle</div>
+    <button class="btn run" type="button" (click)="enviarTexto()">Run</button>
+    <button class="btn submit" type="button">Submit</button>
+  </div>
+</header>
