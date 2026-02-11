@@ -9,8 +9,7 @@ import { dracula } from '@uiw/codemirror-theme-dracula';
 import { solarizedLight, solarizedDark } from '@uiw/codemirror-theme-solarized';
 import { nord } from '@uiw/codemirror-theme-nord';
 import { kimbie } from '@uiw/codemirror-theme-kimbie';
-import { languages as cmLanguages } from '@codemirror/language-data';
-import type { LanguageDescription } from '@codemirror/language';
+import { execution } from '../services/execution';
 
 export type Theme = 'light' | 'dark' | Extension;
 
@@ -22,9 +21,7 @@ export type Theme = 'light' | 'dark' | Extension;
   styleUrls: ['./editor.css'],
 })
 export class Editor {
-  private codigoService = inject(CodigoFuenteServ);
   value = `#include <iostream>\n\nint main() {\n    std::cout << "Hola C++" << std::endl;\n    return 0;\n}`;
-  resultado?: string;
 
   theme: Theme = 'dark';
   language: string = 'cpp';
@@ -40,6 +37,15 @@ export class Editor {
     { label: 'Kimbie', value: kimbie as Theme },
   ];
 
-  languages: LanguageDescription[] = cmLanguages;
-  language = 'cpp';
+  languageOptions = [
+    { label: 'C++', value: 'cpp' },
+    { label: 'JavaScript', value: 'javascript' },
+    { label: 'Python', value: 'python' },
+  ];
+
+  constructor(private executionService: execution){}
+
+  onRunCode() {
+    this.executionService.runCode(this.value);
+  }
 }
