@@ -1,4 +1,4 @@
-import { Component, Input } from '@angular/core';
+import { Component, Input, Output, EventEmitter } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CodeEditor } from '@acrodata/code-editor';
 
@@ -19,13 +19,24 @@ export type Theme = 'light' | 'dark' | Extension;
   styleUrl: './code-section.css',
 })
 export class CodeSection {
-  @Input() value = '';
+  private _value = '';
+  @Input() set value(val: string) {
+    this._value = val;
+  }
+  get value(): string {
+    return this._value;
+  }
+  @Output() valueChange = new EventEmitter<string>();
   @Input() theme: Theme = 'light';
 
   @Input() language: string = 'cpp';
 
   // panel del problema
   isProblemCollapsed = false;
+
+  onValueChange(newValue: string) {
+    this.valueChange.emit(newValue);
+  }
 
   toggleProblem(): void {
     this.isProblemCollapsed = !this.isProblemCollapsed;

@@ -1,13 +1,14 @@
 <div class="ide-body">
-  <!-- Columna Editor -->
-  <div class="editor-panel">
-    <code-editor
-      class="cm-host"
-      [(ngModel)]="value"
-      [theme]="theme"
-      [extensions]="editorExtensions"
-    ></code-editor>
-  </div>
+<!-- Columna Editor -->
+<div class="editor-panel">
+  <code-editor
+    class="cm-host"
+    [ngModel]="value"
+    (ngModelChange)="onValueChange($event)"
+    [theme]="theme"
+    [extensions]="editorExtensions"
+  ></code-editor>
+</div>
 
   <!-- Columna Problema -->
   <aside class="problem-panel" [class.collapsed]="isProblemCollapsed">
