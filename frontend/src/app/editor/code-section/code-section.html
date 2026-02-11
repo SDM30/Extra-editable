@@ -1,0 +1,28 @@
+<div class="ide-body">
+  <!-- Columna Editor -->
+  <div class="editor-panel">
+    <code-editor
+      class="cm-host"
+      [(ngModel)]="value"
+      [theme]="theme"
+      [extensions]="editorExtensions"
+    ></code-editor>
+  </div>
+
+  <!-- Columna Problema -->
+  <aside class="problem-panel" [class.collapsed]="isProblemCollapsed">
+    <div class="problem-header">
+      <span class="problem-title">Problem</span>
+
+      <button class="collapse-btn" type="button" (click)="toggleProblem()">
+        <span class="chev" [class.rotated]="isProblemCollapsed">⮜</span>
+      </button>
+    </div>
+
+    <div class="problem-content">
+      <table class="problem-table">
+        <!-- Tabla vacía por ahora -->
+      </table>
+    </div>
+  </aside>
+</div>

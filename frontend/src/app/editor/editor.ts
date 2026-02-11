@@ -1,45 +1,44 @@
-import { Component, Input } from '@angular/core';
-import { FormsModule } from '@angular/forms';
-import { CodeEditor } from '@acrodata/code-editor';
+import { Component } from '@angular/core';
 import { Extension } from '@codemirror/state';
-import { cpp } from '@codemirror/lang-cpp';
 
-// Imports de los temas que mencionaste
+import { Header } from './headerIDE/headerIDE';
+import { CodeSection } from './code-section/code-section';
+
 import { oneDark } from '@codemirror/theme-one-dark';
 import { dracula } from '@uiw/codemirror-theme-dracula';
 import { solarizedLight, solarizedDark } from '@uiw/codemirror-theme-solarized';
 import { nord } from '@uiw/codemirror-theme-nord';
 import { kimbie } from '@uiw/codemirror-theme-kimbie';
-import { languages as cmLanguages } from '@codemirror/language-data';
-import type { LanguageDescription } from '@codemirror/language';
 
 export type Theme = 'light' | 'dark' | Extension;
 
 @Component({
   selector: 'app-editor',
   standalone: true,
-  imports: [FormsModule, CodeEditor],
+  imports: [Header, CodeSection],
   templateUrl: './editor.html',
-  styleUrl: './editor.css',
+  styleUrls: ['./editor.css'],
 })
 export class Editor {
   value = `#include <iostream>\n\nint main() {\n    std::cout << "Hola C++" << std::endl;\n    return 0;\n}`;
 
-  /** Opcion por defecto */
-  @Input() theme: Theme = 'light';
+  theme: Theme = 'dark';
+  language: string = 'cpp';
 
-  /** Opciones para los temas del editor */
   themeOptions = [
-    { label: 'Standard Light', value: 'light' },
-    { label: 'Standard Dark', value: 'dark' },
-    { label: 'One Dark', value: oneDark },
-    { label: 'Dracula', value: dracula },
-    { label: 'Solarized Light', value: solarizedLight },
-    { label: 'Solarized Dark', value: solarizedDark },
-    { label: 'Nord', value: nord },
-    { label: 'Kimbie', value: kimbie },
+    { label: 'Standard Light', value: 'light' as Theme },
+    { label: 'Standard Dark', value: 'dark' as Theme },
+    { label: 'One Dark', value: oneDark as Theme },
+    { label: 'Dracula', value: dracula as Theme },
+    { label: 'Solarized Light', value: solarizedLight as Theme },
+    { label: 'Solarized Dark', value: solarizedDark as Theme },
+    { label: 'Nord', value: nord as Theme },
+    { label: 'Kimbie', value: kimbie as Theme },
   ];
 
-  languages: LanguageDescription[] = cmLanguages;
-  language = 'cpp';
+  languageOptions = [
+    { label: 'C++', value: 'cpp' },
+    { label: 'JavaScript', value: 'javascript' },
+    { label: 'Python', value: 'python' },
+  ];
 }
