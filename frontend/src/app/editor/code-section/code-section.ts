@@ -30,6 +30,8 @@ export class CodeSection {
   @Input() theme: Theme = 'light';
 
   @Input() language: string = 'cpp';
+  @Input() resultado?: string;
+  @Input() cargando: boolean = false;
 
   // panel del problema
   isProblemCollapsed = false;
