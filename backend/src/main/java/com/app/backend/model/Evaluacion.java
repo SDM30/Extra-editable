@@ -1,5 +1,7 @@
 package com.app.backend.model;
 
+import java.util.List;
+
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
@@ -19,6 +21,5 @@ public class Evaluacion {
     private String descripcion;
 
     @OneToMany(mappedBy = "evaluacion")
-    private CasoPrueba casoPrueba;
-
+    private List<CasoPrueba> casoPrueba;
 }
