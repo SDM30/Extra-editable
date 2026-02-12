@@ -9,6 +9,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.app.backend.dto.CodigoFuenteDTO;
+import com.app.backend.dto.ExecutionRequestDTO;
+import com.app.backend.dto.ExecutionResponseDTO;
 import com.app.backend.model.CodigoFuente;
 import com.app.backend.repository.CodigoFuenteRepository;
 
@@ -26,11 +28,6 @@ public class CodigoFuenteService {
     public CodigoFuenteDTO ejecutarCodigo(CodigoFuenteDTO dto) {
         // DEBUG: registra el código recibido en la consola del backend
         log.info("Código recibido desde el frontend:\n{}", dto.getContenido());
-
-        // Devolvemos el mismo DTO con algunos campos rellenados
-        dto.setFecha(LocalDate.now());
-        dto.setResultado("Código recibido correctamente");
-        dto.setTiempo("N/A");
 
         // Persistir para que genere ID y devolver lo que quedó en BD
         CodigoFuente entity = modelMapper.map(dto, CodigoFuente.class);
