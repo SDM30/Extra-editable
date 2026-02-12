@@ -45,6 +45,7 @@ export class Editor {
   ];
 
   resultado?: string;
+  resultadoOk?: boolean;
   cargando = false;
 
   constructor(
@@ -55,6 +56,7 @@ export class Editor {
   onRunCode() {
     // Estado inicial de cada ejecución
     this.resultado = undefined;
+    this.resultadoOk = undefined;
     this.cargando = true;
     this.executionService
       .runCode(this.value)
@@ -64,25 +66,44 @@ export class Editor {
         finalize(() => {
           // Siempre apagar loading (éxito, error o timeout)
           this.cargando = false;
-          // Forzar refresco por integraciones que pueden resolver fuera de la zona de Angular
+          //ChangeDetectorRef (cdr)
+          // Forzar detección de cambios
           this.cdr.detectChanges();
         }),
       )
       .subscribe({
         next: (resp) => {
-          this.resultado = `id=${resp.id ?? '-'} | ${resp.resultado ?? 'Respuesta recibida'}`;
-          // Asegura pintado inmediato del resultado recibido
+          const resultadoLimpio = this.limpiarResultado(resp.resultado ?? 'Respuesta recibida');
+          this.resultadoOk = this.extraerEstadoOk(resultadoLimpio);
+          this.resultado = this.formatearSalida(resultadoLimpio, resp.tiempo);
+
           this.cdr.detectChanges();
         },
         error: (err) => {
+          this.resultadoOk = false;
           if (err?.name === 'TimeoutError') {
             this.resultado = 'Error: timeout esperando respuesta del backend';
           } else {
             this.resultado = 'Error: ' + (err?.message ?? err?.status ?? err);
           }
-          // Asegura pintado inmediato del error
           this.cdr.detectChanges();
         },
       });
+  }
+
+  private limpiarResultado(resultado: string): string {
+    return resultado.replace(/^id\s*=\s*[^|]*\|\s*/i, '');
+  }
+
+  private extraerEstadoOk(resultado: string): boolean | undefined {
+    const match = resultado.match(/(^|\n)\s*ok\s*=\s*(true|false)\s*(\n|$)/i);
+    if (!match) {
+      return undefined;
+    }
+    return match[2].toLowerCase() === 'true';
+  }
+
+  private formatearSalida(resultado: string, tiempo?: string): string {
+    return `${resultado}\ntiempo=${tiempo ?? 'N/A'}`;
   }
 }

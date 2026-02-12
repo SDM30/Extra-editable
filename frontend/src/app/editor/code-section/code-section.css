@@ -21,6 +21,18 @@
   color: #fff;
 }
 
+.resultado {
+  white-space: pre-wrap;
+}
+
+.resultado-ok {
+  color: #2ecc71;
+}
+
+.resultado-error {
+  color: #ff4d4f;
+}
+
 code-editor.cm-host {
   flex: 1 1 auto;
   min-width: 0;

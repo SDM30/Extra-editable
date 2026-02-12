@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, SimpleChanges } from '@angular/core';
+import { Component, Input, Output, EventEmitter } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CodeEditor } from '@acrodata/code-editor';
 
@@ -7,7 +7,6 @@ import { Extension } from '@codemirror/state';
 import { cpp } from '@codemirror/lang-cpp';
 import { javascript } from '@codemirror/lang-javascript';
 import { python } from '@codemirror/lang-python';
-import { ExecutionService } from '../../services/execution-service';
 
 export type Theme = 'light' | 'dark' | Extension;
 
@@ -19,9 +18,6 @@ export type Theme = 'light' | 'dark' | Extension;
   styleUrl: './code-section.css',
 })
 export class CodeSection {
-  ngOnChanges(changes: SimpleChanges) {
-    console.log('CodeSection cambios', changes);
-  }
   private _value = '';
   @Input() set value(val: string) {
     this._value = val;
@@ -34,6 +30,7 @@ export class CodeSection {
 
   @Input() language: string = 'cpp';
   @Input() resultado?: string;
+  @Input() resultadoOk?: boolean;
   @Input() cargando: boolean = false;
 
   // panel del problema

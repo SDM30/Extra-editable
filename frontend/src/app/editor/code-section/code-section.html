@@ -30,7 +30,11 @@
       @if (cargando) {
         <p class="resultado">Ejecutando...</p>
       } @else if (resultado) {
-        <p class="resultado">Resultado: {{ resultado }}</p>
+        <p
+          class="resultado"
+          [class.resultado-ok]="resultadoOk === true"
+          [class.resultado-error]="resultadoOk === false"
+        >{{ resultado }}</p>
       }
     </div>
   </aside>
