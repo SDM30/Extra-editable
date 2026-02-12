@@ -1,5 +1,5 @@
-import { Component, ChangeDetectorRef } from '@angular/core';
-import { finalize } from 'rxjs';
+import { ChangeDetectorRef, Component } from '@angular/core';
+import { finalize, timeout } from 'rxjs';
 import { Extension } from '@codemirror/state';
 
 import { Header } from './headerIDE/headerIDE';
@@ -49,23 +49,38 @@ export class Editor {
 
   constructor(
     private executionService: ExecutionService,
-    private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
   ) {}
 
   onRunCode() {
+    // Estado inicial de cada ejecución
+    this.resultado = undefined;
     this.cargando = true;
     this.executionService
       .runCode(this.value)
-      .pipe(finalize(() => (this.cargando = false)))
+      .pipe(
+        // Evita que la UI quede esperando para siempre si la request no responde
+        timeout(10000),
+        finalize(() => {
+          // Siempre apagar loading (éxito, error o timeout)
+          this.cargando = false;
+          // Forzar refresco por integraciones que pueden resolver fuera de la zona de Angular
+          this.cdr.detectChanges();
+        }),
+      )
       .subscribe({
         next: (resp) => {
-          this.resultado = resp.resultado ?? 'Respuesta recibida';
-          console.log('Respuesta backend', resp);
+          this.resultado = `id=${resp.id ?? '-'} | ${resp.resultado ?? 'Respuesta recibida'}`;
+          // Asegura pintado inmediato del resultado recibido
           this.cdr.detectChanges();
         },
         error: (err) => {
-          this.resultado = 'Error: ' + (err.message ?? err.status ?? err);
-          console.error('Error backend', err);
+          if (err?.name === 'TimeoutError') {
+            this.resultado = 'Error: timeout esperando respuesta del backend';
+          } else {
+            this.resultado = 'Error: ' + (err?.message ?? err?.status ?? err);
+          }
+          // Asegura pintado inmediato del error
           this.cdr.detectChanges();
         },
       });
