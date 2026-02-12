@@ -1,8 +1,6 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Extension } from '@codemirror/state';
-import { CodeSection } from '../code-section/code-section';
-import { ExecutionService } from '../../services/execution-service';
 
 export type Theme = 'light' | 'dark' | Extension;
 
@@ -23,9 +21,10 @@ export class Header {
   @Output() themeChange = new EventEmitter<Theme>();
   @Output() languageChange = new EventEmitter<string>();
 
-  @Output() runCode = new EventEmitter<void>();
-  enviarTexto() {
-    this.runCode.emit();
+  @Output() runCode = new EventEmitter<void>();  // ← Evento para ejecutar código
+  
+  onRunClick() {
+    console.log('Botón Run clickeado');
+    this.runCode.emit();  // Emitir evento al componente padre
   }
-
 }
