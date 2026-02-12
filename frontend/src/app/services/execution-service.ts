@@ -2,25 +2,13 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { CodigoFuente } from '../model/codigo-fuente';
-
-// Interfaces para type-safety
-export interface ExecutionRequest {
-  contenido: string;
-  lenguaje: string;
-}
-
-export interface ExecutionResponse {
-  status: string;
-  output?: string;
-  errorMessage?: string;
-  executionTime?: number;
-}
+import { enviroment } from '../environments/enviroment';
 
 @Injectable({
   providedIn: 'root',
 })
-export class execution {
-  private apiUrl = 'http://localhost:8080/api';
+export class ExecutionService {
+  private apiUrl = enviroment.apiBaseUrl + '/codigo-fuente';
 
   constructor(private http: HttpClient) {}
 
