@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter } from '@angular/core';
+import { Component, Input, Output, EventEmitter, SimpleChanges } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CodeEditor } from '@acrodata/code-editor';
 
@@ -19,6 +19,9 @@ export type Theme = 'light' | 'dark' | Extension;
   styleUrl: './code-section.css',
 })
 export class CodeSection {
+  ngOnChanges(changes: SimpleChanges) {
+    console.log('CodeSection cambios', changes);
+  }
   private _value = '';
   @Input() set value(val: string) {
     this._value = val;

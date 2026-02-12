@@ -1,4 +1,5 @@
-import { Component } from '@angular/core';
+import { ChangeDetectorRef, Component } from '@angular/core';
+import { finalize, timeout } from 'rxjs';
 import { Extension } from '@codemirror/state';
 
 import { Header } from './headerIDE/headerIDE';
@@ -43,21 +44,45 @@ export class Editor {
     { label: 'Python', value: 'python' },
   ];
 
-  constructor(private executionService: ExecutionService) {}
+  resultado?: string;
+  cargando = false;
+
+  constructor(
+    private executionService: ExecutionService,
+    private cdr: ChangeDetectorRef,
+  ) {}
 
   onRunCode() {
-    console.log('Ejecutando código');
-    console.log('Lenguaje:', this.language);
-    console.log('Código:', this.value.substring(0, 100) + '...');
-
-    this.executionService.runCode(this.value, this.language).subscribe({
-      next: (response) => {
-        console.log('Respuesta recibida:', response);
-      },
-      error: (error) => {
-        console.error('Error en la petición:', error);
-        alert('Error de conexión con el servidor');
-      }
-    });
+    // Estado inicial de cada ejecución
+    this.resultado = undefined;
+    this.cargando = true;
+    this.executionService
+      .runCode(this.value)
+      .pipe(
+        // Evita que la UI quede esperando para siempre si la request no responde
+        timeout(10000),
+        finalize(() => {
+          // Siempre apagar loading (éxito, error o timeout)
+          this.cargando = false;
+          // Forzar refresco por integraciones que pueden resolver fuera de la zona de Angular
+          this.cdr.detectChanges();
+        }),
+      )
+      .subscribe({
+        next: (resp) => {
+          this.resultado = `id=${resp.id ?? '-'} | ${resp.resultado ?? 'Respuesta recibida'}`;
+          // Asegura pintado inmediato del resultado recibido
+          this.cdr.detectChanges();
+        },
+        error: (err) => {
+          if (err?.name === 'TimeoutError') {
+            this.resultado = 'Error: timeout esperando respuesta del backend';
+          } else {
+            this.resultado = 'Error: ' + (err?.message ?? err?.status ?? err);
+          }
+          // Asegura pintado inmediato del error
+          this.cdr.detectChanges();
+        },
+      });
   }
 }
