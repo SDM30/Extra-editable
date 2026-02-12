@@ -1,4 +1,5 @@
-import { Component } from '@angular/core';
+import { Component, ChangeDetectorRef } from '@angular/core';
+import { finalize } from 'rxjs';
 import { Extension } from '@codemirror/state';
 
 import { Header } from './headerIDE/headerIDE';
@@ -43,9 +44,30 @@ export class Editor {
     { label: 'Python', value: 'python' },
   ];
 
-  constructor(private executionService: ExecutionService) { }
+  resultado?: string;
+  cargando = false;
+
+  constructor(
+    private executionService: ExecutionService,
+    private cdr: ChangeDetectorRef
+  ) {}
 
   onRunCode() {
-    this.executionService.runCode(this.value);
+    this.cargando = true;
+    this.executionService
+      .runCode(this.value)
+      .pipe(finalize(() => (this.cargando = false)))
+      .subscribe({
+        next: (resp) => {
+          this.resultado = resp.resultado ?? 'Respuesta recibida';
+          console.log('Respuesta backend', resp);
+          this.cdr.detectChanges();
+        },
+        error: (err) => {
+          this.resultado = 'Error: ' + (err.message ?? err.status ?? err);
+          console.error('Error backend', err);
+          this.cdr.detectChanges();
+        },
+      });
   }
 }

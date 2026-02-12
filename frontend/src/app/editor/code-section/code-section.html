@@ -25,5 +25,13 @@
         <!-- Tabla vacía por ahora -->
       </table>
     </div>
+
+    <div class="resultado-panel">
+      @if (cargando) {
+        <p class="resultado">Ejecutando...</p>
+      } @else if (resultado) {
+        <p class="resultado">Resultado: {{ resultado }}</p>
+      }
+    </div>
   </aside>
 </div>

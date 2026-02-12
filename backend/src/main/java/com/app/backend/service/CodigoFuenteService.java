@@ -1,8 +1,7 @@
 package com.app.backend.service;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 
-import org.modelmapper.ModelMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,22 +19,26 @@ public class CodigoFuenteService {
     @Autowired
     private CodigoFuenteRepository repository;
 
-    @Autowired
-    private ModelMapper modelMapper;
-
     public CodigoFuenteDTO ejecutarCodigo(CodigoFuenteDTO dto) {
         // DEBUG: registra el código recibido en la consola del backend
         log.info("Código recibido desde el frontend:\n{}", dto.getContenido());
 
-        // Devolvemos el mismo DTO con algunos campos rellenados
-        dto.setFecha(LocalDate.now());
-        dto.setResultado("Código recibido correctamente");
-        dto.setTiempo("N/A");
+        // Construir entidad manualmente para evitar ambigüedad de mapeo
+        CodigoFuente entity = new CodigoFuente();
+        entity.setContenido(dto.getContenido());
+        entity.setFechaCreacion(LocalDateTime.now());
+        entity.setResultadoDeCompilacion("Código recibido correctamente");
+        entity.setResultadoDePrueba(dto.getResultado()); // opcional
+        entity.setTiempoEjecucion(null);
 
-        // Persistir para que genere ID y devolver lo que quedó en BD
-        CodigoFuente entity = modelMapper.map(dto, CodigoFuente.class);
+        // Persistir y devolver DTO con el ID generado
         entity = repository.save(entity);
-        return modelMapper.map(entity, CodigoFuenteDTO.class);
+
+        dto.setId(entity.getId());
+        dto.setFecha(entity.getFechaCreacion().toLocalDate());
+        dto.setResultado(entity.getResultadoDeCompilacion());
+        dto.setTiempo(entity.getTiempoEjecucion() == null ? "N/A" : entity.getTiempoEjecucion().toString());
+        return dto;
     }
 
 }
