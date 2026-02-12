@@ -28,6 +28,8 @@ public class CodigoFuenteService {
     public CodigoFuenteDTO ejecutarCodigo(CodigoFuenteDTO dto) {
         // DEBUG: registra el código recibido en la consola del backend
         log.info("Código recibido desde el frontend:\n{}", dto.getContenido());
+        System.out.println("Contenido: " + dto.getContenido());
+        
 
         // Persistir para que genere ID y devolver lo que quedó en BD
         CodigoFuente entity = modelMapper.map(dto, CodigoFuente.class);

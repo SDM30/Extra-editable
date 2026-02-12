@@ -43,9 +43,21 @@ export class Editor {
     { label: 'Python', value: 'python' },
   ];
 
-  constructor(private executionService: ExecutionService) { }
+  constructor(private executionService: ExecutionService) {}
 
   onRunCode() {
-    this.executionService.runCode(this.value);
+    console.log('Ejecutando código');
+    console.log('Lenguaje:', this.language);
+    console.log('Código:', this.value.substring(0, 100) + '...');
+
+    this.executionService.runCode(this.value, this.language).subscribe({
+      next: (response) => {
+        console.log('Respuesta recibida:', response);
+      },
+      error: (error) => {
+        console.error('Error en la petición:', error);
+        alert('Error de conexión con el servidor');
+      }
+    });
   }
 }
