@@ -40,3 +40,7 @@ docker run --rm -p PUERTO_ANFITRION:PUERTO_CONTENEDOR code-execution-service
 ```
 docker run --rm -p 8000:8000 code-execution-service
 ```
+## Monitor
+Para correr el monitor.py:
+pip install requests
+python monitor.py
