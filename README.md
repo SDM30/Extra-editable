@@ -46,3 +46,4 @@ Para correr el monitor.py:
 pip install requests
 ```
 python monitor.py
+```
