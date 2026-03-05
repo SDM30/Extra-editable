@@ -79,7 +79,7 @@ class Ejecutor:
             try:
                 t1 = time.perf_counter()
                 run = subprocess.run(
-                    [str(exe)],
+                    ["sandbox-run", str(exe)],
                     input=entrada,
                     capture_output=True,
                     text=True,

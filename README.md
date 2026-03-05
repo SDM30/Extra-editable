@@ -35,7 +35,7 @@ docker build -t code-execution-service -f code-execution-service/Dockerfile code
 ```
 docker run --rm -p PUERTO_ANFITRION:PUERTO_CONTENEDOR code-execution-service
 ```
-
+Ejemplo:
 
 ```
 docker run --rm -p 8000:8000 code-execution-service
