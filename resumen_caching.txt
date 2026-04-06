@@ -1,0 +1,18 @@
+
+RESULTADOS - PoC Caching vs Sin Caching
+
+Latencia promedio:
+- Sin cache: 8.45 ms
+- Con cache: 4.79 ms
+
+Latencia p95:
+- Sin cache: 15.46 ms
+- Con cache: 13.70 ms
+
+Latencia p99:
+- Sin cache: undefined ms
+- Con cache: undefined ms
+
+Requests totales:
+- Sin cache: 13757
+- Con cache: 14236
