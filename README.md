@@ -50,7 +50,7 @@ python monitor.py
 ```
 
 
-## Prueba de Carga: comparación de escenarios (con cola vs sin cola)
+## Prueba de concepto: comparación de escenarios (con cola vs sin cola)
 
 ### Objetivo
 Evaluar cómo RabbitMQ protege el sistema ante picos de demanda al encolar solicitudes de ejecución de código en lugar de procesarlas directamente.
