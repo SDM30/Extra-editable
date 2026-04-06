@@ -57,6 +57,14 @@ class Ejecutor:
                     timeout=10,
                 )
                 t_compile = int((time.perf_counter() - t0) * 1000)
+            except FileNotFoundError:
+                t_compile = int((time.perf_counter() - t0) * 1000)
+                return Ejecutor._respuesta(
+                    fase="compile",
+                    ok=False,
+                    stderr="g++ no esta instalado o no esta en PATH",
+                    tiempo=t_compile,
+                )
             except subprocess.TimeoutExpired:
                 t_compile = int((time.perf_counter() - t0) * 1000)
                 return Ejecutor._respuesta(
