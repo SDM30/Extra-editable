@@ -50,18 +50,18 @@ python monitor.py
 ```
 
 
-## Prueba de Carga: Comparación de Escenarios (Con Cola vs Sin Cola)
+## Prueba de Carga: comparación de escenarios (con cola vs sin cola)
 
 ### Objetivo
 Evaluar cómo RabbitMQ protege el sistema ante picos de demanda al encolar solicitudes de ejecución de código en lugar de procesarlas directamente.
 
-### Requisitos Previos
+### Requisitos previos
 - Docker y Docker Compose (para RabbitMQ)
 - Maven 3.9+
 - JDK 21
 - Python 3.13+ con FastAPI y Uvicorn (para el runner)
 
-### Escenario A: Sin Cola (Ejecución Directa)
+### Escenario A: Sin cola (Ejecución directa)
 
 1. **Terminal 1 - Levantar el backend:**
    ```
@@ -82,7 +82,7 @@ Evaluar cómo RabbitMQ protege el sistema ante picos de demanda al encolar solic
    powershell -ExecutionPolicy Bypass -File .\poc-carga.ps1 -Escenario sin-cola -Total 30 -VentanaSegundos 2
    ```
 
-### Escenario B: Con Cola (RabbitMQ)
+### Escenario B: Con cola (RabbitMQ)
 
 1. **Terminal 1 - Levantar RabbitMQ:**
    ```
