@@ -104,3 +104,30 @@ Evaluar cómo RabbitMQ protege el sistema ante picos de demanda al encolar solic
 **Comparación esperada:**
 - Sin cola: latencia alta (~4.5s promedio), tiempo total largo (~69s)
 - Con cola: latencia baja (~170ms promedio), tiempo total corto (~8s)
+
+## Prueba de concepto: cache vs sin cache
+
+### Objetivo
+Demostrar que cachear las pistas predeterminadas de un curso reduce la latencia de respuesta cuando muchos estudiantes solicitan la misma información al mismo tiempo.
+
+### Requisitos previos
+- Docker y Docker Compose (para Redis)
+- Maven 3.9+
+- JDK 21
+- k6 instalado en el sistema para el script de medición (https://grafana.com/docs/k6/latest/set-up/install-k6/)
+
+1. **Terminal 1 - Levantar Redis:**
+   ```
+   docker compose up -d
+   ```
+
+2. **Terminal 2 - Levantar el backend:**
+   ```
+   cd backend
+   mvn spring-boot:run
+   ```
+
+3. **Terminal 3 - Ejecutar la prueba:**
+   ```
+   k6 run backend/scripts/medicion.js
+   ```
