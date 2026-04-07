@@ -1,9 +1,7 @@
-version: '3.8'
-
 services:
   # ─── Instancia 1: saludable ────────────────────────────────────────────────
   evaluacion1:
-    build: ..
+    build: ../..
     environment:
       - PORT=8081
       - VERSION=v1
@@ -19,7 +17,7 @@ services:
 
   # ─── Instancia 2: saludable ────────────────────────────────────────────────
   evaluacion2:
-    build: ..
+    build: ../..
     environment:
       - PORT=8082
       - VERSION=v1

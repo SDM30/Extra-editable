@@ -1,9 +1,7 @@
-version: '3.8'
-
 services:
   # ─── Versión estable (90% del tráfico) ────────────────────────────────────
   evaluacion-estable:
-    build: ..
+    build: ../..
     environment:
       - PORT=8081
       - VERSION=v1-estable
@@ -12,7 +10,7 @@ services:
 
   # ─── Versión canario - nueva versión (10% del tráfico) ────────────────────
   evaluacion-canario:
-    build: ..
+    build: ../..
     environment:
       - PORT=8082
       - VERSION=v2-canario
