@@ -5,6 +5,31 @@ const JWT_SECRET = process.env.JWT_SECRET ?? 'dev-secret-change-in-production';
 const PORT = parseInt(process.env.PORT ?? '1234', 10);
 const FRONTEND_ORIGIN = 'http://localhost:4200';
 
+async function isCollabServiceRunningOnPort() {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 1500);
+
+  try {
+    const response = await fetch(`http://127.0.0.1:${PORT}/dev-token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: 'healthcheck', username: 'healthcheck' }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      return false;
+    }
+
+    const data = await response.json();
+    return typeof data?.token === 'string' && data.token.length > 0;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 function setCorsHeaders(res) {
   res.setHeader('Access-Control-Allow-Origin', FRONTEND_ORIGIN);
   res.setHeader('Vary', 'Origin');
@@ -68,7 +93,7 @@ const server = Server.configure({
   },
 
   async onConnect({ documentName, context }) {
-    console.log(`[collab] ${context.username} se unió a "${documentName}"`);
+    console.log(`[collab] ${context?.username ?? context?.userId ?? 'Anónimo'} se unió a "${documentName}"`);
   },
 
   async onDisconnect({ documentName, context }) {
@@ -87,7 +112,13 @@ async function startServer() {
     console.log(`[collab] Endpoint de token de prueba: POST http://localhost:${PORT}/dev-token`);
   } catch (error) {
     if (error?.code === 'EADDRINUSE') {
-      console.error(`[collab] El puerto ${PORT} ya está en uso. Cierra el proceso que lo ocupa o cambia PORT.`);
+      const alreadyRunning = await isCollabServiceRunningOnPort();
+      if (alreadyRunning) {
+        console.log(`[collab] Ya hay una instancia activa en el puerto ${PORT}. Reutilizando servicio existente.`);
+        return;
+      }
+
+      console.error(`[collab] El puerto ${PORT} ya está en uso por otro proceso. Cierra el proceso que lo ocupa o cambia PORT.`);
       process.exitCode = 1;
       return;
     }

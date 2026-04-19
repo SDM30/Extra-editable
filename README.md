@@ -9,9 +9,35 @@ Package Manager   : npm 11.9.0
 ## Editor de código
 Envoltorio: https://github.com/acrodata/code-editor
 
+## Dependencias para colaboración en tiempo real
+Si es la primera vez que levantan el frontend, instalar dependencias:
+```
+cd frontend
+npm install
+```
+
 # BACKEND
 
 Versión de java: 25 (openjdk)
+
+# SERVICIO DE EDICIÓN COLABORATIVA
+
+Node.js           : 22+
+
+Package Manager   : npm
+
+Puerto por defecto: 1234
+
+## Instalar dependencias
+```
+cd collab-service
+npm install
+```
+
+## Levantar servicio colaborativo
+```
+npm start
+```
 
 # Ejecutar proyecto
 
@@ -20,11 +46,13 @@ Versión de java: 25 (openjdk)
 ```
 ng serve
 ```
+
 ## Backend
 2. Iniciar aplicación de spring
 ```
 mvn spring-boot:run
 ```
+
 ## Servicio de ejecución de código
 1. Crear imagen a partir del Dockerfile
 ```
@@ -39,4 +67,34 @@ docker run --rm -p PUERTO_ANFITRION:PUERTO_CONTENEDOR code-execution-service
 
 ```
 docker run --rm -p 8000:8000 code-execution-service
+```
+
+## Servicio de edición colaborativa
+1. Iniciar servicio colaborativo
+```
+cd collab-service
+npm start
+```
+
+Salida esperada:
+```
+[collab] Servidor en http/ws://localhost:1234
+[collab] Endpoint de token de prueba: POST http://localhost:1234/dev-token
+```
+
+2. Iniciar frontend (en otra terminal)
+```
+cd frontend
+ng serve
+```
+
+3. Probar conexión en dos pestañas
+Abrir dos pestañas en:
+```
+http://localhost:4200
+```
+
+En la terminal de collab-service deben aparecer dos conexiones al room:
+```
+[collab] ... se unió a "room-editor-1"
 ```
