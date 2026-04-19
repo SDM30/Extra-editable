@@ -54,6 +54,9 @@ frontend/__screenshots__/
 # System files (global)
 # =========================
 
+# Modernization generated reports
+.github/modernize/assessment/reports/
+
 .DS_Store
 Thumbs.db
 
