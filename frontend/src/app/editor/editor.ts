@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit} from '@angular/core';
 import { finalize, timeout } from 'rxjs';
 import { Extension } from '@codemirror/state';
 
@@ -11,6 +11,8 @@ import { solarizedLight, solarizedDark } from '@uiw/codemirror-theme-solarized';
 import { nord } from '@uiw/codemirror-theme-nord';
 import { kimbie } from '@uiw/codemirror-theme-kimbie';
 import { ExecutionService } from '../services/execution-service';
+import { CollabService } from '../services/collab.service';  
+import { AuthService } from '../services/auth.service';
 
 export type Theme = 'light' | 'dark' | Extension;
 
@@ -21,7 +23,7 @@ export type Theme = 'light' | 'dark' | Extension;
   templateUrl: './editor.html',
   styleUrls: ['./editor.css'],
 })
-export class Editor {
+export class Editor implements OnInit{
   value = `#include <iostream>\n\nint main() {\n    std::cout << "Hola C++" << std::endl;\n    return 0;\n}`;
 
   theme: Theme = 'dark';
@@ -51,7 +53,14 @@ export class Editor {
   constructor(
     private executionService: ExecutionService,
     private cdr: ChangeDetectorRef,
+    private collab: CollabService,  
+    private auth: AuthService,
   ) {}
+
+  async ngOnInit() {
+    const { token, username } = await this.auth.getCollabToken();
+    this.collab.connect('room-editor-1', token, username);
+  }
 
   onRunCode() {
     // Estado inicial de cada ejecución

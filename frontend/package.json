@@ -33,12 +33,15 @@
     "@babel/runtime": "^7.28.6",
     "@codemirror/lang-cpp": "^6.0.3",
     "@codemirror/language-data": "^6.5.2",
+    "@hocuspocus/provider": "^3.4.4",
     "@uiw/codemirror-theme-dracula": "^4.25.4",
     "@uiw/codemirror-theme-kimbie": "^4.25.4",
     "@uiw/codemirror-theme-nord": "^4.25.4",
     "@uiw/codemirror-theme-solarized": "^4.25.4",
+    "jwt-decode": "^4.0.0",
     "rxjs": "~7.8.0",
-    "tslib": "^2.3.0"
+    "tslib": "^2.3.0",
+    "yjs": "^13.6.30"
   },
   "devDependencies": {
     "@angular/build": "^21.1.3",
