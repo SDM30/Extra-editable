@@ -1,4 +1,6 @@
-import { ChangeDetectorRef, Component, OnInit} from '@angular/core';
+// editor.ts
+import { ChangeDetectorRef, Component, OnInit, OnDestroy } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { finalize, timeout } from 'rxjs';
 import { Extension } from '@codemirror/state';
 
@@ -13,6 +15,7 @@ import { kimbie } from '@uiw/codemirror-theme-kimbie';
 import { ExecutionService } from '../services/execution-service';
 import { CollabService } from '../services/collab.service';  
 import { AuthService } from '../services/auth.service';
+import { CodeMirrorLspService } from '../codemirror-lsp-service';
 
 export type Theme = 'light' | 'dark' | Extension;
 
@@ -23,11 +26,24 @@ export type Theme = 'light' | 'dark' | Extension;
   templateUrl: './editor.html',
   styleUrls: ['./editor.css'],
 })
-export class Editor implements OnInit{
-  value = `#include <iostream>\n\nint main() {\n    std::cout << "Hola C++" << std::endl;\n    return 0;\n}`;
+export class Editor implements OnInit, OnDestroy {
+  // Código por defecto según lenguaje
+  private defaultCode: Record<string, string> = {
+    cpp: `#include <iostream>\n\nint main() {\n    std::cout << "Hola C++" << std::endl;\n    return 0;\n}`,
+    python: `def hello():\n    print("Hello, World!")\n\nif __name__ == "__main__":\n    hello()`,
+    typescript: `function greet(name: string): string {\n    return \`Hello, \${name}!\`;\n}\n\nconsole.log(greet("World"));`,
+    javascript: `function greet(name) {\n    return \`Hello, \${name}!\`;\n}\n\nconsole.log(greet("World"));`
+  };
 
+  value = this.defaultCode['cpp'];
   theme: Theme = 'dark';
   language: string = 'cpp';
+  
+  // NUEVO: Identificador del proyecto (puede venir de la URL o usuario)
+  projectId: string = 'proyecto-demo';
+  
+  // NUEVO: Flag para habilitar/deshabilitar LSP
+  lspEnabled: boolean = true;
 
   themeOptions = [
     { label: 'Standard Light', value: 'light' as Theme },
@@ -41,9 +57,10 @@ export class Editor implements OnInit{
   ];
 
   languageOptions = [
-    { label: 'C++', value: 'cpp' },
-    { label: 'JavaScript', value: 'javascript' },
     { label: 'Python', value: 'python' },
+    { label: 'C++', value: 'cpp' },
+    { label: 'TypeScript', value: 'typescript' },
+    { label: 'JavaScript', value: 'javascript' },
   ];
 
   resultado?: string;
@@ -55,28 +72,50 @@ export class Editor implements OnInit{
     private cdr: ChangeDetectorRef,
     private collab: CollabService,  
     private auth: AuthService,
+    private lspService: CodeMirrorLspService,
+    private route: ActivatedRoute,
   ) {}
 
   async ngOnInit() {
+    // Leer projectId de URL query parameters o usar default
+    this.route.queryParams.subscribe(params => {
+      this.projectId = params['projectId'] || 'proyecto-demo';
+      console.log(`[Editor] Project ID: ${this.projectId}`);
+    });
+
     const { token, username } = await this.auth.getCollabToken();
     this.collab.connect('room-editor-1', token, username);
   }
 
+  ngOnDestroy(): void {
+    // NUEVO: Limpiar sesión LSP al destruir el componente
+    if (this.lspEnabled) {
+      this.lspService.shutdownProject(this.projectId).catch(console.error);
+    }
+  }
+
+  // NUEVO: Manejar cambio de lenguaje
+  onLanguageChange(language: string) {
+    this.language = language;
+    
+    // Actualizar código por defecto según lenguaje
+    if (this.defaultCode[language]) {
+      this.value = this.defaultCode[language];
+    }
+    
+    console.log(`[Editor] Lenguaje cambiado a: ${language}`);
+  }
+
   onRunCode() {
-    // Estado inicial de cada ejecución
     this.resultado = undefined;
     this.resultadoOk = undefined;
     this.cargando = true;
     this.executionService
       .runCode(this.value)
       .pipe(
-        // Evita que la UI quede esperando para siempre si la request no responde
         timeout(10000),
         finalize(() => {
-          // Siempre apagar loading (éxito, error o timeout)
           this.cargando = false;
-          //ChangeDetectorRef (cdr)
-          // Forzar detección de cambios
           this.cdr.detectChanges();
         }),
       )
@@ -85,7 +124,6 @@ export class Editor implements OnInit{
           const resultadoLimpio = this.limpiarResultado(resp.resultado ?? 'Respuesta recibida');
           this.resultadoOk = this.extraerEstadoOk(resultadoLimpio);
           this.resultado = this.formatearSalida(resultadoLimpio, resp.tiempo);
-
           this.cdr.detectChanges();
         },
         error: (err) => {

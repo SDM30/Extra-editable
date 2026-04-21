@@ -4,7 +4,7 @@
   (themeChange)="theme = $event"
   [language]="language"
   [languageOptions]="languageOptions"
-  (languageChange)="language = $event"
+  (languageChange)="onLanguageChange($event)"
   (runCode)="onRunCode()"
 ></app-header>
 
@@ -12,6 +12,9 @@
   [(value)]="value"
   [theme]="theme"
   [language]="language"
+  [projectId]="projectId"
+  [filePath]="'main'"
+  [lspEnabled]="lspEnabled"
   [resultado]="resultado"
   [resultadoOk]="resultadoOk"
   [cargando]="cargando"
