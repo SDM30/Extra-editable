@@ -3,8 +3,8 @@
 <div class="editor-panel">
   <code-editor
     class="cm-host"
-    [ngModel]="value"
-    (ngModelChange)="onValueChange($event)"
+    [ngModel]="yjsReady ? '' : value"
+    (ngModelChange)="yjsReady ? null : onValueChange($event)"
     [theme]="theme"
     [extensions]="editorExtensions"
   ></code-editor>

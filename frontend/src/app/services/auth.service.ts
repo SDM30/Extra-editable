@@ -6,11 +6,10 @@ import { firstValueFrom } from 'rxjs';
 export class AuthService {
   private http = inject(HttpClient);
 
+  // Genera o recupera la identidad del usuario (sin login real)
   getLocalUser(): { userId: string; username: string } {
     const stored = sessionStorage.getItem('collab-user-meta');
-    if (stored) {
-      return JSON.parse(stored);
-    }
+    if (stored) return JSON.parse(stored);
 
     const userId = 'user-' + Math.random().toString(36).slice(2, 8);
     const username = 'Dev ' + userId.slice(5).toUpperCase();
@@ -19,18 +18,17 @@ export class AuthService {
     return meta;
   }
 
+  // Pide un JWT firmado al servidor collab y lo cachea en sessionStorage
   async getCollabToken(): Promise<{ token: string; username: string }> {
     const cached = sessionStorage.getItem('collab-token');
-    if (cached) {
-      return JSON.parse(cached);
-    }
+    if (cached) return JSON.parse(cached);
 
     const { userId, username } = this.getLocalUser();
     const resp = await firstValueFrom(
-      this.http.post<{ token: string }>('http://localhost:1234/dev-token', {
-        userId,
-        username,
-      }),
+      this.http.post<{ token: string }>(
+        'http://localhost:1234/dev-token',
+        { userId, username }
+      )
     );
 
     const data = { token: resp.token, username };

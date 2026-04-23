@@ -1,6 +1,7 @@
 import { Injectable, OnDestroy } from '@angular/core';
 import * as Y from 'yjs';
 import { HocuspocusProvider } from '@hocuspocus/provider';
+import { Subject } from 'rxjs';
 
 export interface CollabUser {
   userId: string;
@@ -12,6 +13,9 @@ export interface CollabUser {
 export class CollabService implements OnDestroy {
   private provider: HocuspocusProvider | null = null;
   private ydoc: Y.Doc | null = null;
+
+  // Emite cuando la conexión está lista y el Y.Text ya existe
+  readonly ready$ = new Subject<void>();
 
   connect(documentName: string, token: string, username: string): HocuspocusProvider {
     this.disconnect();
@@ -29,6 +33,8 @@ export class CollabService implements OnDestroy {
           username,
           color: this.randomColor(),
         });
+        // Avisa que ya está listo para que CodeSection pueda crear el binding
+        this.ready$.next();
       },
       onDisconnect: () => console.log('[collab] Desconectado'),
       onAuthenticationFailed: ({ reason }) =>
