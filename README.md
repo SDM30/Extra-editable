@@ -14,6 +14,7 @@ Si es la primera vez que levantan el frontend, instalar dependencias:
 ```
 cd frontend
 npm install
+npm install yjs @hocuspocus/provider y-codemirror.next
 ```
 
 # BACKEND
