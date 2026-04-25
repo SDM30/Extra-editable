@@ -72,17 +72,32 @@ export class CodeMirrorLspService {
 
           const isTsJs = filePath.endsWith('.ts') || filePath.endsWith('.js');
           const isPython = filePath.endsWith('.py');
+          const isCpp = (
+            filePath.endsWith('.cpp') ||
+            filePath.endsWith('.cc') ||
+            filePath.endsWith('.cxx') ||
+            filePath.endsWith('.hpp') ||
+            filePath.endsWith('.h')
+          );
 
-          if (isTsJs || isPython) {
+          if (isTsJs || isPython || isCpp) {
             // Para Python, ser más conservador para evitar ruido:
             // - siempre en '.' (member access)
             // - o cuando el identificador actual tiene longitud >= 2
             const lookback = update.state.doc.sliceString(Math.max(0, head - 50), head);
             const currentIdent = (lookback.match(/[\w$]+$/) || [''])[0];
+
+            const lastTwo = head > 1 ? update.state.doc.sliceString(head - 2, head) : '';
             const shouldTrigger =
               (prevChar === '.') ||
               (isTsJs && /[\w$.]/.test(prevChar)) ||
-              (isPython && /[\w_]/.test(prevChar) && currentIdent.length >= 2);
+              (isPython && /[\w_]/.test(prevChar) && currentIdent.length >= 2) ||
+              (isCpp && (
+                prevChar === '.' ||
+                prevChar === '>' || // para '->'
+                lastTwo === '::' || // scope
+                (/[A-Za-z_]/.test(prevChar) && currentIdent.length >= 2)
+              ));
 
             if (shouldTrigger) {
               clearTimeout(completionTimeout);
@@ -95,7 +110,7 @@ export class CodeMirrorLspService {
                 } catch {
                   // ignore
                 }
-              }, isPython ? 120 : 50);
+              }, isPython ? 120 : (isCpp ? 80 : 50));
             }
           }
           
@@ -239,15 +254,17 @@ export class CodeMirrorLspService {
       const pos = context.pos;
 
       // Reducir requests al LSP: solo cuando hay contexto (explicit, identificador o member access).
-      const memberAccess = context.matchBefore(/\.[\w$]*/);
-      const identifier = context.matchBefore(/[\w$]+/);
+      const memberAccess = context.matchBefore(/(\.|->|::)[\w_]*/);
+      const identifier = context.matchBefore(/[\w_]+/);
       const hasContext = Boolean(memberAccess || identifier);
       if (!context.explicit && !hasContext) return null;
 
       // Calcular rango a reemplazar (sin incluir el '.')
       let from = pos;
       if (memberAccess) {
-        from = memberAccess.from + 1;
+        const text = memberAccess.text || '';
+        const opLen = text.startsWith('->') || text.startsWith('::') ? 2 : 1;
+        from = memberAccess.from + opLen;
       } else if (identifier) {
         from = identifier.from;
       }

@@ -1,5 +1,5 @@
 // code-section.ts
-import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, ViewChild, AfterViewInit } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, ViewChild, AfterViewInit, OnChanges, SimpleChanges } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CodeEditor } from '@acrodata/code-editor';
 import { EditorView } from '@codemirror/view';
@@ -21,7 +21,7 @@ export type Theme = 'light' | 'dark' | Extension;
   templateUrl: './code-section.html',
   styleUrl: './code-section.css',
 })
-export class CodeSection implements OnInit, OnDestroy, AfterViewInit {
+export class CodeSection implements OnInit, OnDestroy, AfterViewInit, OnChanges {
   @ViewChild(CodeEditor) codeEditor!: CodeEditor;
   
   private _value = '';
@@ -45,6 +45,8 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit {
   isProblemCollapsed = false;
   private editorView: EditorView | null = null;
   private lspExtensions: Extension[] = [];
+  private lspAttachedPath: string | null = null;
+  private lspInitSeq = 0;
 
   constructor(private lspIntegration: CodeMirrorLspService) {}
 
@@ -62,9 +64,30 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit {
     }, 100);
   }
 
+  ngOnChanges(changes: SimpleChanges): void {
+    const languageChanged = Boolean(changes['language']);
+    const projectChanged = Boolean(changes['projectId']);
+    const lspToggled = Boolean(changes['lspEnabled']);
+
+    if (!languageChanged && !projectChanged && !lspToggled) return;
+    if (!this.editorView) return;
+
+    if (!this.lspEnabled) {
+      if (this.lspAttachedPath) {
+        this.lspIntegration.detachLSP(this.lspAttachedPath);
+        this.lspAttachedPath = null;
+      }
+      this.lspExtensions = [];
+      return;
+    }
+
+    // Re-inicializar LSP cuando cambia el lenguaje o el proyecto.
+    this.initializeLSP();
+  }
+
   ngOnDestroy(): void {
     if (this.lspEnabled) {
-      const fullPath = this.getFullPath();
+      const fullPath = this.lspAttachedPath ?? this.getFullPath();
       this.lspIntegration.detachLSP(fullPath);
     }
   }
@@ -73,12 +96,24 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit {
     if (!this.editorView) return;
 
     try {
+      const seq = ++this.lspInitSeq;
+
+      // Detach previo si existía (evita mezclar lenguajes en el mismo projectId)
+      if (this.lspAttachedPath) {
+        this.lspIntegration.detachLSP(this.lspAttachedPath);
+        this.lspAttachedPath = null;
+      }
+      this.lspExtensions = [];
+
       this.lspExtensions = await this.lspIntegration.attachLSPToEditor(
         this.projectId,
         this.mapLanguageToLSP(this.language),
         this.editorView,
         this.filePath
       );
+
+      if (seq !== this.lspInitSeq) return;
+      this.lspAttachedPath = this.getFullPath();
       
       // Re-crear el editor con las nuevas extensiones
       this.editorView.dispatch({
