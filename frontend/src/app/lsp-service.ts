@@ -1,7 +1,7 @@
 // app/services/lsp.service.ts
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, Subject, firstValueFrom } from 'rxjs';
+import { Observable, ReplaySubject, Subject, firstValueFrom } from 'rxjs';
 import { enviroment } from './environments/enviroment';
 
 export interface LSPContainerResponse {
@@ -33,9 +33,10 @@ export interface LSPSession {
 export class LspService {
   private readonly API_URL = enviroment.apiUrlLanguageServer || 'http://localhost:8000';
   private activeSessions: Map<string, LSPSession> = new Map();
+  private saveTimersByUri: Map<string, any> = new Map();
   
   // Observables para notificar eventos
-  private diagnosticsSubject = new Subject<{uri: string, diagnostics: any[]}>();
+  private diagnosticsSubject = new ReplaySubject<{uri: string, diagnostics: any[]}>(1);
   public diagnostics$ = this.diagnosticsSubject.asObservable();
   
   private completionSubject = new Subject<{id: number, items: any[]}>();
@@ -153,6 +154,9 @@ export class LspService {
           rootUri: "file:///workspace",
           capabilities: {
             textDocument: {
+              synchronization: {
+                didSave: true
+              },
               completion: {
                 completionItem: { snippetSupport: true }
               },
@@ -183,6 +187,22 @@ export class LspService {
           
           // Enviar notificación initialized
           this.sendNotification(session, "initialized", {});
+
+          // Enviar configuración (especialmente útil para habilitar diagnósticos en pylsp)
+          if (session.language === 'python') {
+            this.sendNotification(session, 'workspace/didChangeConfiguration', {
+              settings: {
+                pylsp: {
+                  plugins: {
+                    pycodestyle: { enabled: true },
+                    pyflakes: { enabled: true },
+                    flake8: { enabled: true },
+                    mccabe: { enabled: true }
+                  }
+                }
+              }
+            });
+          }
           resolve();
         }
       });
@@ -223,7 +243,7 @@ export class LspService {
     switch (message.method) {
       case 'textDocument/publishDiagnostics':
         const params = message.params;
-        console.log(`[LSP] Diagnósticos recibidos: ${params.diagnostics?.length || 0} problemas`);
+        console.log(`[LSP] Diagnósticos recibidos: ${params.diagnostics?.length || 0} problemas para ${params.uri}`);
         this.diagnosticsSubject.next({
           uri: params.uri,
           diagnostics: params.diagnostics || []
@@ -278,6 +298,19 @@ export class LspService {
       },
       contentChanges: [{ text: content }]
     });
+
+    // pylsp suele publicar diagnósticos con más consistencia en didSave.
+    // Debounce para evitar saturar.
+    const existingTimer = this.saveTimersByUri.get(uri);
+    if (existingTimer) clearTimeout(existingTimer);
+
+    this.saveTimersByUri.set(uri, setTimeout(() => {
+      this.sendNotification(session, 'textDocument/didSave', {
+        textDocument: { uri },
+        text: content
+      });
+      this.saveTimersByUri.delete(uri);
+    }, 600));
   }
 
   /**

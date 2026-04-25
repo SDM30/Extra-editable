@@ -3,7 +3,7 @@ import { Injectable } from '@angular/core';
 import { EditorView } from '@codemirror/view';
 import { Extension } from '@codemirror/state';
 import { CompletionContext, CompletionResult, autocompletion } from '@codemirror/autocomplete';
-import { linter, Diagnostic } from '@codemirror/lint';
+import { forceLinting, linter, Diagnostic } from '@codemirror/lint';
 import { LspService, LSPSession } from './lsp-service';
 
 export interface LSPCompletionItem {
@@ -72,7 +72,12 @@ export class CodeMirrorLspService {
 
     // Obtener contenido inicial
     const content = editorView.state.doc.toString();
-    
+
+    // Crear extension de linting y listener de diagnósticos ANTES de didOpen
+    // (algunos servidores envían publishDiagnostics inmediatamente tras abrir).
+    const lintExt = this.createLintExtension(fullPath);
+    this.setupDiagnosticListener(editorView, fullPath, lintExt);
+
     // Abrir documento en LSP
     this.lspService.openDocument(session, fullPath, content, language);
 
@@ -82,12 +87,6 @@ export class CodeMirrorLspService {
     // Crear extension de autocompletado
     const completionExt = this.createCompletionExtension(fullPath);
     
-    // Crear extension de linting
-    const lintExt = this.createLintExtension(fullPath);
-    
-    // Configurar listener de diagnósticos
-    this.setupDiagnosticListener(editorView, fullPath, lintExt);
-
     console.log(`[CodeMirror-LSP] LSP adjuntado a ${fullPath}`);
     
     // Retornar las extensions que necesitan ser añadidas al EditorView
@@ -99,20 +98,46 @@ export class CodeMirrorLspService {
    */
   private setupDiagnosticListener(editorView: EditorView, filePath: string, lintExt: Extension): void {
     this.lspService.diagnostics$.subscribe(({ uri, diagnostics }) => {
-      if (uri.endsWith(filePath)) {
-        const cmDiagnostics = diagnostics.map(d => ({
-          from: this.positionToOffset(editorView, d.range.start),
-          to: this.positionToOffset(editorView, d.range.end),
-          severity: this.mapSeverity(d.severity),
-          message: d.message
-        })) as Diagnostic[];
-        
-        this.diagnostics.set(filePath, cmDiagnostics);
-        console.log(`[LSP] ${cmDiagnostics.length} diagnósticos actualizados para ${filePath}`);
-        
-        // Forzar re-render del editor
-        editorView.dispatch();
+      const expectedUri = `file:///workspace/${filePath}`;
+      const matches = uri === expectedUri || uri.endsWith(`/${filePath}`) || uri.endsWith(filePath);
+
+      if (!matches) {
+        return;
       }
+
+      if (uri !== expectedUri) {
+        console.log(`[LSP] Diagnóstico recibido para uri=${uri} (esperado ${expectedUri})`);
+      }
+
+      if (diagnostics?.length) {
+        const first = diagnostics[0];
+        console.log('[LSP] Primer diagnóstico:', {
+          message: first?.message,
+          severity: first?.severity,
+          start: first?.range?.start,
+          end: first?.range?.end,
+          docLines: editorView.state.doc.lines,
+          docLength: editorView.state.doc.length
+        });
+      }
+
+      const cmDiagnostics = diagnostics
+        .map(d => {
+          const from = this.positionToOffsetClamped(editorView, d.range.start);
+          const to = this.positionToOffsetClamped(editorView, d.range.end);
+          return {
+            from,
+            to: Math.max(from, to),
+            severity: this.mapSeverity(d.severity),
+            message: d.message
+          } as Diagnostic;
+        })
+
+      this.diagnostics.set(filePath, cmDiagnostics);
+      console.log(`[LSP] ${cmDiagnostics.length} diagnósticos actualizados para ${filePath}`);
+
+      // Forzar reevaluación del linter para que tome los diagnósticos recién actualizados
+      forceLinting(editorView);
     });
   }
 
@@ -213,6 +238,14 @@ export class CodeMirrorLspService {
   private positionToOffset(editorView: EditorView, pos: {line: number, character: number}): number {
     const line = editorView.state.doc.line(pos.line + 1);
     return line.from + pos.character;
+  }
+
+  private positionToOffsetClamped(editorView: EditorView, pos: { line: number, character: number }): number {
+    const doc = editorView.state.doc;
+    const lineNumber = Math.min(Math.max(1, (pos?.line ?? 0) + 1), doc.lines);
+    const line = doc.line(lineNumber);
+    const character = Math.min(Math.max(0, pos?.character ?? 0), line.length);
+    return line.from + character;
   }
 
   private mapSeverity(severity: number): 'error' | 'warning' | 'info' {

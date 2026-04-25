@@ -13,7 +13,7 @@ import { solarizedLight, solarizedDark } from '@uiw/codemirror-theme-solarized';
 import { nord } from '@uiw/codemirror-theme-nord';
 import { kimbie } from '@uiw/codemirror-theme-kimbie';
 import { ExecutionService } from '../services/execution-service';
-import { CollabService } from '../services/collab.service';  
+import { CollabService } from '../services/collab.service';
 import { AuthService } from '../services/auth.service';
 import { CodeMirrorLspService } from '../codemirror-lsp-service';
 
@@ -32,16 +32,16 @@ export class Editor implements OnInit, OnDestroy {
     cpp: `#include <iostream>\n\nint main() {\n    std::cout << "Hola C++" << std::endl;\n    return 0;\n}`,
     python: `def hello():\n    print("Hello, World!")\n\nif __name__ == "__main__":\n    hello()`,
     typescript: `function greet(name: string): string {\n    return \`Hello, \${name}!\`;\n}\n\nconsole.log(greet("World"));`,
-    javascript: `function greet(name) {\n    return \`Hello, \${name}!\`;\n}\n\nconsole.log(greet("World"));`
+    javascript: `function greet(name) {\n    return \`Hello, \${name}!\`;\n}\n\nconsole.log(greet("World"));`,
   };
 
-  value = this.defaultCode['cpp'];
+  value = this.defaultCode['python'];
   theme: Theme = 'dark';
-  language: string = 'cpp';
-  
+  language: string = 'python';
+
   // NUEVO: Identificador del proyecto (puede venir de la URL o usuario)
   projectId: string = 'proyecto-demo';
-  
+
   // NUEVO: Flag para habilitar/deshabilitar LSP
   lspEnabled: boolean = true;
 
@@ -70,7 +70,7 @@ export class Editor implements OnInit, OnDestroy {
   constructor(
     private executionService: ExecutionService,
     private cdr: ChangeDetectorRef,
-    private collab: CollabService,  
+    private collab: CollabService,
     private auth: AuthService,
     private lspService: CodeMirrorLspService,
     private route: ActivatedRoute,
@@ -78,7 +78,7 @@ export class Editor implements OnInit, OnDestroy {
 
   async ngOnInit() {
     // Leer projectId de URL query parameters o usar default
-    this.route.queryParams.subscribe(params => {
+    this.route.queryParams.subscribe((params) => {
       this.projectId = params['projectId'] || 'proyecto-demo';
       console.log(`[Editor] Project ID: ${this.projectId}`);
     });
@@ -97,12 +97,12 @@ export class Editor implements OnInit, OnDestroy {
   // NUEVO: Manejar cambio de lenguaje
   onLanguageChange(language: string) {
     this.language = language;
-    
+
     // Actualizar código por defecto según lenguaje
     if (this.defaultCode[language]) {
       this.value = this.defaultCode[language];
     }
-    
+
     console.log(`[Editor] Lenguaje cambiado a: ${language}`);
   }
 
