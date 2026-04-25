@@ -128,12 +128,13 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit {
   get editorExtensions(): Extension[] {
     const extensions: Extension[] = [this.languageExtension()];
     
-    // Agregar autocompletado default (sin LSP)
-    extensions.push(autocompletion());
-    
-    // Agregar extensiones LSP si están disponibles
+    // Usar solo UNA extensión de autocompletado:
+    // - si LSP está listo, viene incluido dentro de `lspExtensions`
+    // - si no, usar el autocompletado default
     if (this.lspExtensions.length > 0) {
       extensions.push(...this.lspExtensions);
+    } else {
+      extensions.push(autocompletion());
     }
     
     return extensions;

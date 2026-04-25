@@ -2,7 +2,7 @@
 import { Injectable } from '@angular/core';
 import { EditorView } from '@codemirror/view';
 import { Extension } from '@codemirror/state';
-import { CompletionContext, CompletionResult, autocompletion } from '@codemirror/autocomplete';
+import { CompletionContext, CompletionResult, autocompletion, startCompletion } from '@codemirror/autocomplete';
 import { forceLinting, linter, Diagnostic } from '@codemirror/lint';
 import { LspService, LSPSession } from './lsp-service';
 
@@ -18,16 +18,44 @@ export interface LSPCompletionItem {
   providedIn: 'root'
 })
 export class CodeMirrorLspService {
-  private sessions: Map<string, {session: LSPSession, version: number}> = new Map();
+  private sessions: Map<string, {
+    session: LSPSession,
+    version: number,
+    lastSentVersion: number,
+    lastSentAt: number,
+    latestContent: string
+  }> = new Map();
   private diagnostics: Map<string, Diagnostic[]> = new Map();
 
   constructor(private lspService: LspService) {}
+
+  private flushDocumentChanges(filePath: string): void {
+    const sessionInfo = this.sessions.get(filePath);
+    if (!sessionInfo) return;
+
+    if (sessionInfo.lastSentVersion === sessionInfo.version) return;
+
+    const now = Date.now();
+    // Evitar saturar el LSP con demasiados didChange en ráfaga
+    if (now - sessionInfo.lastSentAt < 25) return;
+
+    this.lspService.updateDocument(
+      sessionInfo.session,
+      filePath,
+      sessionInfo.latestContent,
+      sessionInfo.version
+    );
+
+    sessionInfo.lastSentVersion = sessionInfo.version;
+    sessionInfo.lastSentAt = now;
+  }
 
   /**
    * Crea un listener para cambios en el editor
    */
   createUpdateListener(filePath: string, session: LSPSession): Extension {
     let updateTimeout: any;
+    let completionTimeout: any;
     
     return EditorView.updateListener.of((update) => {
       if (update.docChanged) {
@@ -35,16 +63,46 @@ export class CodeMirrorLspService {
         if (sessionInfo) {
           sessionInfo.version++;
           const content = update.state.doc.toString();
+          sessionInfo.latestContent = content;
+
+          // Autocompletado automático: fuerza apertura sin Ctrl+Space.
+          // Algunos wrappers/configs desactivan activateOnTyping; esto lo evita manteniendo lógica simple.
+          const head = update.state.selection.main.head;
+          const prevChar = head > 0 ? update.state.doc.sliceString(head - 1, head) : '';
+
+          const isTsJs = filePath.endsWith('.ts') || filePath.endsWith('.js');
+          const isPython = filePath.endsWith('.py');
+
+          if (isTsJs || isPython) {
+            // Para Python, ser más conservador para evitar ruido:
+            // - siempre en '.' (member access)
+            // - o cuando el identificador actual tiene longitud >= 2
+            const lookback = update.state.doc.sliceString(Math.max(0, head - 50), head);
+            const currentIdent = (lookback.match(/[\w$]+$/) || [''])[0];
+            const shouldTrigger =
+              (prevChar === '.') ||
+              (isTsJs && /[\w$.]/.test(prevChar)) ||
+              (isPython && /[\w_]/.test(prevChar) && currentIdent.length >= 2);
+
+            if (shouldTrigger) {
+              clearTimeout(completionTimeout);
+              completionTimeout = setTimeout(() => {
+                try {
+                  // Asegurar que el LSP tenga el texto más reciente ANTES de pedir completion;
+                  // si no, suele aparecer recién después (p.ej. al presionar backspace).
+                  this.flushDocumentChanges(filePath);
+                  startCompletion(update.view);
+                } catch {
+                  // ignore
+                }
+              }, isPython ? 120 : 50);
+            }
+          }
           
           // Debounce para no saturar
           clearTimeout(updateTimeout);
           updateTimeout = setTimeout(() => {
-            this.lspService.updateDocument(
-              session, 
-              filePath, 
-              content, 
-              sessionInfo.version
-            );
+            this.flushDocumentChanges(filePath);
           }, 300);
         }
       }
@@ -66,12 +124,18 @@ export class CodeMirrorLspService {
     // Mapear extensión de archivo según lenguaje
     const extension = this.getFileExtension(language);
     const fullPath = `${filePath}${extension}`;
-    
-    this.sessions.set(fullPath, { session, version: 1 });
-    this.diagnostics.set(fullPath, []);
 
     // Obtener contenido inicial
     const content = editorView.state.doc.toString();
+
+    this.sessions.set(fullPath, {
+      session,
+      version: 1,
+      lastSentVersion: 1,
+      lastSentAt: Date.now(),
+      latestContent: content
+    });
+    this.diagnostics.set(fullPath, []);
 
     // Crear extension de linting y listener de diagnósticos ANTES de didOpen
     // (algunos servidores envían publishDiagnostics inmediatamente tras abrir).
@@ -155,7 +219,9 @@ export class CodeMirrorLspService {
    */
   private createCompletionExtension(filePath: string): Extension {
     return autocompletion({
-      override: [this.createCompletionFunction(filePath)]
+      override: [this.createCompletionFunction(filePath)],
+      activateOnTyping: true,
+      interactionDelay: 150
     });
   }
 
@@ -167,7 +233,29 @@ export class CodeMirrorLspService {
       const sessionInfo = this.sessions.get(filePath);
       if (!sessionInfo) return null;
 
+      // Mantener el LSP sincronizado para evitar completions vacíos al escribir rápido.
+      this.flushDocumentChanges(filePath);
+
       const pos = context.pos;
+
+      // Reducir requests al LSP: solo cuando hay contexto (explicit, identificador o member access).
+      const memberAccess = context.matchBefore(/\.[\w$]*/);
+      const identifier = context.matchBefore(/[\w$]+/);
+      const hasContext = Boolean(memberAccess || identifier);
+      if (!context.explicit && !hasContext) return null;
+
+      // Calcular rango a reemplazar (sin incluir el '.')
+      let from = pos;
+      if (memberAccess) {
+        from = memberAccess.from + 1;
+      } else if (identifier) {
+        from = identifier.from;
+      }
+
+      // Evitar pedir completions por prefijos demasiado cortos (cuando no es explícito)
+      const typed = context.state.sliceDoc(from, pos);
+      if (!context.explicit && !memberAccess && typed.length < 1) return null;
+
       const line = context.state.doc.lineAt(pos);
       const lineNumber = line.number - 1;
       const character = pos - line.from;
@@ -183,7 +271,8 @@ export class CodeMirrorLspService {
         if (items.length === 0) return null;
 
         return {
-          from: pos,
+          from,
+          validFor: /^[\w$]*$/,
           options: items.map((item: any) => ({
             label: item.label,
             type: this.mapCompletionKind(item.kind),
@@ -214,15 +303,21 @@ export class CodeMirrorLspService {
    * Cierra completamente la sesión del proyecto
    */
   async shutdownProject(projectId: string): Promise<void> {
+    const languages = new Set<string>();
+
     // Cerrar todos los documentos del proyecto
     for (const [filePath, sessionInfo] of this.sessions.entries()) {
       if (sessionInfo.session.projectId === projectId) {
         this.lspService.closeDocument(sessionInfo.session, filePath);
+        languages.add(sessionInfo.session.language);
         this.sessions.delete(filePath);
       }
     }
     
-    await this.lspService.shutdownSession(projectId);
+    // Cerrar cada sesión por lenguaje (un contenedor por projectId+language)
+    for (const language of languages) {
+      await this.lspService.shutdownSession(projectId, language);
+    }
   }
 
   // Helpers
@@ -276,7 +371,13 @@ export class CodeMirrorLspService {
     content: string
   ): Promise<void> {
     const session = await this.lspService.initializeSession(projectId, language);
-    this.sessions.set(filePath, { session, version: 1 });
+    this.sessions.set(filePath, {
+      session,
+      version: 1,
+      lastSentVersion: 1,
+      lastSentAt: Date.now(),
+      latestContent: content
+    });
     this.lspService.openDocument(session, filePath, content, language);
   }
 }

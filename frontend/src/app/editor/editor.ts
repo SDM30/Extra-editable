@@ -35,9 +35,9 @@ export class Editor implements OnInit, OnDestroy {
     javascript: `function greet(name) {\n    return \`Hello, \${name}!\`;\n}\n\nconsole.log(greet("World"));`,
   };
 
-  value = this.defaultCode['python'];
+  value = this.defaultCode['typescript'];
   theme: Theme = 'dark';
-  language: string = 'python';
+  language: string = 'typescript';
 
   // NUEVO: Identificador del proyecto (puede venir de la URL o usuario)
   projectId: string = 'proyecto-demo';

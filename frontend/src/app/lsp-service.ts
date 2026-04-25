@@ -65,11 +65,13 @@ export class LspService {
    * Inicializa una sesión LSP para un proyecto
    */
   async initializeSession(projectId: string, language: string): Promise<LSPSession> {
+    const sessionKey = this.getSessionKey(projectId, language);
+
     // Verificar si ya existe sesión
-    if (this.activeSessions.has(projectId)) {
-      const session = this.activeSessions.get(projectId)!;
+    if (this.activeSessions.has(sessionKey)) {
+      const session = this.activeSessions.get(sessionKey)!;
       if (session.connected) {
-        console.log(`[LSP] Reutilizando sesión existente para ${projectId}`);
+        console.log(`[LSP] Reutilizando sesión existente para ${projectId} (${language})`);
         return session;
       }
     }
@@ -94,7 +96,7 @@ export class LspService {
     // Conectar WebSocket
     await this.connectWebSocket(session);
     
-    this.activeSessions.set(projectId, session);
+    this.activeSessions.set(sessionKey, session);
     return session;
   }
 
@@ -187,22 +189,6 @@ export class LspService {
           
           // Enviar notificación initialized
           this.sendNotification(session, "initialized", {});
-
-          // Enviar configuración (especialmente útil para habilitar diagnósticos en pylsp)
-          if (session.language === 'python') {
-            this.sendNotification(session, 'workspace/didChangeConfiguration', {
-              settings: {
-                pylsp: {
-                  plugins: {
-                    pycodestyle: { enabled: true },
-                    pyflakes: { enabled: true },
-                    flake8: { enabled: true },
-                    mccabe: { enabled: true }
-                  }
-                }
-              }
-            });
-          }
           resolve();
         }
       });
@@ -376,26 +362,18 @@ export class LspService {
   /**
    * Cierra la sesión LSP
    */
-  async shutdownSession(projectId: string): Promise<void> {
-    const session = this.activeSessions.get(projectId);
+  async shutdownSession(projectId: string, language: string): Promise<void> {
+    const sessionKey = this.getSessionKey(projectId, language);
+    const session = this.activeSessions.get(sessionKey);
     if (!session || !session.socket) return;
 
-    // Enviar shutdown
-    const messageId = this.getNextMessageId(session);
-    
-    return new Promise((resolve) => {
-      session.pendingRequests.set(messageId, () => {
-        session.socket?.close();
-        this.activeSessions.delete(projectId);
-        resolve();
-      });
-
-      this.sendRaw(session, {
-        jsonrpc: "2.0",
-        id: messageId,
-        method: "shutdown"
-      });
-    });
+    // En un LSP compartido, `shutdown/exit` puede estar bloqueado en el proxy para
+    // evitar que un cliente tumbe la sesión de todos. Cerramos solo el WebSocket.
+    try {
+      session.socket.close();
+    } finally {
+      this.activeSessions.delete(sessionKey);
+    }
   }
 
   // Métodos auxiliares
@@ -420,19 +398,30 @@ export class LspService {
   /**
    * Obtiene el estado de un contenedor
    */
-  async getContainerStatus(projectId: string): Promise<any> {
+  async getContainerStatus(projectId: string, language?: string): Promise<any> {
+    const url = language
+      ? `${this.API_URL}/lsp/${projectId}?language=${encodeURIComponent(language)}`
+      : `${this.API_URL}/lsp/${projectId}`;
+
     return firstValueFrom(
-      this.http.get(`${this.API_URL}/lsp/${projectId}`)
+      this.http.get(url)
     );
   }
 
   /**
    * Elimina un contenedor
    */
-  async destroyContainer(projectId: string): Promise<void> {
+  async destroyContainer(projectId: string, language?: string): Promise<void> {
+    const url = language
+      ? `${this.API_URL}/lsp/${projectId}?language=${encodeURIComponent(language)}`
+      : `${this.API_URL}/lsp/${projectId}`;
+
     await firstValueFrom(
-      this.http.delete(`${this.API_URL}/lsp/${projectId}`)
+      this.http.delete(url)
     );
-    this.activeSessions.delete(projectId);
+  }
+
+  private getSessionKey(projectId: string, language: string): string {
+    return `${projectId}:${language}`;
   }
 }
