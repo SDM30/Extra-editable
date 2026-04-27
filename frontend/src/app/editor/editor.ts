@@ -1,5 +1,4 @@
 import { ChangeDetectorRef, Component } from '@angular/core';
-import { finalize, timeout } from 'rxjs';
 import { Extension } from '@codemirror/state';
 
 import { Header } from './headerIDE/headerIDE';
@@ -10,6 +9,7 @@ import { dracula } from '@uiw/codemirror-theme-dracula';
 import { solarizedLight, solarizedDark } from '@uiw/codemirror-theme-solarized';
 import { nord } from '@uiw/codemirror-theme-nord';
 import { kimbie } from '@uiw/codemirror-theme-kimbie';
+
 import { ExecutionService } from '../services/execution-service';
 
 export type Theme = 'light' | 'dark' | Extension;
@@ -22,10 +22,13 @@ export type Theme = 'light' | 'dark' | Extension;
   styleUrls: ['./editor.css'],
 })
 export class Editor {
-  value = `#include <iostream>\n\nint main() {\n    std::cout << "Hola C++" << std::endl;\n    return 0;\n}`;
-
+  value = '';
   theme: Theme = 'dark';
   language: string = 'cpp';
+
+  resultado = '';
+  resultadoOk = false;
+  cargando = false;
 
   themeOptions = [
     { label: 'Standard Light', value: 'light' as Theme },
@@ -44,51 +47,65 @@ export class Editor {
     { label: 'Python', value: 'python' },
   ];
 
-  resultado?: string;
-  resultadoOk?: boolean;
-  cargando = false;
-
   constructor(
     private executionService: ExecutionService,
-    private cdr: ChangeDetectorRef,
-  ) {}
+    private cdr: ChangeDetectorRef
+  ) { }
 
-  onRunCode() {
-    // Estado inicial de cada ejecución
-    this.resultado = undefined;
-    this.resultadoOk = undefined;
+  ejecutarCodigo(): void {
+    this.resultado = '';
     this.cargando = true;
-    this.executionService
-      .runCode(this.value)
-      .pipe(
-        // Evita que la UI quede esperando para siempre si la request no responde
-        timeout(10000),
-        finalize(() => {
-          // Siempre apagar loading (éxito, error o timeout)
-          this.cargando = false;
-          //ChangeDetectorRef (cdr)
-          // Forzar detección de cambios
-          this.cdr.detectChanges();
-        }),
-      )
-      .subscribe({
-        next: (resp) => {
-          const resultadoLimpio = this.limpiarResultado(resp.resultado ?? 'Respuesta recibida');
-          this.resultadoOk = this.extraerEstadoOk(resultadoLimpio);
-          this.resultado = this.formatearSalida(resultadoLimpio, resp.tiempo);
+    this.resultadoOk = false;
 
-          this.cdr.detectChanges();
-        },
-        error: (err) => {
+    this.executionService.connect(
+      (message) => {
+        if (message.type === 'connected') {
+          this.executionService.runCode(this.language, this.value);
+        }
+
+        if (message.type === 'started') {
+          this.resultado += 'Ejecución iniciada...\n';
+        }
+
+        if (message.type === 'output') {
+          this.resultado += message.data;
+        }
+
+        if (message.type === 'error') {
+          this.resultado += '\nError: ' + message.data;
+          this.cargando = false;
           this.resultadoOk = false;
-          if (err?.name === 'TimeoutError') {
-            this.resultado = 'Error: timeout esperando respuesta del backend';
-          } else {
-            this.resultado = 'Error: ' + (err?.message ?? err?.status ?? err);
-          }
-          this.cdr.detectChanges();
-        },
-      });
+        }
+
+        if (message.type === 'timeout') {
+          this.resultado += '\n' + message.data;
+          this.cargando = false;
+          this.resultadoOk = false;
+        }
+
+        if (message.type === 'finished') {
+          this.cargando = false;
+          this.resultadoOk = message.exitCode === 0;
+          this.resultado += `\nProceso finalizado con código ${message.exitCode}`;
+          this.executionService.disconnect();
+        }
+
+        this.cdr.detectChanges();
+      },
+      () => {
+        this.resultado = 'No se pudo conectar con el servicio de ejecución.';
+        this.cargando = false;
+        this.cdr.detectChanges();
+      },
+      () => {
+        this.cargando = false;
+        this.cdr.detectChanges();
+      }
+    );
+  }
+
+  enviarEntrada(input: string): void {
+    this.executionService.sendInput(input);
   }
 
   private limpiarResultado(resultado: string): string {

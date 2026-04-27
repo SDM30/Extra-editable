@@ -37,6 +37,7 @@ export class CodeSection {
   isProblemCollapsed = false;
 
   onValueChange(newValue: string) {
+    this._value = newValue;
     this.valueChange.emit(newValue);
   }
 
@@ -61,5 +62,18 @@ export class CodeSection {
   // Extensions finales del editor
   get editorExtensions(): Extension[] {
     return [this.languageExtension()];
+  }
+
+  @Output() inputSend = new EventEmitter<string>();
+
+  entradaUsuario = '';
+
+  enviarEntrada(): void {
+    const entrada = this.entradaUsuario;
+
+    if (!entrada.trim()) return;
+
+    this.inputSend.emit(entrada);
+    this.entradaUsuario = '';
   }
 }

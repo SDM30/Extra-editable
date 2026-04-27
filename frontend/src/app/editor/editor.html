@@ -1,18 +1,19 @@
 <app-header
   [theme]="theme"
   [themeOptions]="themeOptions"
-  (themeChange)="theme = $event"
   [language]="language"
   [languageOptions]="languageOptions"
+  (themeChange)="theme = $event"
   (languageChange)="language = $event"
-  (runCode)="onRunCode()"
-></app-header>
+  (runCode)="ejecutarCodigo()">
+</app-header>
 
 <app-code-section
   [(value)]="value"
-  [theme]="theme"
   [language]="language"
+  [theme]="theme"
   [resultado]="resultado"
   [resultadoOk]="resultadoOk"
   [cargando]="cargando"
-></app-code-section>
+  (inputSend)="enviarEntrada($event)">
+</app-code-section>

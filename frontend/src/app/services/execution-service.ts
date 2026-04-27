@@ -1,18 +1,62 @@
-import { HttpClient } from '@angular/common/http';
-import { inject, Injectable } from '@angular/core';
-import { enviroment } from '../environments/enviroment';
-import { CodigoFuente } from '../model/codigo-fuente';
+import { Injectable } from '@angular/core';
+
+export type ExecutionMessage =
+  | { type: 'connected'; data: string }
+  | { type: 'started' }
+  | { type: 'output'; data: string }
+  | { type: 'error'; data: string }
+  | { type: 'timeout'; data: string }
+  | { type: 'finished'; exitCode: number };
 
 @Injectable({
-  providedIn: 'root',
+  providedIn: 'root'
 })
 export class ExecutionService {
-  private http = inject(HttpClient);
-  private base = enviroment.apiBaseUrl;
-  constructor() {}
+  private socket?: WebSocket;
 
-  runCode(code: string) {
-    const payload: Partial<CodigoFuente> = { contenido: code };
-    return this.http.post<CodigoFuente>(`${this.base}/ejecutar`, payload);
+  connect(
+    onMessage: (message: ExecutionMessage) => void,
+    onError?: () => void,
+    onClose?: () => void
+  ): void {
+    this.socket = new WebSocket('ws://localhost:8081/ws/execute');
+
+    this.socket.onmessage = (event) => {
+      const message = JSON.parse(event.data) as ExecutionMessage;
+      onMessage(message);
+    };
+
+    this.socket.onerror = () => {
+      if (onError) onError();
+    };
+
+    this.socket.onclose = () => {
+      if (onClose) onClose();
+    };
+  }
+
+  runCode(language: string, code: string): void {
+    this.socket?.send(JSON.stringify({
+      type: 'run',
+      language,
+      code
+    }));
+  }
+
+  sendInput(input: string): void {
+    this.socket?.send(JSON.stringify({
+      type: 'input',
+      data: input + '\n'
+    }));
+  }
+
+  stop(): void {
+    this.socket?.send(JSON.stringify({
+      type: 'stop'
+    }));
+  }
+
+  disconnect(): void {
+    this.socket?.close();
   }
 }

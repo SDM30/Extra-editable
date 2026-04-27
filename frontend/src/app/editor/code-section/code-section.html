@@ -26,16 +26,19 @@
       </table>
     </div>
 
-    <div class="resultado-panel">
-      @if (cargando) {
-        <p class="resultado">Ejecutando...</p>
-      } @else if (resultado) {
-        <p
-          class="resultado"
-          [class.resultado-ok]="resultadoOk === true"
-          [class.resultado-error]="resultadoOk === false"
-        >{{ resultado }}</p>
-      }
+    <div class="output-console">
+      <pre>{{ resultado }}</pre>
+      <div class="console-input">
+  <input
+    type="text"
+    [(ngModel)]="entradaUsuario"
+    placeholder="Escribe una entrada y presiona Enter"
+    (keydown.enter)="enviarEntrada()" />
+
+  <button (click)="enviarEntrada()">
+    Enviar
+  </button>
+</div>
     </div>
   </aside>
 </div>
