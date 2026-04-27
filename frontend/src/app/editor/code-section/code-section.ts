@@ -33,6 +33,9 @@ export class CodeSection {
   @Input() resultadoOk?: boolean;
   @Input() cargando: boolean = false;
 
+  @Input() terminalHeight: number = 220;
+  @Output() resizeStart = new EventEmitter<MouseEvent>();
+
   // panel del problema
   isProblemCollapsed = false;
 

@@ -14,6 +14,7 @@ import { ExecutionService } from '../services/execution-service';
 
 export type Theme = 'light' | 'dark' | Extension;
 
+
 @Component({
   selector: 'app-editor',
   standalone: true,
@@ -29,6 +30,12 @@ export class Editor {
   resultado = '';
   resultadoOk = false;
   cargando = false;
+
+  terminalHeight = 220;
+
+  private isResizing = false;
+  private startY = 0;
+  private startHeight = 220;
 
   themeOptions = [
     { label: 'Standard Light', value: 'light' as Theme },
@@ -105,22 +112,42 @@ export class Editor {
   }
 
   enviarEntrada(input: string): void {
+    if (!input.trim()) return;
+
+    /* Mostrar también en terminal */
+    this.resultado += input + '\n';
+
+    /* Enviar al contenedor */
     this.executionService.sendInput(input);
+
+    this.cdr.detectChanges();
   }
 
-  private limpiarResultado(resultado: string): string {
-    return resultado.replace(/^id\s*=\s*[^|]*\|\s*/i, '');
+  startResize(event: MouseEvent): void {
+    this.isResizing = true;
+    this.startY = event.clientY;
+    this.startHeight = this.terminalHeight;
+
+    document.addEventListener('mousemove', this.onResize);
+    document.addEventListener('mouseup', this.stopResize);
   }
 
-  private extraerEstadoOk(resultado: string): boolean | undefined {
-    const match = resultado.match(/(^|\n)\s*ok\s*=\s*(true|false)\s*(\n|$)/i);
-    if (!match) {
-      return undefined;
+  onResize = (event: MouseEvent): void => {
+    if (!this.isResizing) return;
+
+    const delta = this.startY - event.clientY;
+    const newHeight = this.startHeight + delta;
+
+    if (newHeight >= 120 && newHeight <= 600) {
+      this.terminalHeight = newHeight;
+      this.cdr.detectChanges();
     }
-    return match[2].toLowerCase() === 'true';
-  }
+  };
 
-  private formatearSalida(resultado: string, tiempo?: string): string {
-    return `${resultado}\ntiempo=${tiempo ?? 'N/A'}`;
-  }
+  stopResize = (): void => {
+    this.isResizing = false;
+
+    document.removeEventListener('mousemove', this.onResize);
+    document.removeEventListener('mouseup', this.stopResize);
+  };
 }

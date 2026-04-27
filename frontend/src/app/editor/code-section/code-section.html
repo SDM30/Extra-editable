@@ -1,44 +1,37 @@
-<div class="ide-body">
-<!-- Columna Editor -->
-<div class="editor-panel">
+<div class="code-section">
+
   <code-editor
-    class="cm-host"
-    [ngModel]="value"
-    (ngModelChange)="onValueChange($event)"
-    [theme]="theme"
+    class="editor-area"
+    [(ngModel)]="value"
     [extensions]="editorExtensions"
-  ></code-editor>
-</div>
+    [theme]="theme"
+    (ngModelChange)="onValueChange($event)">
+  </code-editor>
 
-  <!-- Columna Problema -->
-  <aside class="problem-panel" [class.collapsed]="isProblemCollapsed">
-    <div class="problem-header">
-      <span class="problem-title">Problem</span>
+  <div
+  class="resize-bar"
+  (mousedown)="resizeStart.emit($event)">
+  </div>
 
-      <button class="collapse-btn" type="button" (click)="toggleProblem()">
-        <span class="chev" [class.rotated]="isProblemCollapsed">⮜</span>
-      </button>
+
+  <div class="output-panel" [style.height.px]="terminalHeight">
+    <div class="output-header">
+      <span>OUTPUT</span>
+      <span class="output-state">
+        {{ cargando ? 'running...' : resultadoOk ? 'finished' : 'console' }}
+      </span>
     </div>
 
-    <div class="problem-content">
-      <table class="problem-table">
-        <!-- Tabla vacía por ahora -->
-      </table>
-    </div>
+    <pre class="output-body">{{ resultado || 'Run code to see output...' }}</pre>
 
-    <div class="output-console">
-      <pre>{{ resultado }}</pre>
-      <div class="console-input">
-  <input
-    type="text"
-    [(ngModel)]="entradaUsuario"
-    placeholder="Escribe una entrada y presiona Enter"
-    (keydown.enter)="enviarEntrada()" />
-
-  <button (click)="enviarEntrada()">
-    Enviar
-  </button>
-</div>
+    <div class="output-input">
+      <span>&gt;</span>
+      <input
+        type="text"
+        [(ngModel)]="entradaUsuario"
+        placeholder="stdin"
+        (keydown.enter)="enviarEntrada()" />
     </div>
-  </aside>
+  </div>
+
 </div>

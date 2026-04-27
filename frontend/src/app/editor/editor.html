@@ -10,10 +10,12 @@
 
 <app-code-section
   [(value)]="value"
-  [language]="language"
   [theme]="theme"
+  [language]="language"
   [resultado]="resultado"
   [resultadoOk]="resultadoOk"
   [cargando]="cargando"
+  [terminalHeight]="terminalHeight"
+  (resizeStart)="startResize($event)"
   (inputSend)="enviarEntrada($event)">
 </app-code-section>
