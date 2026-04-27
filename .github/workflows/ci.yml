@@ -1,0 +1,74 @@
+name: CI/CD - PoC Desplegabilidad
+
+on:
+  push:
+    branches: [ pruebas_despliegue ]
+  pull_request:
+    branches: [ pruebas_despliegue ]
+
+jobs:
+  # ─── Stage 1: Build y validación ────────────────────────────────────────────
+  build:
+    name: Build del mock
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Instalar dependencias
+        working-directory: poc_despliegue
+        run: npm install
+
+      - name: Verificar que el servidor arranca
+        working-directory: poc_despliegue
+        run: |
+          node server.js &
+          sleep 2
+          curl -f -X POST http://localhost:8081/api/evaluacion || exit 1
+          curl -f http://localhost:8081/health || exit 1
+          echo "✅ Servidor responde correctamente"
+
+  # ─── Stage 2: Build de imagen Docker ────────────────────────────────────────
+  docker-build:
+    name: Build imagen Docker
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      - name: Build de imagen Docker
+        working-directory: poc_despliegue
+        run: |
+          docker build -t mock-evaluacion:${{ github.sha }} .
+          echo "✅ Imagen construida: mock-evaluacion:${{ github.sha }}"
+
+      - name: Verificar imagen con healthcheck
+        working-directory: poc_despliegue
+        run: |
+          docker run -d --name test-container \
+            -e PORT=8081 \
+            -e VERSION=v-${{ github.sha }} \
+            -p 8081:8081 \
+            mock-evaluacion:${{ github.sha }}
+          sleep 3
+          curl -f http://localhost:8081/health
+          docker stop test-container
+          echo "✅ Contenedor responde correctamente"
+
+  # ─── Stage 3: Medir cycle time ──────────────────────────────────────────────
+  cycle-time:
+    name: Reporte de cycle time
+    runs-on: ubuntu-latest
+    needs: docker-build
+    steps:
+      - name: Calcular tiempo transcurrido
+        run: |
+          echo "🕐 Commit SHA: ${{ github.sha }}"
+          echo "🕐 Timestamp del workflow: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "✅ Pipeline completado - revisar duración total en el summary de Actions"
