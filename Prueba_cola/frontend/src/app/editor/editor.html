@@ -1,0 +1,18 @@
+<app-header
+  [theme]="theme"
+  [themeOptions]="themeOptions"
+  (themeChange)="theme = $event"
+  [language]="language"
+  [languageOptions]="languageOptions"
+  (languageChange)="language = $event"
+  (runCode)="onRunCode()"
+></app-header>
+
+<app-code-section
+  [(value)]="value"
+  [theme]="theme"
+  [language]="language"
+  [resultado]="resultado"
+  [resultadoOk]="resultadoOk"
+  [cargando]="cargando"
+></app-code-section>
