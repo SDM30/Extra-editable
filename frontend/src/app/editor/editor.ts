@@ -1,8 +1,8 @@
 /**
  * editor.ts
- * 
+ *
  * Componente principal del editor de código con soporte para múltiples lenguajes.
- * 
+ *
  * Responsabilidades:
  * 1. Orquestar la interfaz del editor (CodeMirror)
  * 2. Gestionar cambios de lenguaje y tema
@@ -10,9 +10,9 @@
  * 4. Integrar ejecución de código via ExecutionService
  * 5. Integrar edición colaborativa via CollabService
  * 6. Limpiar recursos al destruir
- * 
+ *
  * Lenguajes soportados: Python, C++, TypeScript, JavaScript
- * 
+ *
  * @module editor/editor
  * @component
  * @standalone
@@ -40,14 +40,27 @@ import { CodeMirrorLspService } from '../services/codemirror-lsp-service';
 export type Theme = 'light' | 'dark' | Extension;
 
 /**
- * Componente Editor de C\u00f3digo Angular
- * 
- * Proporciona una interfaz completa para editar y ejecutar c\u00f3digo en m\u00faltiples lenguajes.\n * \n * Propiedades Principales:\n * - `value`: C\u00f3digo actual en el editor\n * - `language`: Lenguaje actual (python, cpp, typescript, javascript)\n * - `projectId`: ID del proyecto (obtenido de URL)\n * - `theme`: Tema de colores del editor\n * - `lspEnabled`: Si LSP est\u00e1 activo para asistencia de c\u00f3digo\n * - `resultado`: Output de la ejecuci\u00f3n del c\u00f3digo\n * - `cargando`: Indicador de carga durante ejecuci\u00f3n\n * \n * @class Editor\n * @implements {OnInit, OnDestroy}\n */\n@Component({
+ * Componente Editor de Código Angular
+ *
+ * Proporciona una interfaz completa para editar y ejecutar código en múltiples lenguajes.
+ *
+ * Propiedades principales:
+ * - `value`: Código actual en el editor
+ * - `language`: Lenguaje de programación seleccionado
+ * - `theme`: Tema visual del editor
+ * - `lspEnabled`: Flag para habilitar/deshabilitar integración LSP
+ * - `resultado`: Resultado de la ejecución del código
+ * - `cargando`: Flag para mostrar estado de carga durante ejecución
+ *
+ * @class Editor
+ * @implements {OnInit, OnDestroy}
+ * **/
+@Component({
   selector: 'app-editor',
   standalone: true,
   imports: [Header, CodeSection],
   templateUrl: './editor.html',
-  styleUrls: ['./editor.css'],
+  styleUrl: './editor.css',
 })
 export class Editor implements OnInit, OnDestroy {
   // Código por defecto según lenguaje
@@ -103,15 +116,15 @@ export class Editor implements OnInit, OnDestroy {
 
   /**
    * Hook del ciclo de vida Angular - Inicializa el componente
-   * 
+   *
    * Realiza:
    * 1. Lee projectId de los query parameters de la URL (o usa 'proyecto-demo')
    * 2. Obtiene token y username para colaboración
    * 3. Conecta al servicio de colaboración
-   * 
+   *
    * @async
    * @returns {Promise<void>}
-   * 
+   *
    * @example
    * // URL: http://localhost:4200/editor?projectId=mi-proyecto
    * // Se conectará al proyecto 'mi-proyecto'
@@ -129,11 +142,11 @@ export class Editor implements OnInit, OnDestroy {
 
   /**
    * Hook del ciclo de vida Angular - Limpia recursos al destruir el componente
-   * 
+   *
    * Realiza:
    * 1. Si LSP está habilitado, cierra todas las sesiones del proyecto
    * 2. Libera conexiones WebSocket y contenedores Docker
-   * 
+   *
    * @returns {void}
    */
   ngOnDestroy(): void {
@@ -146,17 +159,17 @@ export class Editor implements OnInit, OnDestroy {
   // NUEVO: Manejar cambio de lenguaje
   /**
    * Maneja cambio de lenguaje de programación
-   * 
+   *
    * Realiza:
    * 1. Actualiza el lenguaje actual
    * 2. Carga el código por defecto para ese lenguaje
-   * 
+   *
    * TODO: Debería reinicializar la sesión LSP cuando cambia el lenguaje.
    * Actualmente solo cambia el código sin actualizar el servidor LSP.
-   * 
+   *
    * @param {string} language - Lenguaje a usar (python, cpp, typescript, javascript)
    * @returns {void}
-   * 
+   *
    * @example
    * onLanguageChange('python'); // Carga código Python por defecto
    */
@@ -173,15 +186,15 @@ export class Editor implements OnInit, OnDestroy {
 
   /**
    * Ejecuta el código actual
-   * 
+   *
    * Realiza:
    * 1. Llama a ExecutionService para ejecutar el código
    * 2. Muestra resultado y tiempo de ejecución
    * 3. Extrae estado "ok" del resultado si está disponible
    * 4. Maneja timeout de 10 segundos
-   * 
+   *
    * @returns {void}
-   * 
+   *
    * @example
    * onRunCode();
    * // Muestra en 'resultado': "Hello World\ntiempo=1.234s"
@@ -220,7 +233,7 @@ export class Editor implements OnInit, OnDestroy {
 
   /**
    * Limpia el resultado eliminando prefijo 'id='
-   * 
+   *
    * @private
    * @param {string} resultado - Resultado raw del ejecutor
    * @returns {string} Resultado limpio
@@ -231,9 +244,9 @@ export class Editor implements OnInit, OnDestroy {
 
   /**
    * Extrae el estado "ok" del resultado si existe
-   * 
+   *
    * Busca patrón: "ok = true" o "ok = false"
-   * 
+   *
    * @private
    * @param {string} resultado - Resultado procesado
    * @returns {boolean|undefined} true/false si se encuentra, undefined si no
@@ -248,7 +261,7 @@ export class Editor implements OnInit, OnDestroy {
 
   /**
    * Formatea la salida añadiendo tiempo de ejecución
-   * 
+   *
    * @private
    * @param {string} resultado - Resultado del código
    * @param {string} [tiempo] - Tiempo de ejecución (opcional)
