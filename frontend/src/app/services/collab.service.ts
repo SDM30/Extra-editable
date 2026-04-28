@@ -23,7 +23,7 @@ export class CollabService implements OnDestroy {
     this.ydoc = new Y.Doc();
 
     this.provider = new HocuspocusProvider({
-      url: 'ws://localhost:1234',
+      url: 'ws://localhost:8080/collab',
       name: documentName,
       document: this.ydoc,
       token,

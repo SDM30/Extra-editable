@@ -33,7 +33,7 @@ spring:
             - JwtAuth
 
         - id: collab-service
-          uri: ws://localhost:1234
+          uri: http://localhost:1234
           predicates:
             - Path=/collab/**
           filters:
