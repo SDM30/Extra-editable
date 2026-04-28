@@ -1,13 +1,13 @@
 import { TestBed } from '@angular/core/testing';
 
-import { CodemirrorLspService } from './codemirror-lsp-service';
+import { CodeMirrorLspService } from './codemirror-lsp-service';
 
 describe('CodemirrorLspService', () => {
-  let service: CodemirrorLspService;
+  let service: CodeMirrorLspService;
 
   beforeEach(() => {
     TestBed.configureTestingModule({});
-    service = TestBed.inject(CodemirrorLspService);
+    service = TestBed.inject(CodeMirrorLspService);
   });
 
   it('should be created', () => {

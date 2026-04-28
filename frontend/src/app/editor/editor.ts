@@ -1,3 +1,23 @@
+/**
+ * editor.ts
+ * 
+ * Componente principal del editor de código con soporte para múltiples lenguajes.
+ * 
+ * Responsabilidades:
+ * 1. Orquestar la interfaz del editor (CodeMirror)
+ * 2. Gestionar cambios de lenguaje y tema
+ * 3. Integrar Language Server Protocol (LSP) para asistencia de código
+ * 4. Integrar ejecución de código via ExecutionService
+ * 5. Integrar edición colaborativa via CollabService
+ * 6. Limpiar recursos al destruir
+ * 
+ * Lenguajes soportados: Python, C++, TypeScript, JavaScript
+ * 
+ * @module editor/editor
+ * @component
+ * @standalone
+ * @dependencies CodeMirrorLspService, ExecutionService, CollabService, AuthService
+ */
 // editor.ts
 import { ChangeDetectorRef, Component, OnInit, OnDestroy } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
@@ -15,11 +35,14 @@ import { kimbie } from '@uiw/codemirror-theme-kimbie';
 import { ExecutionService } from '../services/execution-service';
 import { CollabService } from '../services/collab.service';
 import { AuthService } from '../services/auth.service';
-import { CodeMirrorLspService } from '../codemirror-lsp-service';
+import { CodeMirrorLspService } from '../services/codemirror-lsp-service';
 
 export type Theme = 'light' | 'dark' | Extension;
 
-@Component({
+/**
+ * Componente Editor de C\u00f3digo Angular
+ * 
+ * Proporciona una interfaz completa para editar y ejecutar c\u00f3digo en m\u00faltiples lenguajes.\n * \n * Propiedades Principales:\n * - `value`: C\u00f3digo actual en el editor\n * - `language`: Lenguaje actual (python, cpp, typescript, javascript)\n * - `projectId`: ID del proyecto (obtenido de URL)\n * - `theme`: Tema de colores del editor\n * - `lspEnabled`: Si LSP est\u00e1 activo para asistencia de c\u00f3digo\n * - `resultado`: Output de la ejecuci\u00f3n del c\u00f3digo\n * - `cargando`: Indicador de carga durante ejecuci\u00f3n\n * \n * @class Editor\n * @implements {OnInit, OnDestroy}\n */\n@Component({
   selector: 'app-editor',
   standalone: true,
   imports: [Header, CodeSection],
@@ -45,6 +68,7 @@ export class Editor implements OnInit, OnDestroy {
   // NUEVO: Flag para habilitar/deshabilitar LSP
   lspEnabled: boolean = true;
 
+  // TODO: Colocar solo un tema oscuro y claro
   themeOptions = [
     { label: 'Standard Light', value: 'light' as Theme },
     { label: 'Standard Dark', value: 'dark' as Theme },
@@ -56,6 +80,7 @@ export class Editor implements OnInit, OnDestroy {
     { label: 'Kimbie', value: kimbie as Theme },
   ];
 
+  // TODO: El lenguaje solo se deberia elegir al crear el proyecto, no cambiarlo dinamicamente
   languageOptions = [
     { label: 'Python', value: 'python' },
     { label: 'C++', value: 'cpp' },
@@ -76,6 +101,21 @@ export class Editor implements OnInit, OnDestroy {
     private route: ActivatedRoute,
   ) {}
 
+  /**
+   * Hook del ciclo de vida Angular - Inicializa el componente
+   * 
+   * Realiza:
+   * 1. Lee projectId de los query parameters de la URL (o usa 'proyecto-demo')
+   * 2. Obtiene token y username para colaboración
+   * 3. Conecta al servicio de colaboración
+   * 
+   * @async
+   * @returns {Promise<void>}
+   * 
+   * @example
+   * // URL: http://localhost:4200/editor?projectId=mi-proyecto
+   * // Se conectará al proyecto 'mi-proyecto'
+   */
   async ngOnInit() {
     // Leer projectId de URL query parameters o usar default
     this.route.queryParams.subscribe((params) => {
@@ -87,6 +127,15 @@ export class Editor implements OnInit, OnDestroy {
     this.collab.connect('room-editor-1', token, username);
   }
 
+  /**
+   * Hook del ciclo de vida Angular - Limpia recursos al destruir el componente
+   * 
+   * Realiza:
+   * 1. Si LSP está habilitado, cierra todas las sesiones del proyecto
+   * 2. Libera conexiones WebSocket y contenedores Docker
+   * 
+   * @returns {void}
+   */
   ngOnDestroy(): void {
     // NUEVO: Limpiar sesión LSP al destruir el componente
     if (this.lspEnabled) {
@@ -95,6 +144,22 @@ export class Editor implements OnInit, OnDestroy {
   }
 
   // NUEVO: Manejar cambio de lenguaje
+  /**
+   * Maneja cambio de lenguaje de programación
+   * 
+   * Realiza:
+   * 1. Actualiza el lenguaje actual
+   * 2. Carga el código por defecto para ese lenguaje
+   * 
+   * TODO: Debería reinicializar la sesión LSP cuando cambia el lenguaje.
+   * Actualmente solo cambia el código sin actualizar el servidor LSP.
+   * 
+   * @param {string} language - Lenguaje a usar (python, cpp, typescript, javascript)
+   * @returns {void}
+   * 
+   * @example
+   * onLanguageChange('python'); // Carga código Python por defecto
+   */
   onLanguageChange(language: string) {
     this.language = language;
 
@@ -106,6 +171,21 @@ export class Editor implements OnInit, OnDestroy {
     console.log(`[Editor] Lenguaje cambiado a: ${language}`);
   }
 
+  /**
+   * Ejecuta el código actual
+   * 
+   * Realiza:
+   * 1. Llama a ExecutionService para ejecutar el código
+   * 2. Muestra resultado y tiempo de ejecución
+   * 3. Extrae estado "ok" del resultado si está disponible
+   * 4. Maneja timeout de 10 segundos
+   * 
+   * @returns {void}
+   * 
+   * @example
+   * onRunCode();
+   * // Muestra en 'resultado': "Hello World\ntiempo=1.234s"
+   */
   onRunCode() {
     this.resultado = undefined;
     this.resultadoOk = undefined;
@@ -138,10 +218,26 @@ export class Editor implements OnInit, OnDestroy {
       });
   }
 
+  /**
+   * Limpia el resultado eliminando prefijo 'id='
+   * 
+   * @private
+   * @param {string} resultado - Resultado raw del ejecutor
+   * @returns {string} Resultado limpio
+   */
   private limpiarResultado(resultado: string): string {
     return resultado.replace(/^id\s*=\s*[^|]*\|\s*/i, '');
   }
 
+  /**
+   * Extrae el estado "ok" del resultado si existe
+   * 
+   * Busca patrón: "ok = true" o "ok = false"
+   * 
+   * @private
+   * @param {string} resultado - Resultado procesado
+   * @returns {boolean|undefined} true/false si se encuentra, undefined si no
+   */
   private extraerEstadoOk(resultado: string): boolean | undefined {
     const match = resultado.match(/(^|\n)\s*ok\s*=\s*(true|false)\s*(\n|$)/i);
     if (!match) {
@@ -150,6 +246,14 @@ export class Editor implements OnInit, OnDestroy {
     return match[2].toLowerCase() === 'true';
   }
 
+  /**
+   * Formatea la salida añadiendo tiempo de ejecución
+   * 
+   * @private
+   * @param {string} resultado - Resultado del código
+   * @param {string} [tiempo] - Tiempo de ejecución (opcional)
+   * @returns {string} Salida formateada
+   */
   private formatearSalida(resultado: string, tiempo?: string): string {
     return `${resultado}\ntiempo=${tiempo ?? 'N/A'}`;
   }
