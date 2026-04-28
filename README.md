@@ -82,7 +82,12 @@ Salida esperada:
 [collab] Servidor en http/ws://localhost:1234
 [collab] Endpoint de token de prueba: POST http://localhost:1234/dev-token
 ```
-
+## API Gateway
+1. Iniciar el API Gateway en el puerto 8080. Todas las peticiones del frontend deben apuntar a este puerto.
+```
+cd api-gateway
+mvn spring-boot:run
+```
 2. Iniciar frontend (en otra terminal)
 ```
 cd frontend
