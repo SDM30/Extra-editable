@@ -80,3 +80,6 @@ media/
 
 # JetBrains IDEs (PyCharm, etc.)
 .idea/
+
+# Public files
+public/

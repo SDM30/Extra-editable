@@ -3,8 +3,10 @@ import { Editor } from './editor/editor';
 
 export const routes: Routes = [
   {
-    path: '',
+    path: 'editor',
     component: Editor,
-    title: 'Home page',
+    title: 'Editor',
   },
+  { path: 'auth', loadComponent: () => import('./auth/auth-wrap/auth-wrap.component').then(m => m.AuthWrapComponent) },
+  { path: '', redirectTo: '/editor', pathMatch: 'full' },
 ];
