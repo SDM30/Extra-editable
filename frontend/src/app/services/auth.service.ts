@@ -26,7 +26,7 @@ export class AuthService {
     const { userId, username } = this.getLocalUser();
     const resp = await firstValueFrom(
       this.http.post<{ token: string }>(
-        'http://localhost:8080/collab/dev-token',
+        'http://localhost:1234/dev-token',
         { userId, username }
       )
     );

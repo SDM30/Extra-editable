@@ -28,12 +28,11 @@ spring:
           uri: http://localhost:8081
           predicates:
             - Path=/api/**
-          # The JwtAuth filter will be applied programmatically or by referencing its name here if registered as a component
           filters:
             - JwtAuth
 
         - id: collab-service
-          uri: http://localhost:1234
+          uri: ws://localhost:1234
           predicates:
             - Path=/collab/**
           filters:
