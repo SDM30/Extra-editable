@@ -16,6 +16,20 @@ USUARIOS_INICIALES = [
         'nombre': 'David Dev',
         'rol': User.Role.USUARIO,
     },
+    {
+        'username': 'samuel',
+        'email': 'samuel@myide.com',
+        'password': 'User1234!',
+        'nombre': 'Samuel Dev',
+        'rol': User.Role.USUARIO,
+    },
+    {
+        'username': 'santiago',
+        'email': 'santiago@myide.com',
+        'password': 'User1234!',
+        'nombre': 'Santiago Dev',
+        'rol': User.Role.USUARIO,
+    },
 ]
 
 class Command(BaseCommand):
