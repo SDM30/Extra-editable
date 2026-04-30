@@ -10,6 +10,9 @@ frontend/bazel-out/
 
 # Node
 frontend/node_modules/
+collab-service/node_modules/
+collab-service/test-tmp/
+code-execution-service/node_modules/
 frontend/npm-debug.log
 frontend/yarn-error.log
 
@@ -50,6 +53,9 @@ frontend/__screenshots__/
 # =========================
 # System files (global)
 # =========================
+
+# Modernization generated reports
+.github/modernize/assessment/reports/
 
 .DS_Store
 Thumbs.db
