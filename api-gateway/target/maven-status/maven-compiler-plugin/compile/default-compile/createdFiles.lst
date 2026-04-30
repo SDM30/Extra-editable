@@ -1,3 +1,0 @@
-com\app\gateway\filter\JwtAuthGatewayFilterFactory.class
-com\app\gateway\ApiGatewayApplication.class
-com\app\gateway\filter\JwtAuthGatewayFilterFactory$Config.class

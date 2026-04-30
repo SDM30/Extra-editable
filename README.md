@@ -42,65 +42,80 @@ npm start
 
 # Ejecutar proyecto
 
-## Frontend
-1. Iniciar proyecto de angular
-```
-ng serve
+El gateway actualmente está implementado con **Nginx** sirviendo como Proxy Inverso en el puerto 8080.
+
+## Orden de despliegue sugerido:
+
+### 1. Backend (Django)
+
+**Primera vez (Configuración inicial):**
+```bash
+cd backend
+
+# 1. Crear entorno virtual
+python -m venv venv
+
+# 2. Activarlo
+# Windows:
+.\venv\Scripts\activate
+# Mac/Linux: source venv/bin/activate
+
+# 3. Instalar dependencias
+pip install -r requirements.txt
+
+# 4. Crear archivo .env (copiar el ejemplo)
+# Windows:
+copy .env.example .env
+# Mac/Linux: cp .env.example .env
+
+# 5. Migraciones
+python manage.py makemigrations users projects
+python manage.py migrate
+
+# 6. Datos dummy de la BD
+python manage.py seed
 ```
 
-## Backend
-2. Iniciar aplicación de spring
-```
-mvn spring-boot:run
+**Levantar el servidor (ejecuciones posteriores):**
+Una vez hecho lo anterior (o si ya lo habías hecho antes), solo necesitas asegurarte de tener el entorno virtual activado y ejecutar el servidor apuntando al puerto **8081**:
+```bash
+cd backend
+# Activar entorno virtual si no lo está: .\venv\Scripts\activate
+python manage.py runserver 8081
 ```
 
-## Servicio de ejecución de código
-1. Crear imagen a partir del Dockerfile
+### 2. Servicio de edición colaborativa (Hocuspocus)
+```bash
+cd collab-service
+npm install
+npm start
 ```
+*(Corre en el puerto 1234)*
+
+### 3. Servicio de ejecución de código (FastAPI Dockerizado)
+```bash
 docker build -t code-execution-service -f code-execution-service/Dockerfile code-execution-service
-```
-2. Iniciar el contenedor en el puerto 8000
-
-```
-docker run --rm -p PUERTO_ANFITRION:PUERTO_CONTENEDOR code-execution-service
-```
-
-
-```
 docker run --rm -p 8000:8000 code-execution-service
 ```
 
-## Servicio de edición colaborativa
-1. Iniciar servicio colaborativo
-```
-cd collab-service
-npm start
+### 4. Nginx (API Gateway)
+Desde la raíz del proyecto, levanta un contenedor de nginx pasando nuestro archivo de configuración.
+
+**Para Windows (PowerShell):**
+```bash
+docker run --rm --name api-gateway -p 8080:8080 -v "${PWD}/nginx.conf:/etc/nginx/nginx.conf:ro" nginx
 ```
 
-Salida esperada:
+**Para Linux / Mac / Git Bash:**
+```bash
+docker run --rm --name api-gateway -p 8080:8080 -v "$(pwd)/nginx.conf:/etc/nginx/nginx.conf:ro" nginx
 ```
-[collab] Servidor en http/ws://localhost:1234
-[collab] Endpoint de token de prueba: POST http://localhost:1234/dev-token
-```
-## API Gateway
-1. Iniciar el API Gateway en el puerto 8080. Todas las peticiones del frontend deben apuntar a este puerto.
-```
-cd api-gateway
-mvn spring-boot:run
-```
-2. Iniciar frontend (en otra terminal)
-```
+*(Corre en el puerto 8080 y enrutará todo el tráfico hacia tus demás servicios locales)*
+
+### 5. Frontend (Angular)
+```bash
 cd frontend
 ng serve
 ```
+*(Corre en el puerto 4200)*
 
-3. Probar conexión en dos pestañas
-Abrir dos pestañas en:
-```
-http://localhost:4200
-```
-
-En la terminal de collab-service deben aparecer dos conexiones al room:
-```
-[collab] ... se unió a "room-editor-1"
-```
