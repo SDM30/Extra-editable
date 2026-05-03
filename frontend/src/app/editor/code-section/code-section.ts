@@ -52,7 +52,7 @@ import { CollabService } from '../../services/collab.service';
  * - 'dark': Tema oscuro predefinido
  * - Extension: Extensión personalizada de CodeMirror
  */
-export type Theme = 'light' | 'dark' | Extension;
+export type Theme = 'dark' | 'light' | Extension;
 
 @Component({
   selector: 'app-code-section',
@@ -134,13 +134,13 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit, OnChanges 
    * Puede ser un tema predefinido ('light', 'dark') o una extensión de CodeMirror personalizada
    *
    * @type {Theme}
-   * @default 'light'
+   * @default 'dark'
    *
    * @example
    * [theme]="'dark'" // Tema oscuro
    * [theme]="oneDark" // Extensión personalizada
    */
-  @Input() theme: Theme = 'light';
+  @Input() theme: Theme = 'dark';
 
   /**
    * Lenguaje de programación actual
@@ -432,26 +432,9 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit, OnChanges 
     // yCollab incluye sincronización (ySync) + cursores remotos (awareness).
     this.collabExtensions = [yCollab(shared, awareness, { undoManager: this.collabUndoManager })];
 
-    // Aplicar las extensiones directamente al EditorView para asegurar que
-    // los bindings de Yjs/awareness estén activos desde el inicio.
-    try {
-      const newExtensions = this.editorExtensions;
-
-      // Crear un nuevo EditorState conservando documento y selección,
-      // pero con las nuevas extensiones aplicadas.
-      const newState = EditorState.create({
-        doc: this.editorView.state.doc,
-        selection: this.editorView.state.selection,
-        extensions: newExtensions,
-      });
-
-      this.editorView.setState(newState);
-    } catch (err) {
-      console.error('[CodeSection] Error reconfigurando EditorView para collab:', err);
-      // Como fallback, forzar que Angular re-renderice el wrapper para que
-      // `code-editor` reciba las nuevas extensiones.
-      this.cdr.detectChanges();
-    }
+    // El provider se conecta fuera del zone de Angular; forzar update para que
+    // `code-editor` reciba las nuevas extensiones.
+    this.cdr.detectChanges();
   }
 
   /**
