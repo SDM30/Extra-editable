@@ -87,7 +87,8 @@ const server = Server.configure({
         userId: payload.sub ?? 'anon',
         username: payload.username ?? 'Anónimo',
       };
-    } catch {
+    } catch (err) {
+      console.error('[collab] Auth fallida:', err?.message ?? err);
       throw new Error('Token inválido o expirado');
     }
   },
