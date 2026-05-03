@@ -26,6 +26,7 @@ import {
   AfterViewInit,
   OnChanges,
   SimpleChanges,
+  ChangeDetectorRef,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CodeEditor } from '@acrodata/code-editor';
@@ -307,6 +308,7 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit, OnChanges 
   constructor(
     private lspIntegration: CodeMirrorLspService,
     private collab: CollabService,
+    private cdr: ChangeDetectorRef,
   ) {}
 
   /**
@@ -420,6 +422,10 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit, OnChanges 
     this.collabUndoManager = new Y.UndoManager(shared);
     // yCollab incluye sincronización (ySync) + cursores remotos (awareness).
     this.collabExtensions = [yCollab(shared, awareness, { undoManager: this.collabUndoManager })];
+
+    // El provider se conecta fuera del zone de Angular; forzar update para que
+    // `code-editor` reciba las nuevas extensiones.
+    this.cdr.detectChanges();
   }
 
   /**
