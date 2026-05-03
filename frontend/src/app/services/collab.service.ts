@@ -23,7 +23,8 @@ export class CollabService implements OnDestroy {
     this.ydoc = new Y.Doc();
 
     this.provider = new HocuspocusProvider({
-      url: 'ws://localhost:8080/collab',
+      // Usar slash final para matchear `location /collab/` en Nginx
+      url: 'ws://localhost:8080/collab/',
       name: documentName,
       document: this.ydoc,
       token,
@@ -37,8 +38,11 @@ export class CollabService implements OnDestroy {
         this.ready$.next();
       },
       onDisconnect: () => console.log('[collab] Desconectado'),
-      onAuthenticationFailed: ({ reason }) =>
-        console.error('[collab] Auth fallida:', reason),
+      onAuthenticationFailed: ({ reason }) => {
+        const tokenPreview =
+          typeof token === 'string' && token.length > 12 ? `${token.slice(0, 12)}…` : token;
+        console.error('[collab] Auth fallida:', { reason, token: tokenPreview });
+      },
     });
 
     return this.provider;
