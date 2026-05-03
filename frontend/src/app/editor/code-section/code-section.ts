@@ -32,7 +32,7 @@ import { CodeEditor } from '@acrodata/code-editor';
 import { EditorView } from '@codemirror/view';
 import { Extension } from '@codemirror/state';
 import { autocompletion } from '@codemirror/autocomplete';
-import { yCollab, ySync, yUndoManager } from 'y-codemirror.next';
+import { yCollab } from 'y-codemirror.next';
 import { Subscription } from 'rxjs';
 import * as Y from 'yjs';
 
@@ -417,14 +417,9 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit, OnChanges 
 
     if (!shared || !awareness) return;
 
-    // Importante: para que los cursores remotos "se muevan" con las ediciones,
-    // necesitamos sincronizar el documento con ySync (no solo awareness/cursors).
     this.collabUndoManager = new Y.UndoManager(shared);
-    this.collabExtensions = [
-      ySync(shared),
-      yUndoManager(this.collabUndoManager),
-      yCollab(shared, awareness),
-    ];
+    // yCollab incluye sincronización (ySync) + cursores remotos (awareness).
+    this.collabExtensions = [yCollab(shared, awareness, { undoManager: this.collabUndoManager })];
   }
 
   /**
