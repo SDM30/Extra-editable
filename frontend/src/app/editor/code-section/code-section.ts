@@ -32,8 +32,9 @@ import { CodeEditor } from '@acrodata/code-editor';
 import { EditorView } from '@codemirror/view';
 import { Extension } from '@codemirror/state';
 import { autocompletion } from '@codemirror/autocomplete';
-import { yCollab } from 'y-codemirror.next';
+import { yCollab, ySync, yUndoManager } from 'y-codemirror.next';
 import { Subscription } from 'rxjs';
+import * as Y from 'yjs';
 
 import { cpp } from '@codemirror/lang-cpp';
 import { javascript } from '@codemirror/lang-javascript';
@@ -278,6 +279,7 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit, OnChanges 
    * @private
    */
   private collabExtensions: Extension[] = [];
+  private collabUndoManager: Y.UndoManager | null = null;
 
   private collabReadySub: Subscription | null = null;
 
@@ -396,6 +398,8 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit, OnChanges 
   ngOnDestroy(): void {
     this.collabReadySub?.unsubscribe();
     this.collabReadySub = null;
+    this.collabUndoManager?.destroy();
+    this.collabUndoManager = null;
 
     if (this.lspEnabled) {
       const fullPath = this.lspAttachedPath ?? this.getFullPath();
@@ -413,8 +417,14 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit, OnChanges 
 
     if (!shared || !awareness) return;
 
-    // yCollab muestra cursores/selecciones remotas a partir del awareness.
-    this.collabExtensions = [yCollab(shared, awareness)];
+    // Importante: para que los cursores remotos "se muevan" con las ediciones,
+    // necesitamos sincronizar el documento con ySync (no solo awareness/cursors).
+    this.collabUndoManager = new Y.UndoManager(shared);
+    this.collabExtensions = [
+      ySync(shared),
+      yUndoManager(this.collabUndoManager),
+      yCollab(shared, awareness),
+    ];
   }
 
   /**
