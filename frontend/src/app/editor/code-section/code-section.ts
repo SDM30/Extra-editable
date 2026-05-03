@@ -32,12 +32,15 @@ import { CodeEditor } from '@acrodata/code-editor';
 import { EditorView } from '@codemirror/view';
 import { Extension } from '@codemirror/state';
 import { autocompletion } from '@codemirror/autocomplete';
+import { yCollab } from 'y-codemirror.next';
+import { Subscription } from 'rxjs';
 
 import { cpp } from '@codemirror/lang-cpp';
 import { javascript } from '@codemirror/lang-javascript';
 import { python } from '@codemirror/lang-python';
 
 import { CodeMirrorLspService } from '../../services/codemirror-lsp-service';
+import { CollabService } from '../../services/collab.service';
 
 /**
  * Tipo de tema del editor
@@ -271,6 +274,14 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit, OnChanges 
   private lspExtensions: Extension[] = [];
 
   /**
+   * Extensiones de colaboración (Yjs + cursores remotos)
+   * @private
+   */
+  private collabExtensions: Extension[] = [];
+
+  private collabReadySub: Subscription | null = null;
+
+  /**
    * Ruta completa del archivo actualmente conectado a LSP
    * Se usa para desconectar LSP cuando cambia el lenguaje
    * @private
@@ -291,7 +302,10 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit, OnChanges 
    *
    * @param {CodeMirrorLspService} lspIntegration - Servicio de integración LSP
    */
-  constructor(private lspIntegration: CodeMirrorLspService) {}
+  constructor(
+    private lspIntegration: CodeMirrorLspService,
+    private collab: CollabService,
+  ) {}
 
   /**
    * Hook del ciclo de vida Angular - Inicializa el componente
@@ -321,6 +335,13 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit, OnChanges 
   ngAfterViewInit(): void {
     setTimeout(() => {
       this.editorView = (this.codeEditor as any).view;
+
+      // Inicializar binding colaborativo cuando el provider esté listo.
+      // (CollabService emite ready$ en onConnect del provider)
+      this.collabReadySub?.unsubscribe();
+      this.collabReadySub = this.collab.ready$.subscribe(() => this.initializeCollab());
+      // Intento inmediato por si ya estaba conectado antes de montar el componente.
+      this.initializeCollab();
 
       if (this.editorView && this.lspEnabled) {
         this.initializeLSP();
@@ -373,10 +394,27 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit, OnChanges 
    * @returns {void}
    */
   ngOnDestroy(): void {
+    this.collabReadySub?.unsubscribe();
+    this.collabReadySub = null;
+
     if (this.lspEnabled) {
       const fullPath = this.lspAttachedPath ?? this.getFullPath();
       this.lspIntegration.detachLSP(fullPath);
     }
+  }
+
+  private initializeCollab(): void {
+    if (!this.editorView) return;
+    if (this.collabExtensions.length > 0) return;
+
+    const shared = this.collab.getSharedText('codemirror');
+    const provider = this.collab.getProvider();
+    const awareness = provider?.awareness;
+
+    if (!shared || !awareness) return;
+
+    // yCollab muestra cursores/selecciones remotas a partir del awareness.
+    this.collabExtensions = [yCollab(shared, awareness)];
   }
 
   /**
@@ -541,6 +579,11 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit, OnChanges 
       extensions.push(...this.lspExtensions);
     } else {
       extensions.push(autocompletion());
+    }
+
+    // Colaboración (cursores remotos + sync doc)
+    if (this.collabExtensions.length > 0) {
+      extensions.push(...this.collabExtensions);
     }
 
     return extensions;
