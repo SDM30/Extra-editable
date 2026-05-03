@@ -31,7 +31,7 @@ import {
 import { FormsModule } from '@angular/forms';
 import { CodeEditor } from '@acrodata/code-editor';
 import { EditorView } from '@codemirror/view';
-import { Extension } from '@codemirror/state';
+import { Extension, EditorState } from '@codemirror/state';
 import { autocompletion } from '@codemirror/autocomplete';
 import { yCollab } from 'y-codemirror.next';
 import { Subscription } from 'rxjs';
@@ -282,6 +282,12 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit, OnChanges 
   private collabExtensions: Extension[] = [];
   private collabUndoManager: Y.UndoManager | null = null;
 
+  /**
+   * Cache de la extensión de lenguaje para evitar crear nuevas instancias en cada getter
+   * CodeMirror compara por identidad de objetos.
+   */
+  private languageExt: Extension | null = null;
+
   private collabReadySub: Subscription | null = null;
 
   /**
@@ -375,6 +381,9 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit, OnChanges 
     if (!languageChanged && !projectChanged && !lspToggled) return;
     if (!this.editorView) return;
 
+    // Limpiar cache de la extensión de lenguaje si cambió el lenguaje
+    if (languageChanged) this.languageExt = null;
+
     if (!this.lspEnabled) {
       if (this.lspAttachedPath) {
         this.lspIntegration.detachLSP(this.lspAttachedPath);
@@ -423,9 +432,26 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit, OnChanges 
     // yCollab incluye sincronización (ySync) + cursores remotos (awareness).
     this.collabExtensions = [yCollab(shared, awareness, { undoManager: this.collabUndoManager })];
 
-    // El provider se conecta fuera del zone de Angular; forzar update para que
-    // `code-editor` reciba las nuevas extensiones.
-    this.cdr.detectChanges();
+    // Aplicar las extensiones directamente al EditorView para asegurar que
+    // los bindings de Yjs/awareness estén activos desde el inicio.
+    try {
+      const newExtensions = this.editorExtensions;
+
+      // Crear un nuevo EditorState conservando documento y selección,
+      // pero con las nuevas extensiones aplicadas.
+      const newState = EditorState.create({
+        doc: this.editorView.state.doc,
+        selection: this.editorView.state.selection,
+        extensions: newExtensions,
+      });
+
+      this.editorView.setState(newState);
+    } catch (err) {
+      console.error('[CodeSection] Error reconfigurando EditorView para collab:', err);
+      // Como fallback, forzar que Angular re-renderice el wrapper para que
+      // `code-editor` reciba las nuevas extensiones.
+      this.cdr.detectChanges();
+    }
   }
 
   /**
@@ -612,17 +638,26 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit, OnChanges 
    * @returns {Extension} Extensión de CodeMirror para el lenguaje actual
    */
   private languageExtension(): Extension {
+    if (this.languageExt) return this.languageExt;
+
+    let ext: Extension;
     switch (this.language) {
       case 'cpp':
-        return cpp();
+        ext = cpp();
+        break;
       case 'typescript':
       case 'javascript':
-        return javascript();
+        ext = javascript();
+        break;
       case 'python':
-        return python();
+        ext = python();
+        break;
       default:
-        return cpp();
+        ext = cpp();
     }
+
+    this.languageExt = ext;
+    return ext;
   }
 
   @Output() inputSend = new EventEmitter<string>();
