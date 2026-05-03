@@ -50,8 +50,8 @@ export class Editor {
 
   languageOptions = [
     { label: 'C++', value: 'cpp' },
-    { label: 'JavaScript', value: 'javascript' },
     { label: 'Python', value: 'python' },
+    { label: 'TypeScript', value: 'typescript' },
   ];
 
   constructor(
@@ -68,6 +68,14 @@ export class Editor {
       (message) => {
         if (message.type === 'connected') {
           this.executionService.runCode(this.language, this.value);
+        }
+
+        if (message.type === 'queued') {
+          this.resultado += `En cola. Posición: ${message.position}\n`;
+        }
+
+        if (message.type === 'dequeued') {
+          this.resultado += `${message.data}\n`;
         }
 
         if (message.type === 'started') {
