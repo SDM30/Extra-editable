@@ -78,7 +78,7 @@ export interface LSPSession {
   providedIn: 'root',
 })
 export class LspService {
-  private readonly API_URL = enviroment.apiUrlLanguageServer || 'http://localhost:8000';
+  private readonly API_URL = enviroment.apiUrlLanguageServer || 'http://localhost:8135';
   private activeSessions: Map<string, LSPSession> = new Map();
   private saveTimersByUri: Map<string, any> = new Map();
 
@@ -93,16 +93,16 @@ export class LspService {
 
   /**
    * Crea o recupera un contenedor LSP para el proyecto
-   * 
+   *
    * Realiza una petición HTTP POST a `/lsp/{projectId}` en la API de Lenguaje Service.
    * Si el contenedor ya existe, la API lo reutiliza. Si es nuevo, lo crea en Docker.
-   * 
+   *
    * @param {string} projectId - Identificador único del proyecto
    * @param {string} language - Lenguaje de programación (python, cpp, typescript)
    * @param {number} [maxClients=4] - Máximo número de clientes concurrentes permitidos
    * @returns {Promise<LSPContainerResponse>} Información del contenedor (URL WebSocket, puerto, etc.)
    * @throws {Error} Si la API retorna error o no hay conexión
-   * 
+   *
    * @example
    * const response = await lspService.getOrCreateContainer('my-project', 'python');
    * console.log(response.ws_url); // ws://127.0.0.1:32768
@@ -123,7 +123,7 @@ export class LspService {
 
   /**
    * Inicializa una sesión LSP para un proyecto
-   * 
+   *
    * Este es el método principal para establecer la conexión con el servidor LSP.
    * Realiza lo siguiente:
    * 1. Verifica si ya existe una sesión activa y la reutiliza
@@ -131,12 +131,12 @@ export class LspService {
    * 3. Establece conexión WebSocket
    * 4. Inicializa el protocolo LSP (handshake initialize/initialized)
    * 5. Almacena la sesión en el registro interno
-   * 
+   *
    * @param {string} projectId - Identificador del proyecto
    * @param {string} language - Lenguaje de programación
    * @returns {Promise<LSPSession>} La sesión LSP inicializada y lista para usar
    * @throws {Error} Si hay timeout conectando o si falla la inicialización LSP
-   * 
+   *
    * @example
    * const session = await lspService.initializeSession('my-project', 'python');
    * console.log(session.initialized); // true
@@ -331,16 +331,16 @@ export class LspService {
 
   /**
    * Abre un documento en el servidor LSP
-   * 
+   *
    * Envía la notificación `textDocument/didOpen` para que el servidor comience
    * a analizar el archivo. El servidor puede generar diagnósticos tras recibir esta notificación.
-   * 
+   *
    * @param {LSPSession} session - La sesión LSP activa
    * @param {string} filePath - Ruta relativa del archivo (ej: 'main.py')
    * @param {string} content - Contenido completo del archivo
    * @param {string} language - ID del lenguaje (python, cpp, typescript)
    * @throws No lanza errores; registra warning si la sesión no está inicializada
-   * 
+   *
    * @example
    * lspService.openDocument(session, 'app.py', 'import os\nos.path.', 'python');
    */
@@ -366,19 +366,19 @@ export class LspService {
 
   /**
    * Actualiza un documento cuando el usuario escribe
-   * 
+   *
    * Envía la notificación `textDocument/didChange` con el contenido actualizado.
    * Implementa debouncing (~600ms) antes de enviar `textDocument/didSave` para evitar
    * saturar el servidor con demasiadas notificaciones.
-   * 
+   *
    * El servidor LSP puede generar diagnósticos después de recibir didSave.
-   * 
+   *
    * @param {LSPSession} session - La sesión LSP activa
    * @param {string} filePath - Ruta relativa del archivo
    * @param {string} content - Contenido actualizado completo del archivo
    * @param {number} version - Número de versión del documento (incremental)
    * @throws No lanza errores; retorna silenciosamente si la sesión no está inicializada
-   * 
+   *
    * @example
    * lspService.updateDocument(session, 'app.py', 'import os\nos.path.exists', 2);
    */
@@ -414,19 +414,19 @@ export class LspService {
 
   /**
    * Solicita autocompletado en una posición específica del código
-   * 
+   *
    * Envía un request `textDocument/completion` al servidor LSP.
    * El servidor devuelve una lista de sugerencias basadas en el contexto.
-   * 
+   *
    * Incluye timeout de seguridad de 3 segundos para evitar quedarse esperando.
-   * 
+   *
    * @param {LSPSession} session - La sesión LSP activa
    * @param {string} filePath - Ruta relativa del archivo
    * @param {number} line - Número de línea (0-indexado)
    * @param {number} character - Posición del carácter en la línea (0-indexado)
    * @returns {Promise<any[]>} Array de items de autocompletado (LSPCompletionItem[])
    * @throws No lanza errores; devuelve array vacío si hay timeout o error
-   * 
+   *
    * @example
    * const items = await lspService.requestCompletion(session, 'app.py', 5, 10);
    * // items[0].label → 'forEach', 'filter', etc.
@@ -478,14 +478,14 @@ export class LspService {
 
   /**
    * Cierra un documento en el servidor LSP
-   * 
+   *
    * Envía la notificación `textDocument/didClose` para que el servidor
    * libere recursos asociados al archivo.
-   * 
+   *
    * @param {LSPSession} session - La sesión LSP activa
    * @param {string} filePath - Ruta relativa del archivo
    * @throws No lanza errores; retorna silenciosamente si la sesión no está inicializada
-   * 
+   *
    * @example
    * lspService.closeDocument(session, 'app.py');
    */
@@ -500,18 +500,18 @@ export class LspService {
 
   /**
    * Cierra la sesión LSP y libera recursos
-   * 
+   *
    * Cierra el WebSocket y elimina la sesión del registro interno.
-   * 
+   *
    * Nota: En un LSP compartido (multiplexor), no enviamos shutdown/exit
    * ya que eso cerraría la sesión para todos los clientes. Solo cerramos
    * la conexión del cliente actual.
-   * 
+   *
    * @param {string} projectId - Identificador del proyecto
    * @param {string} language - Lenguaje de programación
    * @returns {Promise<void>}
    * @throws No lanza errores; es segura de llamar múltiples veces
-   * 
+   *
    * @example
    * await lspService.shutdownSession('my-project', 'python');
    */
@@ -550,10 +550,10 @@ export class LspService {
 
   /**
    * Obtiene el estado actual de un contenedor LSP
-   * 
+   *
    * Realiza una petición HTTP GET a `/lsp/{projectId}` para consultar
    * información sobre el contenedor (si está activo, número de clientes, etc.).
-   * 
+   *
    * @param {string} projectId - Identificador del proyecto
    * @param {string} [language] - Lenguaje opcional para filtrar
    * @returns {Promise<any>} Información del estado del contenedor
@@ -569,10 +569,10 @@ export class LspService {
 
   /**
    * Elimina/destruye un contenedor LSP
-   * 
+   *
    * Realiza una petición HTTP DELETE a `/lsp/{projectId}` para
    * detener y eliminar el contenedor Docker del proyecto.
-   * 
+   *
    * @param {string} projectId - Identificador del proyecto
    * @param {string} [language] - Lenguaje opcional
    * @returns {Promise<void>}
