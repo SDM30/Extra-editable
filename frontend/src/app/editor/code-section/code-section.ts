@@ -350,8 +350,10 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit, OnChanges 
       // (CollabService emite ready$ en onConnect del provider)
       this.collabReadySub?.unsubscribe();
       this.collabReadySub = this.collab.ready$.subscribe(() => this.initializeCollab());
-      // Intento inmediato por si ya estaba conectado antes de montar el componente.
-      this.initializeCollab();
+      // Si el provider ya está sincronizado al montar, inicializar ahora.
+      if (this.collab.getProvider() && (this.collab as any).isReady && (this.collab as any).isReady()) {
+        this.initializeCollab();
+      }
 
       if (this.editorView && this.lspEnabled) {
         this.initializeLSP();
@@ -418,7 +420,7 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit, OnChanges 
     }
   }
 
-  private initializeCollab(): void {
+  private async initializeCollab(): Promise<void> {
     if (!this.editorView) return;
     if (this.collabExtensions.length > 0) return;
 
@@ -427,6 +429,23 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit, OnChanges 
     const awareness = provider?.awareness;
 
     if (!shared || !awareness) return;
+
+    // Normalizar saltos de línea para evitar desalineaciones CRLF/LF
+    const localText = this.editorView.state.doc.toString().replace(/\r\n/g, '\n');
+
+    try {
+      const sharedText = shared.toString();
+
+      // Si ya existe contenido remoto, hidratar el editor local desde el Y.Text
+      // compartido antes de adjuntar yCollab. Así un tab nuevo arranca con el
+      // documento real en vez del texto predeterminado del componente.
+      if (sharedText.length > 0 && sharedText !== localText) {
+        this._value = sharedText;
+        this.cdr.detectChanges();
+      }
+    } catch (e) {
+      console.warn('[CodeSection] Error comprobando/inicializando shared text:', e);
+    }
 
     this.collabUndoManager = new Y.UndoManager(shared);
     // yCollab incluye sincronización (ySync) + cursores remotos (awareness).

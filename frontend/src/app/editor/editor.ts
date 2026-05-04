@@ -1,31 +1,19 @@
-/**
- * editor.ts
- *
- * Componente principal del editor de código con soporte para múltiples lenguajes.
- *
- * Conserva:
- * - Ejecución por WebSocket (ExecutionService)
- * - Terminal con stdin + resize
- * - Colaboración (CollabService/AuthService)
- * - Integración LSP (CodeMirrorLspService) vía CodeSection
- */
 import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { Subscription } from 'rxjs';
+import { finalize, timeout } from 'rxjs';
 import { Extension } from '@codemirror/state';
+
+import { Header } from './headerIDE/headerIDE';
+import { CodeSection } from './code-section/code-section';
 
 import { oneDark } from '@codemirror/theme-one-dark';
 import { dracula } from '@uiw/codemirror-theme-dracula';
 import { solarizedLight, solarizedDark } from '@uiw/codemirror-theme-solarized';
 import { nord } from '@uiw/codemirror-theme-nord';
 import { kimbie } from '@uiw/codemirror-theme-kimbie';
-
-import { Header } from './headerIDE/headerIDE';
-import { CodeSection } from './code-section/code-section';
-
 import { ExecutionService } from '../services/execution-service';
 import { CollabService } from '../services/collab.service';
 import { AuthService } from '../services/auth.service';
-import { CodeMirrorLspService } from '../services/codemirror-lsp-service';
 
 export type Theme = 'light' | 'dark' | Extension;
 
@@ -34,33 +22,14 @@ export type Theme = 'light' | 'dark' | Extension;
   standalone: true,
   imports: [Header, CodeSection],
   templateUrl: './editor.html',
-  styleUrl: './editor.css',
+  styleUrls: ['./editor.css'],
 })
 export class Editor implements OnInit, OnDestroy {
-  private defaultCode: Record<string, string> = {
-    cpp: `#include <iostream>\n\nint main() {\n    std::cout << "Hola C++" << std::endl;\n    return 0;\n}`,
-    python: `def hello():\n    print("Hello, World!")\n\nif __name__ == "__main__":\n    hello()`,
-    typescript: `function greet(name: string): string {\n    return \`Hello, \${name}!\`;\n}\n\nconsole.log(greet("World"));`,
-    javascript: `function greet(name) {\n    return \`Hello, \${name}!\`;\n}\n\nconsole.log(greet("World"));`,
-  };
 
-  value = this.defaultCode['cpp'];
+  value = `#include <iostream>\n\nint main() {\n    std::cout << "Hola C++" << std::endl;\n    return 0;\n}`;
+
   theme: Theme = 'dark';
   language: string = 'cpp';
-
-  // Colaboración + LSP
-  projectId: string = 'proyecto-demo';
-  lspEnabled: boolean = true;
-
-  // Terminal / ejecución
-  resultado: string = '';
-  resultadoOk: boolean = false;
-  cargando: boolean = false;
-
-  terminalHeight = 220;
-  private isResizing = false;
-  private startY = 0;
-  private startHeight = 220;
 
   themeOptions = [
     { label: 'Standard Light', value: 'light' as Theme },
@@ -74,137 +43,131 @@ export class Editor implements OnInit, OnDestroy {
   ];
 
   languageOptions = [
-    { label: 'Python', value: 'python' },
     { label: 'C++', value: 'cpp' },
-    { label: 'TypeScript', value: 'typescript' },
+    { label: 'JavaScript', value: 'javascript' },
+    { label: 'Python', value: 'python' },
   ];
+
+  resultado?: string;
+  resultadoOk?: boolean;
+  cargando = false;
+  projectId: string = 'default-project';
+  lspEnabled: boolean = true;
+  terminalHeight: number = 220;
+  collaborators: Array<{ userId: string; username: string; color: string }> = [];
+  private collaboratorsSub?: Subscription;
 
   constructor(
     private executionService: ExecutionService,
     private cdr: ChangeDetectorRef,
     private collab: CollabService,
     private auth: AuthService,
-    private lspService: CodeMirrorLspService,
-    private route: ActivatedRoute,
   ) {}
 
   async ngOnInit() {
-    this.route.queryParams.subscribe((params) => {
-      this.projectId = params['projectId'] || 'proyecto-demo';
-      console.log(`[Editor] Project ID: ${this.projectId}`);
-    });
+    console.log('[Editor] solicitando token collab...');
+    // Obtiene (o genera) la identidad del usuario y pide el token al servidor collab
+    const { token, username, userId } = await this.auth.getCollabToken();
+    console.log('[Editor] token recibido para', username);
+    // Conecta al documento compartido. Todos los que entren a 'room-editor-1' comparten el mismo código.
+    console.log('[Editor] llamando collab.connect()');
+    try {
+      this.collaboratorsSub?.unsubscribe();
+      this.collaboratorsSub = this.collab.collaborators$.subscribe((list) => {
+        this.collaborators = list;
+        this.cdr.detectChanges();
+      });
 
-    const { token, username } = await this.auth.getCollabToken();
-    this.collab.connect('room-editor-1', token, username);
+      await this.collab.connect('room-editor-1', token, username, userId);
+      console.log('[Editor] collab.connect() completado');
+    } catch (err) {
+      console.error('[Editor] Error en collab.connect():', err);
+    }
   }
 
   ngOnDestroy(): void {
-    if (this.lspEnabled) {
-      this.lspService.shutdownProject(this.projectId).catch(console.error);
-    }
+    this.collaboratorsSub?.unsubscribe();
   }
-
-  onLanguageChange(language: string) {
-    this.language = language;
-    if (this.defaultCode[language]) {
-      this.value = this.defaultCode[language];
-    }
-    console.log(`[Editor] Lenguaje cambiado a: ${language}`);
-  }
-
+  // Método invocado desde la plantilla. Alias en español para compatibilidad.
   ejecutarCodigo(): void {
-    this.resultado = '';
+    this.onRunCode();
+  }
+
+  onLanguageChange(newLang: string): void {
+    this.language = newLang;
+  }
+
+  startResize(ev: MouseEvent): void {
+    // Placeholder: se puede manejar arrastrar tamaño del terminal desde aquí.
+    console.log('[Editor] startResize', ev.type);
+  }
+
+  enviarEntrada(input: string): void {
+    this.executionService.sendInput(input);
+  }
+
+  private onRunCode(): void {
+    this.resultado = undefined;
+    this.resultadoOk = undefined;
     this.cargando = true;
-    this.resultadoOk = false;
+    this.cdr.detectChanges();
+
+    const sharedCode = this.collab.getSharedText('codemirror')?.toString();
+    const codeToRun = sharedCode && sharedCode.length > 0 ? sharedCode : this.value;
+    let accumulated = '';
 
     this.executionService.connect(
       (message) => {
-        if (message.type === 'connected') {
-          this.executionService.runCode(this.language, this.value);
+        switch (message.type) {
+          case 'output':
+            accumulated += message.data;
+            this.resultado = accumulated;
+            break;
+          case 'dequeued':
+            accumulated += message.data || '';
+            break;
+          case 'error':
+            accumulated += '\n[error] ' + message.data;
+            break;
+          case 'finished':
+            this.cargando = false;
+            this.resultado = accumulated;
+            this.resultadoOk = message.exitCode === 0;
+            this.cdr.detectChanges();
+            break;
+          default:
+            // otros mensajes: queued, started, timeout
+            break;
         }
-
-        if (message.type === 'queued') {
-          this.resultado += `En cola. Posición: ${message.position}\n`;
-        }
-
-        if (message.type === 'dequeued') {
-          this.resultado += `${message.data}\n`;
-        }
-
-        if (message.type === 'started') {
-          this.resultado += 'Ejecución iniciada...\n';
-        }
-
-        if (message.type === 'output') {
-          this.resultado += message.data;
-        }
-
-        if (message.type === 'error') {
-          this.resultado += '\nError: ' + message.data;
-          this.cargando = false;
-          this.resultadoOk = false;
-        }
-
-        if (message.type === 'timeout') {
-          this.resultado += '\n' + message.data;
-          this.cargando = false;
-          this.resultadoOk = false;
-        }
-
-        if (message.type === 'finished') {
-          this.cargando = false;
-          this.resultadoOk = message.exitCode === 0;
-          this.resultado += `\nProceso finalizado con código ${message.exitCode}`;
-          this.executionService.disconnect();
-        }
-
-        this.cdr.detectChanges();
       },
       () => {
-        this.resultado = 'No se pudo conectar con el servicio de ejecución.';
+        // onError
         this.cargando = false;
+        this.resultado = 'Error: conexión de ejecución fallida';
         this.cdr.detectChanges();
       },
       () => {
+        // onClose
         this.cargando = false;
         this.cdr.detectChanges();
       },
     );
+
+    // Enviar petición de ejecución
+    this.executionService.runCode(this.language, codeToRun);
   }
 
-  enviarEntrada(input: string): void {
-    if (!input.trim()) return;
-
-    this.resultado += input + '\n';
-    this.executionService.sendInput(input);
-    this.cdr.detectChanges();
+  private limpiarResultado(resultado: string): string {
+    return resultado.replace(/^id\s*=\s*[^|]*\|\s*/i, '');
   }
 
-  startResize(event: MouseEvent): void {
-    this.isResizing = true;
-    this.startY = event.clientY;
-    this.startHeight = this.terminalHeight;
-
-    document.addEventListener('mousemove', this.onResize);
-    document.addEventListener('mouseup', this.stopResize);
+  private extraerEstadoOk(resultado: string): boolean | undefined {
+    const match = resultado.match(/(^|\n)\s*ok\s*=\s*(true|false)\s*(\n|$)/i);
+    if (!match) return undefined;
+    return match[2].toLowerCase() === 'true';
   }
 
-  onResize = (event: MouseEvent): void => {
-    if (!this.isResizing) return;
-
-    const delta = this.startY - event.clientY;
-    const newHeight = this.startHeight + delta;
-
-    if (newHeight >= 120 && newHeight <= 600) {
-      this.terminalHeight = newHeight;
-      this.cdr.detectChanges();
-    }
-  };
-
-  stopResize = (): void => {
-    this.isResizing = false;
-    document.removeEventListener('mousemove', this.onResize);
-    document.removeEventListener('mouseup', this.stopResize);
-  };
+  private formatearSalida(resultado: string, tiempo?: string): string {
+    return `${resultado}\ntiempo=${tiempo ?? 'N/A'}`;
+  }
 }
-
