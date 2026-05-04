@@ -1,0 +1,55 @@
+<form (ngSubmit)="onRegister()" [formGroup]="registerForm" novalidate>
+
+  <div class="alert error"   *ngIf="errorMessage">{{ errorMessage }}</div>
+  <div class="alert success" *ngIf="successMessage">{{ successMessage }}</div>
+
+  <div class="form-grid">
+
+    <div class="field">
+      <label for="reg-username">Usuario*</label>
+      <input id="reg-username" formControlName="username" type="text" placeholder="tu_usuario" autocomplete="username" />
+      <div class="error-message" *ngIf="registerForm.get('username')?.invalid && registerForm.get('username')?.touched">
+        <span *ngIf="registerForm.get('username')?.errors?.['required']">El usuario es requerido.</span>
+        <span *ngIf="registerForm.get('username')?.errors?.['minlength']">Mínimo 3 caracteres.</span>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="reg-nombre">Nombre*</label>
+      <input id="reg-nombre" formControlName="nombre" type="text" placeholder="Tu nombre completo" />
+      <div class="error-message" *ngIf="registerForm.get('nombre')?.invalid && registerForm.get('nombre')?.touched">
+        <span *ngIf="registerForm.get('nombre')?.errors?.['required']">El nombre es requerido.</span>
+        <span *ngIf="registerForm.get('nombre')?.errors?.['minlength']">Mínimo 2 caracteres.</span>
+      </div>
+    </div>
+
+    <div class="field field-full">
+      <label for="reg-email">Correo*</label>
+      <input id="reg-email" formControlName="email" type="email" placeholder="tu@correo.com" autocomplete="email" />
+      <div class="error-message" *ngIf="registerForm.get('email')?.invalid && registerForm.get('email')?.touched">
+        <span *ngIf="registerForm.get('email')?.errors?.['required']">El correo es requerido.</span>
+        <span *ngIf="registerForm.get('email')?.errors?.['email']">Ingresa un correo válido.</span>
+      </div>
+    </div>
+
+    <div class="field field-full">
+      <label for="reg-password">Contraseña*</label>
+      <input id="reg-password" formControlName="password" type="password" placeholder="••••••••" autocomplete="new-password" />
+      <div class="error-message" *ngIf="registerForm.get('password')?.invalid && registerForm.get('password')?.touched">
+        <span *ngIf="registerForm.get('password')?.errors?.['required']">La contraseña es requerida.</span>
+        <span *ngIf="registerForm.get('password')?.errors?.['minlength']">Mínimo 8 caracteres.</span>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="actions">
+    <button class="btn" type="submit" [disabled]="isLoading || registerForm.invalid">
+      {{ isLoading ? 'Registrando...' : 'Crear cuenta' }}
+    </button>
+    <button class="btn btn--outline" type="button" (click)="toggleForm.emit()" [disabled]="isLoading">
+      Ya tengo cuenta
+    </button>
+  </div>
+
+</form>

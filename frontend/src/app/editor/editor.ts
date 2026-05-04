@@ -1,8 +1,17 @@
-import { ChangeDetectorRef, Component } from '@angular/core';
+/**
+ * editor.ts
+ *
+ * Componente principal del editor de código con soporte para múltiples lenguajes.
+ *
+ * Conserva:
+ * - Ejecución por WebSocket (ExecutionService)
+ * - Terminal con stdin + resize
+ * - Colaboración (CollabService/AuthService)
+ * - Integración LSP (CodeMirrorLspService) vía CodeSection
+ */
+import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { Extension } from '@codemirror/state';
-
-import { Header } from './headerIDE/headerIDE';
-import { CodeSection } from './code-section/code-section';
 
 import { oneDark } from '@codemirror/theme-one-dark';
 import { dracula } from '@uiw/codemirror-theme-dracula';
@@ -10,29 +19,45 @@ import { solarizedLight, solarizedDark } from '@uiw/codemirror-theme-solarized';
 import { nord } from '@uiw/codemirror-theme-nord';
 import { kimbie } from '@uiw/codemirror-theme-kimbie';
 
+import { Header } from './headerIDE/headerIDE';
+import { CodeSection } from './code-section/code-section';
+
 import { ExecutionService } from '../services/execution-service';
+import { CollabService } from '../services/collab.service';
+import { AuthService } from '../services/auth.service';
+import { CodeMirrorLspService } from '../services/codemirror-lsp-service';
 
 export type Theme = 'light' | 'dark' | Extension;
-
 
 @Component({
   selector: 'app-editor',
   standalone: true,
   imports: [Header, CodeSection],
   templateUrl: './editor.html',
-  styleUrls: ['./editor.css'],
+  styleUrl: './editor.css',
 })
-export class Editor {
-  value = '';
+export class Editor implements OnInit, OnDestroy {
+  private defaultCode: Record<string, string> = {
+    cpp: `#include <iostream>\n\nint main() {\n    std::cout << "Hola C++" << std::endl;\n    return 0;\n}`,
+    python: `def hello():\n    print("Hello, World!")\n\nif __name__ == "__main__":\n    hello()`,
+    typescript: `function greet(name: string): string {\n    return \`Hello, \${name}!\`;\n}\n\nconsole.log(greet("World"));`,
+    javascript: `function greet(name) {\n    return \`Hello, \${name}!\`;\n}\n\nconsole.log(greet("World"));`,
+  };
+
+  value = this.defaultCode['cpp'];
   theme: Theme = 'dark';
   language: string = 'cpp';
 
-  resultado = '';
-  resultadoOk = false;
-  cargando = false;
+  // Colaboración + LSP
+  projectId: string = 'proyecto-demo';
+  lspEnabled: boolean = true;
+
+  // Terminal / ejecución
+  resultado: string = '';
+  resultadoOk: boolean = false;
+  cargando: boolean = false;
 
   terminalHeight = 220;
-
   private isResizing = false;
   private startY = 0;
   private startHeight = 220;
@@ -49,15 +74,43 @@ export class Editor {
   ];
 
   languageOptions = [
-    { label: 'C++', value: 'cpp' },
     { label: 'Python', value: 'python' },
+    { label: 'C++', value: 'cpp' },
     { label: 'TypeScript', value: 'typescript' },
   ];
 
   constructor(
     private executionService: ExecutionService,
-    private cdr: ChangeDetectorRef
-  ) { }
+    private cdr: ChangeDetectorRef,
+    private collab: CollabService,
+    private auth: AuthService,
+    private lspService: CodeMirrorLspService,
+    private route: ActivatedRoute,
+  ) {}
+
+  async ngOnInit() {
+    this.route.queryParams.subscribe((params) => {
+      this.projectId = params['projectId'] || 'proyecto-demo';
+      console.log(`[Editor] Project ID: ${this.projectId}`);
+    });
+
+    const { token, username } = await this.auth.getCollabToken();
+    this.collab.connect('room-editor-1', token, username);
+  }
+
+  ngOnDestroy(): void {
+    if (this.lspEnabled) {
+      this.lspService.shutdownProject(this.projectId).catch(console.error);
+    }
+  }
+
+  onLanguageChange(language: string) {
+    this.language = language;
+    if (this.defaultCode[language]) {
+      this.value = this.defaultCode[language];
+    }
+    console.log(`[Editor] Lenguaje cambiado a: ${language}`);
+  }
 
   ejecutarCodigo(): void {
     this.resultado = '';
@@ -115,19 +168,15 @@ export class Editor {
       () => {
         this.cargando = false;
         this.cdr.detectChanges();
-      }
+      },
     );
   }
 
   enviarEntrada(input: string): void {
     if (!input.trim()) return;
 
-    /* Mostrar también en terminal */
     this.resultado += input + '\n';
-
-    /* Enviar al contenedor */
     this.executionService.sendInput(input);
-
     this.cdr.detectChanges();
   }
 
@@ -154,8 +203,8 @@ export class Editor {
 
   stopResize = (): void => {
     this.isResizing = false;
-
     document.removeEventListener('mousemove', this.onResize);
     document.removeEventListener('mouseup', this.stopResize);
   };
 }
+

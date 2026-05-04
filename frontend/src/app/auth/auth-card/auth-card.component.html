@@ -1,0 +1,19 @@
+<div class="auth-card" [class.expanded]="!mostrarLogin">
+  <div class="auth-head">
+    <div class="auth-logo-icon">&#10022;</div>
+    <h1 class="auth-title">Extra Editable</h1>
+    <p class="auth-sub">
+      {{ mostrarLogin ? 'Ingresa a tu cuenta para continuar' : 'Crea una nueva cuenta' }}
+    </p>
+  </div>
+
+  <app-login-form
+    *ngIf="mostrarLogin"
+    (toggleForm)="onToggleForm()">
+  </app-login-form>
+
+  <app-register-form
+    *ngIf="!mostrarLogin"
+    (toggleForm)="onToggleForm()">
+  </app-register-form>
+</div>

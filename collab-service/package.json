@@ -1,0 +1,15 @@
+{
+  "name": "collab-service",
+  "version": "1.0.0",
+  "description": "Servicio de edicion colaborativa con Hocuspocus + Yjs",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "dependencies": {
+    "@hocuspocus/server": "^2.13.4",
+    "jsonwebtoken": "^9.0.2"
+  }
+}

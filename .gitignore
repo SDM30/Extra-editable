@@ -10,6 +10,9 @@ frontend/bazel-out/
 
 # Node
 frontend/node_modules/
+collab-service/node_modules/
+collab-service/test-tmp/
+code-execution-service/node_modules/
 frontend/npm-debug.log
 frontend/yarn-error.log
 
@@ -51,6 +54,9 @@ frontend/__screenshots__/
 # System files (global)
 # =========================
 
+# Modernization generated reports
+.github/modernize/assessment/reports/
+
 .DS_Store
 Thumbs.db
 
@@ -58,34 +64,28 @@ Thumbs.db
 # ==========================
 # Backend
 # ==========================
+# Entorno virtual
+venv/
+env/
 
-# Spring Boot/Maven generated files
-backend/HELP.md
-backend/target/
-backend/.mvn/wrapper/maven-wrapper.jar
+# Django
+*.pyc
+__pycache__/
+db.sqlite3
+media/
 
-### STS ###
-.apt_generated
-.classpath
-.factorypath
-.project
-.settings
-.springBeans
-.sts4-cache
+# Variables de entorno
+.env
 
-### IntelliJ IDEA ###
-.idea
-*.iws
-*.iml
-*.ipr
+# Migraciones generadas (opcional, muchos equipos las incluyen)
+*/migrations/
 
-### NetBeans ###
-/nbproject/private/
-/nbbuild/
-/dist/
-/nbdist/
-/.nb-gradle/
-build/
 
 ### VS Code ###
 .vscode/
+
+# JetBrains IDEs (PyCharm, etc.)
+.idea/
+
+# Public files
+public/

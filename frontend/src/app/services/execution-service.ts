@@ -21,7 +21,7 @@ export class ExecutionService {
     onError?: () => void,
     onClose?: () => void
   ): void {
-    this.socket = new WebSocket('ws://localhost:8081/ws/execute');
+    this.socket = new WebSocket('ws://localhost:8080/ejecutar/run');
 
     this.socket.onmessage = (event) => {
       console.log('MENSAJE WS:', event.data);
