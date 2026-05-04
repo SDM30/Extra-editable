@@ -1,9 +1,12 @@
 import { Server } from '@hocuspocus/server';
+import * as Y from 'yjs';
 import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET ?? 'dev-secret-change-in-production';
 const PORT = parseInt(process.env.PORT ?? '1234', 10);
 const FRONTEND_ORIGIN = 'http://localhost:4200';
+const INITIAL_DOCUMENT = `#include <iostream>\n\nint main() {\n    std::cout << "Hola C++" << std::endl;\n    return 0;\n}`;
+const documentSnapshots = new Map();
 
 async function isCollabServiceRunningOnPort() {
   const controller = new AbortController();
@@ -102,7 +105,25 @@ const server = Server.configure({
   },
 
   async onLoadDocument({ document }) {
+    const snapshot = documentSnapshots.get(document.name);
+
+    if (snapshot) {
+      Y.applyUpdate(document, snapshot);
+      return document;
+    }
+
+    const sharedText = document.getText('codemirror');
+
+    if (sharedText.length === 0) {
+      sharedText.insert(0, INITIAL_DOCUMENT);
+      documentSnapshots.set(document.name, Y.encodeStateAsUpdate(document));
+    }
+
     return document;
+  },
+
+  async onStoreDocument({ document }) {
+    documentSnapshots.set(document.name, Y.encodeStateAsUpdate(document));
   },
 });
 

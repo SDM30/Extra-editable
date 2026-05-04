@@ -1,26 +1,40 @@
-<app-header
-  [theme]="theme"
-  [themeOptions]="themeOptions"
-  [language]="language"
-  [languageOptions]="languageOptions"
-  (themeChange)="theme = $event"
-  (languageChange)="onLanguageChange($event)"
-  (runCode)="ejecutarCodigo()"
->
-</app-header>
+<div class="editor-shell">
+  <app-header
+    [theme]="theme"
+    [themeOptions]="themeOptions"
+    [language]="language"
+    [languageOptions]="languageOptions"
+    (themeChange)="theme = $event"
+    (languageChange)="onLanguageChange($event)"
+    (runCode)="ejecutarCodigo()"
+  >
+  </app-header>
 
-<app-code-section
-  [(value)]="value"
-  [theme]="theme"
-  [language]="language"
-  [projectId]="projectId"
-  [filePath]="'main'"
-  [lspEnabled]="lspEnabled"
-  [resultado]="resultado"
-  [resultadoOk]="resultadoOk"
-  [cargando]="cargando"
-  [terminalHeight]="terminalHeight"
-  (resizeStart)="startResize($event)"
-  (inputSend)="enviarEntrada($event)"
->
-</app-code-section>
+  @if (collaborators.length > 0) {
+    <div class="collaborators-bar">
+      <span class="collaborators-label">Colaboradores</span>
+      @for (user of collaborators; track user.userId) {
+        <span class="collaborator-pill">
+          <span class="collaborator-dot" [style.backgroundColor]="user.color"></span>
+          <span>{{ user.username }}</span>
+        </span>
+      }
+    </div>
+  }
+
+  <app-code-section
+    [(value)]="value"
+    [theme]="theme"
+    [language]="language"
+    [projectId]="projectId"
+    [filePath]="'main'"
+    [lspEnabled]="lspEnabled"
+    [resultado]="resultado"
+    [resultadoOk]="resultadoOk"
+    [cargando]="cargando"
+    [terminalHeight]="terminalHeight"
+    (resizeStart)="startResize($event)"
+    (inputSend)="enviarEntrada($event)"
+  >
+  </app-code-section>
+</div>
