@@ -1,0 +1,15 @@
+{
+  "name": "lsp-ws-bridge",
+  "version": "1.0.0",
+  "description": "WebSocket bridge for LSP servers based on Newton-LSP",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.16.0",
+    "vscode-ws-jsonrpc": "^3.3.0",
+    "vscode-jsonrpc": "^8.2.0"
+  }
+}

@@ -1,6 +1,7 @@
 # LSP Load Balancer - Balanceador de Cargas para Servicio de Lenguaje
 
-Balanceador Nginx independiente que distribuye conexiones WebSocket entre múltiples instancias del servicio LSP (Language Server Protocol).
+Balanceador Nginx independiente que distribuye peticiones entre múltiples instancias del
+**Servicio de Lenguaje (API FastAPI)**. Cada instancia del servicio gestiona internamente el ciclo de vida de los contenedores LSP asociados a cada proyecto, garantizando que el multiplexor de cada contenedor sea usado exclusivamente por el proyecto que le corresponde.
 
 ## 🏗️ Arquitectura
 
@@ -11,59 +12,144 @@ Nginx Principal (puerto 8080)
     ↓ /lsp/
 LSP Load Balancer (puerto 8082) ← Balanceador Nginx
     ↓↓↓ Round-Robin
-[LSP Instance 1] [LSP Instance 2] [LSP Instance 3]
+[LSP Service :8135] [LSP Service :8136] [LSP Service :8137]
+    ↓                    ↓                    ↓
+[Contenedor        [Contenedor          [Contenedor
+ LSP proyecto-A]    LSP proyecto-B]      LSP proyecto-C]
 ```
 
 ## 📋 Prerequisitos
 
 1. **Nginx instalado** en la máquina host
-2. **2-3 instancias del servicio LSP** ejecutándose en puertos específicos
-3. El **Nginx principal** (puerto 8080) debe reenviar requests de `/lsp/` a este balanceador
+2. **Redis corriendo** en `localhost:6379` — requerido para el registro compartido de contenedores entre instancias
+3. **2-3 instancias del Servicio de Lenguaje** ejecutándose en puertos distintos
+4. El **Nginx principal** (puerto 8080) debe reenviar requests de `/lsp/` a este balanceador
+
+### Levantar Redis
+
+```bash
+# Con Docker (recomendado para desarrollo)
+docker run -d --name redis-lsp -p 6379:6379 redis:7-alpine
+
+# O instalando en el sistema
+sudo apt update && sudo apt install redis-server -y
+sudo systemctl start redis-server
+
+# Verificar que está corriendo
+redis-cli ping
+# Debe responder: PONG
+```
 
 ## ⚙️ Configuración
 
-### 1. Definir puertos de instancias LSP
+### 1. Variables de entorno del Servicio de Lenguaje
 
-Edita `nginx.conf` en esta carpeta y actualiza el bloque `upstream lsp_backend`:
+Agrega las siguientes variables al archivo `.env` en `language-service/`:
 
-```nginx
-upstream lsp_backend {
-    server host.docker.internal:9001;  # LSP Instance 1
-    server host.docker.internal:9002;  # LSP Instance 2
-    server host.docker.internal:9003;  # LSP Instance 3 (opcional)
-}
+```bash
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_DB=0
+# REDIS_PASSWORD=tu_password  # solo si Redis tiene autenticación configurada
 ```
 
-**Reemplaza los puertos (9001, 9002, 9003) con los puertos reales donde corre tu servicio LSP.**
+### 2. Levantar múltiples instancias del Servicio de Lenguaje
 
-### 2. Levantar el balanceador Nginx
+```bash
+# Instancia 1
+cd language-service
+uvicorn app.main:app --host 0.0.0.0 --port 8135
+
+# Instancia 2 (nueva terminal)
+uvicorn app.main:app --host 0.0.0.0 --port 8136
+
+# Instancia 3 (nueva terminal, opcional)
+uvicorn app.main:app --host 0.0.0.0 --port 8137
+```
+
+### 3. Levantar el balanceador Nginx
 
 ```bash
 cd lsp-load-balancer
 
-# MacOS / Linux
+# Verificar configuración antes de levantar
+nginx -t -c $(pwd)/nginx.conf
+
+# Levantar en foreground (desarrollo)
 nginx -c $(pwd)/nginx.conf -g "daemon off;"
 
 # O en background
 nginx -c $(pwd)/nginx.conf
 ```
 
-
 ## 🔄 Verificar que el balanceador funciona
 
 ```bash
-# 1. Test básico de conectividad
-curl -i http://localhost:8082/
+# 1. Health check del balanceador
+curl -i http://localhost:8082/health
+# Debe responder: {"status":"ok","service":"lsp-load-balancer"}
 
-# 2. Debe retornar una respuesta (probablemente error 400 o 502 si no hay LSP atrás)
-# Eso es normal - indica que el balanceador funciona y redirige a upstream
+# 2. Verificar round-robin — observar a qué instancia llega cada petición
+#    (requiere el middleware de identificación de instancia, ver sección de pruebas)
+for i in {1..6}; do
+    echo "Petición $i → $(curl -s -o /dev/null -D - http://localhost:8082/lsp/ | grep X-Instance-Port)"
+done
+```
 
-# 3. Si ves "502 Bad Gateway" es porque los puertos de LSP en nginx.conf no existen aún
+## 🧪 Probar la distribución entre instancias
+
+Para confirmar visualmente que el balanceador distribuye en round-robin, agrega
+temporalmente este middleware en `language-service/app/main.py`:
+
+```python
+import os
+from fastapi import Request
+
+@app.middleware("http")
+async def add_instance_header(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Instance-Port"] = str(os.getenv("PORT", "unknown"))
+    return response
+```
+
+Luego lanzar cada instancia con su variable `PORT`:
+
+```bash
+PORT=8135 uvicorn app.main:app --host 0.0.0.0 --port 8135
+PORT=8136 uvicorn app.main:app --host 0.0.0.0 --port 8136
+```
+
+La salida esperada con round-robin:
+
+```
+Petición 1 → X-Instance-Port: 8135
+Petición 2 → X-Instance-Port: 8136
+Petición 3 → X-Instance-Port: 8135
+Petición 4 → X-Instance-Port: 8136
+```
+
+### Verificar el registro compartido en Redis
+
+```bash
+# Observar en tiempo real las claves que se crean al gestionar contenedores
+redis-cli monitor
+
+# En otra terminal, crear un contenedor LSP
+curl -X POST http://localhost:8082/lsp/proyecto-1 \
+  -H "Content-Type: application/json" \
+  -d '{"language": "python"}'
+
+# Listar contenedores activos registrados en Redis
+redis-cli keys "lsp:container:*"
+
+# Ver el detalle de un contenedor específico
+redis-cli get "lsp:container:proyecto-1:python"
 ```
 
 ## 🔗 Integración con Nginx Principal
 
-El archivo `nginx.conf` en la **raíz del proyecto** ya tiene un location `/lsp/` que debería apuntar a este balanceador:
+El archivo `nginx.conf` en la raíz del proyecto debe tener el location `/lsp/`
+apuntando a este balanceador:
 
 ```nginx
 location /lsp/ {
@@ -72,58 +158,33 @@ location /lsp/ {
 }
 ```
 
-Con esto, el flujo es:
-- Cliente → `http://localhost:8080/lsp/` → Nginx Principal 
-- → `http://host.docker.internal:8082` → Este balanceador
-- → Distribuye entre LSP instances (9001, 9002, 9003)
+Flujo completo:
+```
+Cliente → localhost:8080/lsp/ → Nginx Principal
+        → host.docker.internal:8082 → Este balanceador
+        → Servicio de Lenguaje (8135 | 8136 | 8137)
+        → Contenedor LSP del proyecto correspondiente
+```
 
 ## 📊 Algoritmo de balanceo
 
 - **Tipo:** Round-robin (predeterminado en Nginx)
-- **Comportamiento:** Cada nueva conexión va a la siguiente instancia en orden
-- Las conexiones WebSocket se mantienen en la misma instancia (sticky por conexión)
+- **Comportamiento:** Cada nueva petición va a la siguiente instancia del Servicio de Lenguaje en orden
+- **Registro compartido:** Redis garantiza que todas las instancias conozcan los contenedores activos, evitando duplicados por proyecto+lenguaje
 
-## 🆙 Levantar múltiples instancias LSP (Ejemplo)
-
-Si tienes un servicio LSP en un contenedor Docker, puedes levantarlo 3 veces en puertos diferentes:
-
-```bash
-# Instance 1
-docker run -d -p 9001:8000 --name lsp-1 tu-imagen-lsp
-
-# Instance 2
-docker run -d -p 9002:8000 --name lsp-2 tu-imagen-lsp
-
-# Instance 3
-docker run -d -p 9003:8000 --name lsp-3 tu-imagen-lsp
-```
-
-Luego actualiza los puertos en `nginx.conf` de este balanceador.
-
-## 🧪 Troubleshooting
+## 🧯 Troubleshooting
 
 | Problema | Solución |
 |----------|----------|
-| `502 Bad Gateway` | Los puertos en `upstream lsp_backend` no tienen servicio LSP escuchando |
-| Conexión rechazada en puerto 8082 | Nginx no está corriendo, revisa: `ps aux \| grep nginx` |
-| Requests no se distribuyen | Verifica que tienes 2+ instancias levantadas |
-| WebSocket desconecta | Ajusta `proxy_read_timeout` / `proxy_send_timeout` en nginx.conf |
+| `502 Bad Gateway` | Las instancias del Servicio de Lenguaje no están corriendo en los puertos configurados |
+| `Connection refused` en puerto 8082 | Nginx no está corriendo: `ps aux \| grep nginx` |
+| `Redis error on get: Connection refused` | Redis no está corriendo: `redis-cli ping` |
+| Requests no se distribuyen | Verificar que hay 2+ instancias levantadas y que Nginx recargó la config |
+| Contenedores duplicados por proyecto | Verificar que Redis está corriendo y que `REDIS_HOST` está configurado en `.env` |
 
 ## 📝 Notas operacionales
 
-- Este balanceador es **stateless** - puedes levantarlo/bajarlo sin afectar clientes existentes
-- Cada instancia LSP debe ser idéntica (misma versión, misma configuración)
-- Para **health checks avanzados**, agrega directivas `max_fails` y `fail_timeout` en el upstream
-- Para **sticky sessions** (misma instancia siempre), usa `hash $remote_addr` en upstream
-
-## 🔧 Próximos pasos
-
-1. Asegúrate de que tienes 2-3 instancias LSP corriendo
-2. Actualiza `nginx.conf` en esta carpeta con los puertos correctos
-3. Levanta el balanceador
-4. Verifica que el Nginx principal (puerto 8080) redirige `/lsp/` correctamente
-5. Test desde frontend: `http://localhost:4200` debería comunicarse correctamente
-
----
-
-**Mantenedor:** Balanceador independiente para scale horizontal del servicio LSP
+- Este balanceador es **stateless** — puede levantarse y bajarse sin afectar las instancias del servicio ni los contenedores LSP activos
+- El estado compartido vive en **Redis**: si Redis cae, cada instancia opera con su registro local vacío hasta que Redis se recupere
+- Cada instancia del Servicio de Lenguaje debe tener acceso al **Docker socket** para gestionar los contenedores LSP
+- Las instancias deben ser idénticas (misma versión, mismo `.env`, mismo acceso a Docker)
