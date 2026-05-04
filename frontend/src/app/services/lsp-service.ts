@@ -78,7 +78,7 @@ export interface LSPSession {
   providedIn: 'root',
 })
 export class LspService {
-  private readonly API_URL = enviroment.apiUrlLanguageServer || 'http://localhost:8135';
+  private readonly API_URL = enviroment.apiUrlLanguageServer || 'http://localhost:8080';
   private activeSessions: Map<string, LSPSession> = new Map();
   private saveTimersByUri: Map<string, any> = new Map();
 
