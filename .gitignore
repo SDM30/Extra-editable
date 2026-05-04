@@ -89,3 +89,11 @@ media/
 
 # Public files
 public/
+
+# ==== Servicio de lenguaje ====
+.codex
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv_lsp/
