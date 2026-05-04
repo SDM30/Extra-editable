@@ -115,11 +115,19 @@ Desde la raíz del proyecto, levanta un contenedor de nginx pasando nuestro arch
 docker run --rm --name api-gateway -p 8080:8080 -v "${PWD}/nginx.conf:/etc/nginx/nginx.conf:ro" nginx
 ```
 
-**Para Linux / Mac / Git Bash:**
+**Para Mac / Git Bash:**
 ```bash
 docker run --rm --name api-gateway -p 8080:8080 -v "$(pwd)/nginx.conf:/etc/nginx/nginx.conf:ro" nginx
 ```
 *(Corre en el puerto 8080 y enrutará todo el tráfico hacia tus demás servicios locales)*
+
+**Para Linux:**
+```bash
+docker run --rm --name api-gateway -p 8080:8080 \
+  --add-host host.docker.internal:host-gateway \
+  -v "$(pwd)/nginx.conf:/etc/nginx/nginx.conf:ro" \
+  nginx
+```
 
 ### 5. Frontend (Angular)
 ```bash
