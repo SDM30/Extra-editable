@@ -127,3 +127,9 @@ cd frontend
 ng serve
 ```
 *(Corre en el puerto 4200)*
+
+### 6. Balanceador de cargas
+```bash
+cd lsp-load-balancer
+nginx -c $(pwd)/nginx.conf
+```
