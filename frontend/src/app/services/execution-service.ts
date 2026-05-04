@@ -24,8 +24,6 @@ export class ExecutionService {
     this.socket = new WebSocket('ws://localhost:8081/ws/execute');
 
     this.socket.onmessage = (event) => {
-      console.log('MENSAJE WS:', event.data);
-
       const message = JSON.parse(event.data) as ExecutionMessage;
       onMessage(message);
     };
