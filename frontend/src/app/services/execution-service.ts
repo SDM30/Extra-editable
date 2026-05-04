@@ -2,6 +2,8 @@ import { Injectable } from '@angular/core';
 
 export type ExecutionMessage =
   | { type: 'connected'; data: string }
+  | { type: 'queued'; position: number; language: string }
+  | { type: 'dequeued'; data: string }
   | { type: 'started' }
   | { type: 'output'; data: string }
   | { type: 'error'; data: string }
@@ -22,6 +24,8 @@ export class ExecutionService {
     this.socket = new WebSocket('ws://localhost:8080/ejecutar/run');
 
     this.socket.onmessage = (event) => {
+      console.log('MENSAJE WS:', event.data);
+
       const message = JSON.parse(event.data) as ExecutionMessage;
       onMessage(message);
     };
