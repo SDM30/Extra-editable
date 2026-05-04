@@ -92,19 +92,14 @@ npm start
 ```
 *(Corre en el puerto 1234)*
 
-### 3. Servicio de ejecución de código (FastAPI Dockerizado)
+### 3. Servicio de ejecución de código
+Acceder a la carpeta
 ```bash
-docker build -t code-execution-service -f code-execution-service/Dockerfile code-execution-service
+cd code-execution-service
 ```
-
-Para iniciar el contenedor, puedes mapear el puerto del anfitrión al `8000` del contenedor:
+Correr el proyecto
 ```bash
-docker run --rm -p PUERTO_ANFITRION:8000 code-execution-service
-```
-
-Ejemplo (puerto 8000):
-```bash
-docker run --rm -p 8000:8000 code-execution-service
+npm run dev
 ```
 
 ### 4. Nginx (API Gateway)
