@@ -1,7 +1,10 @@
 import { Injectable } from '@angular/core';
+import { enviroment } from '../environments/enviroment';
 
 export type ExecutionMessage =
   | { type: 'connected'; data: string }
+  | { type: 'queued'; position: number; language: string }
+  | { type: 'dequeued'; data: string }
   | { type: 'started' }
   | { type: 'output'; data: string }
   | { type: 'error'; data: string }
@@ -9,7 +12,7 @@ export type ExecutionMessage =
   | { type: 'finished'; exitCode: number };
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class ExecutionService {
   private socket?: WebSocket;
@@ -17,9 +20,9 @@ export class ExecutionService {
   connect(
     onMessage: (message: ExecutionMessage) => void,
     onError?: () => void,
-    onClose?: () => void
+    onClose?: () => void,
   ): void {
-    this.socket = new WebSocket('ws://localhost:8080/ejecutar/run');
+    this.socket = new WebSocket(`${enviroment.ejecutarUrl}`);
 
     this.socket.onmessage = (event) => {
       const message = JSON.parse(event.data) as ExecutionMessage;
@@ -36,24 +39,30 @@ export class ExecutionService {
   }
 
   runCode(language: string, code: string): void {
-    this.socket?.send(JSON.stringify({
-      type: 'run',
-      language,
-      code
-    }));
+    this.socket?.send(
+      JSON.stringify({
+        type: 'run',
+        language,
+        code,
+      }),
+    );
   }
 
   sendInput(input: string): void {
-    this.socket?.send(JSON.stringify({
-      type: 'input',
-      data: input + '\n'
-    }));
+    this.socket?.send(
+      JSON.stringify({
+        type: 'input',
+        data: input + '\n',
+      }),
+    );
   }
 
   stop(): void {
-    this.socket?.send(JSON.stringify({
-      type: 'stop'
-    }));
+    this.socket?.send(
+      JSON.stringify({
+        type: 'stop',
+      }),
+    );
   }
 
   disconnect(): void {

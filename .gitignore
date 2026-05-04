@@ -90,5 +90,12 @@ media/
 # Public files
 public/
 
-==== Documentacion ====
+# ==== Documentacion ====
 Extra-editable.wiki/
+# ==== Servicio de lenguaje ====
+.codex
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv_lsp/

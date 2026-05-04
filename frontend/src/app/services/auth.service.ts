@@ -7,8 +7,8 @@ import { AuthTokens, LoginRequest, RegisterRequest, UserProfile } from '../model
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  private base = enviroment.apiBaseUrl; // http://localhost:8000/api
-  private collabTokenUrl = 'http://localhost:8080/collab/dev-token';
+  private base = enviroment.apiBaseUrl; // http://localhost:8080/api
+  private collabTokenUrl = `${enviroment.collabUrl}/dev-token`;
 
   constructor(private http: HttpClient, private router: Router) {}
 

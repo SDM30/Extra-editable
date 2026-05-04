@@ -92,19 +92,14 @@ npm start
 ```
 *(Corre en el puerto 1234)*
 
-### 3. Servicio de ejecución de código (FastAPI Dockerizado)
+### 3. Servicio de ejecución de código
+Acceder a la carpeta
 ```bash
-docker build -t code-execution-service -f code-execution-service/Dockerfile code-execution-service
+cd code-execution-service
 ```
-
-Para iniciar el contenedor, puedes mapear el puerto del anfitrión al `8000` del contenedor:
+Correr el proyecto
 ```bash
-docker run --rm -p PUERTO_ANFITRION:8000 code-execution-service
-```
-
-Ejemplo (puerto 8000):
-```bash
-docker run --rm -p 8000:8000 code-execution-service
+npm run dev
 ```
 
 ### 4. Nginx (API Gateway)
@@ -115,11 +110,19 @@ Desde la raíz del proyecto, levanta un contenedor de nginx pasando nuestro arch
 docker run --rm --name api-gateway -p 8080:8080 -v "${PWD}/nginx.conf:/etc/nginx/nginx.conf:ro" nginx
 ```
 
-**Para Linux / Mac / Git Bash:**
+**Para Mac / Git Bash:**
 ```bash
 docker run --rm --name api-gateway -p 8080:8080 -v "$(pwd)/nginx.conf:/etc/nginx/nginx.conf:ro" nginx
 ```
 *(Corre en el puerto 8080 y enrutará todo el tráfico hacia tus demás servicios locales)*
+
+**Para Linux:**
+```bash
+docker run --rm --name api-gateway -p 8080:8080 \
+  --add-host host.docker.internal:host-gateway \
+  -v "$(pwd)/nginx.conf:/etc/nginx/nginx.conf:ro" \
+  nginx
+```
 
 ### 5. Frontend (Angular)
 ```bash

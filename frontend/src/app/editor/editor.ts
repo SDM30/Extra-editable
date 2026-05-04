@@ -77,7 +77,6 @@ export class Editor implements OnInit, OnDestroy {
     { label: 'Python', value: 'python' },
     { label: 'C++', value: 'cpp' },
     { label: 'TypeScript', value: 'typescript' },
-    { label: 'JavaScript', value: 'javascript' },
   ];
 
   constructor(
@@ -122,6 +121,14 @@ export class Editor implements OnInit, OnDestroy {
       (message) => {
         if (message.type === 'connected') {
           this.executionService.runCode(this.language, this.value);
+        }
+
+        if (message.type === 'queued') {
+          this.resultado += `En cola. Posición: ${message.position}\n`;
+        }
+
+        if (message.type === 'dequeued') {
+          this.resultado += `${message.data}\n`;
         }
 
         if (message.type === 'started') {
