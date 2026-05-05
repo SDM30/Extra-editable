@@ -3,6 +3,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import lsp
 import os
+from fastapi.responses import JSONResponse
+from app.services import health as health_service
 
 # Cargar variables del archivo .env
 load_dotenv()
@@ -26,4 +28,16 @@ app.include_router(lsp.router)
 
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    return health_service.liveness()
+
+
+@app.get("/ready")
+def ready():
+    result = health_service.readiness()
+    status_code = 200 if result.get("status") == "ready" else 503
+    return JSONResponse(status_code=status_code, content=result)
+
+
+@app.get("/health/containers")
+def health_containers():
+    return health_service.containers_health()
