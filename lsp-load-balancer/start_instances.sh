@@ -9,7 +9,7 @@
 
 set -e
 
-PORTS=(8135 8136 8137 8138)
+PORTS=(8135 8136 8137 8138 8139 8140)
 SERVICE_DIR="$(cd "$(dirname "$0")/../LSP-Service/language-service" && pwd)"
 VENV_PYTHON="$(cd "$(dirname "$0")/.." && pwd)/.venv_lsp/bin/python3"
 LOG_DIR="/tmp"
