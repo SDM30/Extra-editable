@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 BASE_DIR             = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE_PATH        = os.getenv("NGINX_TEMPLATE_PATH",  os.path.join(BASE_DIR, "nginx_template.conf"))
 NGINX_CONF_PATH      = os.getenv("NGINX_CONF_PATH",      os.path.join(BASE_DIR, "nginx.conf"))
-POLL_INTERVAL        = int(os.getenv("POLL_INTERVAL", 15))
+POLL_INTERVAL        = int(os.getenv("POLL_INTERVAL", 1))
 
 # Marcador dentro del template que será reemplazado por los servidores dinámicos
 UPSTREAM_MARKER      = "# {{LSP_INSTANCES}}"
@@ -41,14 +41,20 @@ def load_template() -> str:
 
 
 def get_live_instances() -> list[str]:
-    """Retorna instancias vivas y elimina del set las que perdieron el heartbeat."""
+    """Retorna instancias vivas (host:port) y elimina del set las que perdieron el heartbeat.
+
+    El set puede contener instance_id con formato host:port:pid. Para nginx se necesita host:port,
+    por eso transformamos las instancias vivas a host:port al retornarlas.
+    """
     all_instances = r.smembers("lsp:instances")
     live = []
     dead = []
 
     for instance in all_instances:
         if r.exists(f"lsp:heartbeat:{instance}"):
-            live.append(instance)
+            # instance may include a PID suffix like host:port:pid; extract host:port for nginx
+            host_port = ":".join(instance.split(":")[:2])
+            live.append(host_port)
         else:
             dead.append(instance)
 

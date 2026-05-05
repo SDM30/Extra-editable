@@ -1,7 +1,10 @@
 # LSP Load Balancer - Balanceador de Cargas para Servicio de Lenguaje
 
 Balanceador Nginx independiente que distribuye peticiones entre múltiples instancias del
-**Servicio de Lenguaje (API FastAPI)**. Cada instancia del servicio gestiona internamente el ciclo de vida de los contenedores LSP asociados a cada proyecto, garantizando que el multiplexor de cada contenedor sea usado exclusivamente por el proyecto que le corresponde.
+**Servicio de Lenguaje (API FastAPI)**, no entre contenedores LSP directamente. Cada instancia
+del servicio gestiona internamente el ciclo de vida de los contenedores LSP asociados a cada
+proyecto, garantizando que el multiplexor de cada contenedor sea usado exclusivamente por
+el proyecto que le corresponde.
 
 ## 🏗️ Arquitectura
 
@@ -17,6 +20,12 @@ LSP Load Balancer (puerto 8082) ← Balanceador Nginx
 [Contenedor        [Contenedor          [Contenedor
  LSP proyecto-A]    LSP proyecto-B]      LSP proyecto-C]
 ```
+
+> **¿Por qué balancear el Servicio de Lenguaje y no los contenedores LSP?**
+> Cada contenedor LSP es efímero y específico de un proyecto: el multiplexor interno está
+> diseñado para ser usado por un solo proyecto a la vez. El Servicio de Lenguaje (FastAPI)
+> es quien gestiona qué contenedor corresponde a cada `project_id`, por lo que es la capa
+> correcta para escalar horizontalmente.
 
 ## 📋 Prerequisitos
 
@@ -53,21 +62,10 @@ REDIS_DB=0
 # REDIS_PASSWORD=tu_password  # solo si Redis tiene autenticación configurada
 ```
 
-### 2. Levantar múltiples instancias del Servicio de Lenguaje
+### 2. Levantar el balanceador Nginx
 
-```bash
-# Instancia 1
-cd language-service
-uvicorn app.main:app --host 0.0.0.0 --port 8135
-
-# Instancia 2 (nueva terminal)
-uvicorn app.main:app --host 0.0.0.0 --port 8136
-
-# Instancia 3 (nueva terminal, opcional)
-uvicorn app.main:app --host 0.0.0.0 --port 8137
-```
-
-### 3. Levantar el balanceador Nginx
+El balanceador **debe estar corriendo antes** de levantar las instancias del servicio.
+Sin Nginx activo, las peticiones del API Gateway recibirán `502 Bad Gateway`.
 
 ```bash
 cd lsp-load-balancer
@@ -75,12 +73,50 @@ cd lsp-load-balancer
 # Verificar configuración antes de levantar
 nginx -t -c $(pwd)/nginx.conf
 
-# Levantar en foreground (desarrollo)
-nginx -c $(pwd)/nginx.conf -g "daemon off;"
-
-# O en background
+# Levantar en background
 nginx -c $(pwd)/nginx.conf
+
+# Verificar que está corriendo
+curl http://localhost:8082/health
+# {"status":"ok","service":"lsp-load-balancer"}
 ```
+
+### 3. Levantar el watcher de descubrimiento dinámico
+
+`update_nginx.py` observa Redis y regenera `nginx.conf` cada vez que una instancia
+entra o sale. Debe correr en paralelo con Nginx.
+
+```bash
+cd lsp-load-balancer
+python3 update_nginx.py
+```
+
+### 4. Levantar las instancias del Servicio de Lenguaje
+
+Usar el script incluido, que gestiona los procesos en background con PID files:
+
+```bash
+cd lsp-load-balancer
+
+./start_instances.sh            # levantar las 3 instancias
+./start_instances.sh status     # verificar cuáles están corriendo
+./start_instances.sh logs       # ver logs de las 3 en tiempo real
+./start_instances.sh stop       # detener las 3 instancias
+./start_instances.sh restart    # reiniciar las 3 instancias
+```
+
+O manualmente si se prefiere control individual:
+
+```bash
+cd language-service
+PORT=8135 uvicorn app.main:app --host 0.0.0.0 --port 8135
+PORT=8136 uvicorn app.main:app --host 0.0.0.0 --port 8136  # nueva terminal
+PORT=8137 uvicorn app.main:app --host 0.0.0.0 --port 8137  # nueva terminal
+```
+
+> **Importante:** pasar siempre la variable `PORT` al lanzar cada instancia.
+> Es el identificador que usa el servicio para registrarse en Redis y que
+> `update_nginx.py` usa para incluirla en el upstream de Nginx.
 
 ## 🔄 Verificar que el balanceador funciona
 
@@ -176,10 +212,12 @@ Cliente → localhost:8080/lsp/ → Nginx Principal
 
 | Problema | Solución |
 |----------|----------|
-| `502 Bad Gateway` | Las instancias del Servicio de Lenguaje no están corriendo en los puertos configurados |
+| `502 Bad Gateway` desde el API Gateway | Nginx del balanceador no está corriendo — levantarlo **antes** que las instancias: `nginx -c $(pwd)/nginx.conf` |
+| `502 Bad Gateway` con Nginx corriendo | Las instancias del Servicio de Lenguaje no están corriendo: `./start_instances.sh status` |
 | `Connection refused` en puerto 8082 | Nginx no está corriendo: `ps aux \| grep nginx` |
 | `Redis error on get: Connection refused` | Redis no está corriendo: `redis-cli ping` |
-| Requests no se distribuyen | Verificar que hay 2+ instancias levantadas y que Nginx recargó la config |
+| Nginx corre pero upstream vacío | `update_nginx.py` no está corriendo o no detectó instancias: verificar `redis-cli smembers lsp:instances` |
+| Requests no se distribuyen | Verificar que hay 2+ instancias levantadas y que `update_nginx.py` regeneró el `nginx.conf` |
 | Contenedores duplicados por proyecto | Verificar que Redis está corriendo y que `REDIS_HOST` está configurado en `.env` |
 
 ## 📝 Notas operacionales

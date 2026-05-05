@@ -25,11 +25,10 @@ export type Theme = 'light' | 'dark' | Extension;
   styleUrls: ['./editor.css'],
 })
 export class Editor implements OnInit, OnDestroy {
-
   value = `#include <iostream>\n\nint main() {\n    std::cout << "Hola C++" << std::endl;\n    return 0;\n}`;
 
   theme: Theme = 'dark';
-  language: string = 'cpp';
+  language: string = 'python';
 
   themeOptions = [
     { label: 'Standard Light', value: 'light' as Theme },

@@ -43,8 +43,10 @@ logger = logging.getLogger(__name__)
 
 
 def _get_instance_id() -> str:
-    """Identificador único de esta instancia: <ip>:<puerto>."""
-    return f"{socket.gethostbyname(socket.gethostname())}:{INSTANCE_PORT}"
+    """Identificador único de esta instancia: <ip>:<puerto>:<pid>."""
+    host_ip = socket.gethostbyname(socket.gethostname())
+    pid = os.getpid()
+    return f"{host_ip}:{INSTANCE_PORT}:{pid}"
 
 
 async def _heartbeat(instance_id: str):
