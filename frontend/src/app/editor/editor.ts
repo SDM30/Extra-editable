@@ -28,7 +28,7 @@ export class Editor implements OnInit, OnDestroy {
   value = `#include <iostream>\n\nint main() {\n    std::cout << "Hola C++" << std::endl;\n    return 0;\n}`;
 
   theme: Theme = 'dark';
-  language: string = 'python';
+  language: string = 'cpp';
 
   themeOptions = [
     { label: 'Standard Light', value: 'light' as Theme },
