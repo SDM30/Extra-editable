@@ -7,6 +7,9 @@ import redis
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from app.routers import lsp
+from fastapi.responses import JSONResponse
+from app.services import health as health_service
 
 from app.routers import lsp
 
@@ -104,4 +107,16 @@ async def deregister_instance():
 
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    return health_service.liveness()
+
+
+@app.get("/ready")
+def ready():
+    result = health_service.readiness()
+    status_code = 200 if result.get("status") == "ready" else 503
+    return JSONResponse(status_code=status_code, content=result)
+
+
+@app.get("/health/containers")
+def health_containers():
+    return health_service.containers_health()

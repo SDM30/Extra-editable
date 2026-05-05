@@ -14,7 +14,7 @@ Frontend (http://localhost:4200)
 Nginx Principal (puerto 8080)
     ↓ /lsp/
 LSP Load Balancer (puerto 8082) ← Balanceador Nginx
-    ↓↓↓ Round-Robin
+    ↓↓↓ Least Conn
 [LSP Service :8135] [LSP Service :8136] [LSP Service :8137]
     ↓                    ↓                    ↓
 [Contenedor        [Contenedor          [Contenedor

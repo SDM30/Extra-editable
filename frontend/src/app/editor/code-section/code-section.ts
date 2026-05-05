@@ -497,11 +497,13 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit, OnChanges 
       if (seq !== this.lspInitSeq) return;
       this.lspAttachedPath = this.getFullPath();
 
-      // Re-crear el editor con las nuevas extensiones
-      this.editorView.dispatch({
-        effects: [
-          // Las extensiones ya están aplicadas por CodeMirror
-        ],
+      // Forzar detección de cambios para que el wrapper `code-editor` vuelva a leer
+      // el getter `editorExtensions` y aplique las nuevas extensiones (linting/autocompletion)
+      this.cdr.detectChanges();
+
+      // Re-crear el editor con las nuevas extensiones (no-op dispatch para forzar render)
+      this.editorView?.dispatch({
+        effects: [],
       });
 
       console.log(
