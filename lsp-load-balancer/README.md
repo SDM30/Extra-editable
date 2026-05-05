@@ -89,6 +89,9 @@ entra o sale. Debe correr en paralelo con Nginx.
 ```bash
 cd lsp-load-balancer
 python3 update_nginx.py
+# En lugar de sudo python3, usar la ruta completa al python del venv
+# TODO: HACERLO BIEN
+sudo /home/simondm/Development/ARQ/Proyecto_ARQ/.venv_lsp/bin/python3 update_nginx.py
 ```
 
 ### 4. Levantar las instancias del Servicio de Lenguaje
