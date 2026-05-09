@@ -10,7 +10,7 @@ class Proyecto(models.Model):
 
     nombre = models.CharField(max_length=255)
     descripcion = models.TextField(blank=True)
-    fechaCreacion = models.DateTimeField(auto_now_add=True)
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
     lenguaje = models.CharField(max_length=10, choices=Lenguaje.choices)
     usuario = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -19,7 +19,9 @@ class Proyecto(models.Model):
     )
 
     class Meta:
-        ordering = ['-fechaCreacion']
+        managed = False
+        db_table = 'proyectos'
+        ordering = ['-fecha_creacion']
         verbose_name = 'proyecto'
 
     def __str__(self):
@@ -29,15 +31,18 @@ class Proyecto(models.Model):
 class Archivo(models.Model):
     nombre = models.CharField(max_length=255)
     contenido = models.TextField(blank=True)
+    ydoc = models.BinaryField(blank=True, null=True)  # estado binario Yjs (HocusPocus)
     proyecto = models.ForeignKey(
         Proyecto,
         on_delete=models.CASCADE,
         related_name='archivos'
     )
-    fechaCreacion = models.DateTimeField(auto_now_add=True)
-    fechaActualizacion = models.DateTimeField(auto_now=True)
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
 
     class Meta:
+        managed = False
+        db_table = 'archivos'
         unique_together = ('proyecto', 'nombre')
         ordering = ['nombre']
         verbose_name = 'archivo'

@@ -76,6 +76,9 @@ media/
 
 # Variables de entorno
 .env
+.env.*
+.env.local
+.env.*.local
 
 # Migraciones generadas (opcional, muchos equipos las incluyen)
 */migrations/
