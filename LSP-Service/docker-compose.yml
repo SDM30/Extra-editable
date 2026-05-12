@@ -1,0 +1,49 @@
+services:
+  language-service:
+    build: ./language-service
+    ports:
+      - "8135"  # ← Sin especificar puerto host, Docker asigna uno aleatorio
+    environment:
+      - PROJECTS_DIR=/home/projects
+      - WS_PUBLIC_HOST=0.0.0.0
+      - CONTAINER_IDLE_TIMEOUT=300000
+      - MAX_CLIENTS_PER_CONTAINER=4
+      - REDIS_HOST=redis-lsp
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - projects_data:/home/projects
+      - ./language-service:/app
+    networks:
+      - lsp-network
+    depends_on:
+      redis-lsp:
+        condition: service_healthy
+    restart: unless-stopped
+
+  redis-lsp:
+    image: redis:7-alpine
+    container_name: redis-lsp
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - lsp-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    deploy:
+      replicas: 1
+
+volumes:
+  projects_data:
+  redis_data:
+
+networks:
+  lsp-network:
+    driver: bridge

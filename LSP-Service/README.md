@@ -721,6 +721,3 @@ export const enviroment = {
 │    └─ typescript-language-server (TS)   │
 └─────────────────────────────────────────┘
 ```
-
-# TODO
-## 2. AUTENTIFICACION CON EL API GATEWAY
