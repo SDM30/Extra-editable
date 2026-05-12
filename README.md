@@ -92,6 +92,21 @@ npm start
 ```
 *(Corre en el puerto 1234)*
 
+Para usar el balanceador de colaboración, levanta varias instancias del servicio en terminales distintas:
+```bash
+# Terminal 1
+cd collab-service
+PORT=1234 JWT_SECRET=dev-secret-change-in-production node src/server.js
+
+# Terminal 2
+cd collab-service
+PORT=1235 JWT_SECRET=dev-secret-change-in-production node src/server.js
+
+# Terminal 3
+cd collab-service
+PORT=1236 JWT_SECRET=dev-secret-change-in-production node src/server.js
+```
+
 ### 3. Servicio de ejecución de código
 Acceder a la carpeta
 ```bash
@@ -136,3 +151,52 @@ ng serve
 cd lsp-load-balancer
 nginx -c $(pwd)/nginx.conf
 ```
+
+### 7. Balanceador de colaboración
+Este balanceador expone Hocuspocus en el puerto **8083** y distribuye el tráfico entre varias instancias de `collab-service`.
+
+**Opción 1: Nginx instalado en la máquina**
+
+```bash
+cd collab-load-balancer
+
+# Verificar la configuración
+nginx -t -c $(pwd)/nginx.config
+
+# Levantarlo en foreground (desarrollo)
+nginx -c $(pwd)/nginx.config -g "daemon off;"
+
+# O levantarlo en background
+nginx -c $(pwd)/nginx.config
+```
+
+**Opción 2: Nginx en Docker**
+
+Se puede levantar el balanceador con Docker. Este contenedor usa la configuración del proyecto y expone el puerto `8083`.
+
+**Windows / PowerShell:**
+```powershell
+docker run --rm --name collab-lb -p 8083:8083 `
+  -v "${PWD}\collab-load-balancer\nginx.config:/etc/nginx/nginx.conf:ro" `
+  nginx:stable
+```
+
+**Mac / Git Bash:**
+```bash
+docker run --rm --name collab-lb -p 8083:8083 \
+  -v "$(pwd)/collab-load-balancer/nginx.config:/etc/nginx/nginx.conf:ro" \
+  nginx:stable
+```
+
+**Linux:**
+```bash
+docker run --rm --name collab-lb -p 8083:8083 \
+  --add-host host.docker.internal:host-gateway \
+  -v "$(pwd)/collab-load-balancer/nginx.config:/etc/nginx/nginx.conf:ro" \
+  nginx:stable
+```
+
+Después, el frontend y el gateway principal deben apuntar al balanceador de colaboración:
+
+- `http://localhost:8083/dev-token`
+- `ws://localhost:8083`
