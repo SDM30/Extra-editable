@@ -53,7 +53,7 @@ export class CollabService implements OnDestroy {
     this.connectPromise = new Promise<HocuspocusProvider>((resolve, reject) => {
       try {
         this.provider = new HocuspocusProvider({
-          url: 'ws://localhost:1234',
+          url: 'ws://localhost:8083',
           name: documentName,
           document: this.ydoc!,
           token,

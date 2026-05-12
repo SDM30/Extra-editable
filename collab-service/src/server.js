@@ -47,6 +47,7 @@ const server = Server.configure({
 
   async onRequest({ request, response }) {
     setCorsHeaders(response);
+    response.setHeader('X-Instance-Port', String(PORT));
 
     if (request.method === 'OPTIONS') {
       response.writeHead(204);
