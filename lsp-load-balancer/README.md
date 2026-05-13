@@ -34,35 +34,9 @@ LSP Load Balancer (puerto 8082) ← Balanceador Nginx
 3. **2-3 instancias del Servicio de Lenguaje** ejecutándose en puertos distintos
 4. El **Nginx principal** (puerto 8080) debe reenviar requests de `/lsp/` a este balanceador
 
-### Levantar Redis
-
-```bash
-# Con Docker (recomendado para desarrollo)
-docker run -d --name redis-lsp -p 6379:6379 redis:7-alpine
-
-# O instalando en el sistema
-sudo apt update && sudo apt install redis-server -y
-sudo systemctl start redis-server
-
-# Verificar que está corriendo
-redis-cli ping
-# Debe responder: PONG
-```
-
 ## ⚙️ Configuración
 
-### 1. Variables de entorno del Servicio de Lenguaje
-
-Agrega las siguientes variables al archivo `.env` en `language-service/`:
-
-```bash
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_DB=0
-# REDIS_PASSWORD=tu_password  # solo si Redis tiene autenticación configurada
-```
-
-### 2. Levantar el balanceador Nginx
+### 1. Levantar el balanceador Nginx
 
 El balanceador **debe estar corriendo antes** de levantar las instancias del servicio.
 Sin Nginx activo, las peticiones del API Gateway recibirán `502 Bad Gateway`.
@@ -81,7 +55,7 @@ curl http://localhost:8082/health
 # {"status":"ok","service":"lsp-load-balancer"}
 ```
 
-### 3. Levantar el watcher de descubrimiento dinámico
+### 2. Levantar el watcher de descubrimiento dinámico
 
 `update_nginx.py` observa Redis y regenera `nginx.conf` cada vez que una instancia
 entra o sale. Debe correr en paralelo con Nginx.
@@ -94,32 +68,18 @@ python3 update_nginx.py
 sudo /home/simondm/Development/ARQ/Proyecto_ARQ/.venv_lsp/bin/python3 update_nginx.py
 ```
 
-### 4. Levantar las instancias del Servicio de Lenguaje
+### 3. Levantar las instancias del Servicio de Lenguaje
 
-Usar el script incluido, que gestiona los procesos en background con PID files:
-
-```bash
-cd lsp-load-balancer
-
-./start_instances.sh            # levantar las 3 instancias
-./start_instances.sh status     # verificar cuáles están corriendo
-./start_instances.sh logs       # ver logs de las 3 en tiempo real
-./start_instances.sh stop       # detener las 3 instancias
-./start_instances.sh restart    # reiniciar las 3 instancias
-```
-
-O manualmente si se prefiere control individual:
+Desde el directorio `LSP-Service/`:
 
 ```bash
-cd language-service
-PORT=8135 uvicorn app.main:app --host 0.0.0.0 --port 8135
-PORT=8136 uvicorn app.main:app --host 0.0.0.0 --port 8136  # nueva terminal
-PORT=8137 uvicorn app.main:app --host 0.0.0.0 --port 8137  # nueva terminal
-```
+# Desplegar con Docker Compose (recomendado)
+make deploy 3          # 3 instancias con hot-reload
+./deploy.sh 3          # equivalente directo
 
-> **Importante:** pasar siempre la variable `PORT` al lanzar cada instancia.
-> Es el identificador que usa el servicio para registrarse en Redis y que
-> `update_nginx.py` usa para incluirla en el upstream de Nginx.
+# O si aún no están construidas las imágenes
+make setup 3           # build + deploy
+./setup.sh 3           # equivalente directo
 
 ## 🔄 Verificar que el balanceador funciona
 
@@ -149,13 +109,6 @@ async def add_instance_header(request: Request, call_next):
     response = await call_next(request)
     response.headers["X-Instance-Port"] = str(os.getenv("PORT", "unknown"))
     return response
-```
-
-Luego lanzar cada instancia con su variable `PORT`:
-
-```bash
-PORT=8135 uvicorn app.main:app --host 0.0.0.0 --port 8135
-PORT=8136 uvicorn app.main:app --host 0.0.0.0 --port 8136
 ```
 
 La salida esperada con round-robin:

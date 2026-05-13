@@ -118,10 +118,11 @@ docker run --rm --name api-gateway -p 8080:8080 -v "$(pwd)/nginx.conf:/etc/nginx
 
 **Para Linux:**
 ```bash
-docker run --rm --name api-gateway -p 8080:8080 \
-  --add-host host.docker.internal:host-gateway \
-  -v "$(pwd)/nginx.conf:/etc/nginx/nginx.conf:ro" \
-  nginx
+# Desarrollo local (todo en misma máquina)
+./start-api-gateway.sh
+
+# Producción (LSP remoto) TODO: PROBAR -SIMON
+./start-api-gateway.sh remote 10.0.0.1
 ```
 
 ### 5. Frontend (Angular)

@@ -19,8 +19,8 @@ from app.routers import lsp
 load_dotenv()
 
 PROJECTS_DIR   = os.getenv("PROJECTS_DIR", os.path.expanduser("~/projects"))
-WS_PUBLIC_HOST = os.getenv("WS_PUBLIC_HOST", "127.0.0.1")
-
+HOST_IP = os.getenv("HOST_IP", "127.0.0.1")
+WS_PUBLIC_HOST = os.getenv("WS_PUBLIC_HOST", HOST_IP)
 # Puerto en el que corre esta instancia — debe pasarse como variable de entorno
 # al lanzar cada réplica: PORT=8135 uvicorn app.main:app --port 8135
 INSTANCE_PORT  = int(os.getenv("PORT", 8135))

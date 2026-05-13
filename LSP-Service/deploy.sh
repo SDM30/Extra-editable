@@ -2,6 +2,16 @@
 # deploy.sh - Despliegue rápido
 # Uso: ./deploy.sh [num_instancias]
 
+
+# Detectar IP del host en docker0
+export HOST_IP=$(ip addr show docker0 2>/dev/null | grep 'inet ' | awk '{print $2}' | cut -d/ -f1)
+[ -z "$HOST_IP" ] && HOST_IP="127.0.0.1"
+
+echo "Host IP: $HOST_IP"
+
+# Desplegar con la IP
+HOST_IP=$HOST_IP docker compose up -d --build --scale language-service=${1:-1}
+
 set -e
 
 # ─── Configuración ───
