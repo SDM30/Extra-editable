@@ -65,7 +65,7 @@ class LSPMultiplexer {
     /** @property {Map<number, { ws: WebSocket, clientRequestId: any }>} pendingRequests - Mapeo id interno -> cliente origen */
     this.pendingRequests = new Map();
 
-    /** @property {Map<string, { text: string, owner: WebSocket }>} documents - Estado canónico por URI (texto + dueño) */
+    /** @property {Map<string, { text: string, watchers: Set<WebSocket> }>} documents - Estado canónico por URI (texto + watchers) */
     this.documents = new Map();
 
     /** @property {string} lspBuffer - Buffer para mensajes LSP incompletos */
@@ -625,9 +625,10 @@ class LSPMultiplexer {
           this.primaryClient = null;
         }
 
-        // Cerrar/limpiar documentos que pertenecen a este cliente
+        // Limpiar documentos: remover cliente de watchers, cerrar si no quedan watchers
         for (const [uri, doc] of this.documents.entries()) {
-          if (doc.owner === ws) {
+          doc.watchers.delete(ws);
+          if (doc.watchers.size === 0) {
             this.documents.delete(uri);
             if (this.lspProcess && this.lspProcess.stdin.writable) {
               this.sendToLSP({
@@ -739,24 +740,20 @@ class LSPMultiplexer {
       return;
     }
 
-    // Mantener estado canónico de documentos (owner-writer)
+    // Mantener estado canónico de documentos (watchers)
     if (message.method === "textDocument/didOpen") {
       const uri = message?.params?.textDocument?.uri;
       const text = message?.params?.textDocument?.text ?? "";
       if (typeof uri === "string") {
         const existing = this.documents.get(uri);
         if (!existing) {
-          this.documents.set(uri, { text, owner: ws });
-          this.sendToLSP(message);
-        } else if (existing.owner === ws) {
-          // Re-open del mismo dueño: tratarlo como refresco de texto
-          this.documents.set(uri, { text, owner: ws });
+          this.documents.set(uri, { text, watchers: new Set([ws]) });
           this.sendToLSP(message);
         } else {
-          this.sendLogMessage(
-            ws,
-            `Document already owned by another client: ${uri}`,
-          );
+          existing.watchers.add(ws);
+          if (typeof text === "string" && text.length > 0) {
+            existing.text = text;
+          }
         }
         return;
       }
@@ -767,21 +764,13 @@ class LSPMultiplexer {
       if (typeof uri === "string") {
         const existing = this.documents.get(uri);
         if (!existing) {
-          // No visto: reenviar sin validar
-          this.sendToLSP(message);
-          return;
+          this.documents.set(uri, { text: "", watchers: new Set([ws]) });
         }
-        if (existing.owner !== ws) {
-          this.sendLogMessage(
-            ws,
-            `Ignoring didChange from non-owner client: ${uri}`,
-          );
-          return;
-        }
-
+        const doc = this.documents.get(uri);
+        doc.watchers.add(ws);
         const newText = message?.params?.contentChanges?.[0]?.text;
         if (typeof newText === "string") {
-          this.documents.set(uri, { text: newText, owner: ws });
+          doc.text = newText;
         }
         this.sendToLSP(message);
         return;
@@ -792,14 +781,13 @@ class LSPMultiplexer {
       const uri = message?.params?.textDocument?.uri;
       if (typeof uri === "string") {
         const existing = this.documents.get(uri);
-        if (existing && existing.owner === ws) {
+        if (!existing) {
+          return;
+        }
+        existing.watchers.delete(ws);
+        if (existing.watchers.size === 0) {
           this.documents.delete(uri);
           this.sendToLSP(message);
-        } else {
-          this.sendLogMessage(
-            ws,
-            `Ignoring didClose from non-owner client: ${uri}`,
-          );
         }
         return;
       }
@@ -813,13 +801,7 @@ class LSPMultiplexer {
           this.sendToLSP(message);
           return;
         }
-        if (existing.owner !== ws) {
-          this.sendLogMessage(
-            ws,
-            `Ignoring didSave from non-owner client: ${uri}`,
-          );
-          return;
-        }
+        existing.watchers.add(ws);
         this.sendToLSP(message);
         return;
       }

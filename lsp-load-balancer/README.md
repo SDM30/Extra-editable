@@ -34,7 +34,31 @@ LSP Load Balancer (puerto 8082) ← Balanceador Nginx
 3. **2-3 instancias del Servicio de Lenguaje** ejecutándose en puertos distintos
 4. El **Nginx principal** (puerto 8080) debe reenviar requests de `/lsp/` a este balanceador
 
-## ⚙️ Configuración
+## 📦 Instalación
+
+El script `install.sh` automatiza la puesta en marcha completa del balanceador:
+
+```bash
+cd lsp-load-balancer
+./install.sh
+```
+
+Qué hace:
+1. Verifica que **Nginx**, **redis-cli** y **Python** estén disponibles
+2. Instala la dependencia `redis` en el venv del proyecto
+3. Comprueba que **Redis** responda en `localhost:6379`
+4. Crea y habilita el servicio **systemd** `lsp-watcher` para que el watcher corra siempre en background
+5. Levanta Nginx con la configuración del balanceador (puerto 8085)
+6. Inicia el watcher y ejecuta una verificación final
+
+```bash
+# Reinstalación forzada (detiene servicios previos)
+./install.sh --force
+```
+
+---
+
+## ⚙️ Configuración manual
 
 ### 1. Levantar el balanceador Nginx
 
