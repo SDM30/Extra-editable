@@ -142,6 +142,38 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit, OnChanges 
    */
   @Input() theme: Theme = 'dark';
 
+  // ============== INPUT: Configuración UI/Edición (CodeMirror wrapper) ==============
+
+  /**
+   * Si es true, la tecla Tab indenta el código (en vez de cambiar el foco).
+   */
+  @Input() indentWithTab: boolean = true;
+
+  /**
+   * Unidad de indentación. Debe ser whitespace homogéneo (ej. 4 espacios).
+   */
+  @Input() indentUnit: string = '    ';
+
+  /**
+   * Si es true, el editor envuelve líneas largas.
+   */
+  @Input() lineWrapping: boolean = false;
+
+  /**
+   * Si es true, resalta whitespace (espacios/tabs).
+   */
+  @Input() highlightWhitespace: boolean = false;
+
+  /**
+   * Texto guía cuando el editor está vacío.
+   */
+  @Input() placeholder: string = '';
+
+  /**
+   * Si es true, enfoca el editor automáticamente al inicializar.
+   */
+  @Input() autoFocus: boolean = false;
+
   /**
    * Lenguaje de programación actual
    *

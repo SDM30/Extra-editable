@@ -16,7 +16,7 @@
  */
 // app/services/codemirror-lsp.service.ts
 import { Injectable } from '@angular/core';
-import { EditorView } from '@codemirror/view';
+import { EditorView, hoverTooltip, tooltips } from '@codemirror/view';
 import { Extension } from '@codemirror/state';
 import {
   CompletionContext,
@@ -35,9 +35,9 @@ import { LspService, LSPSession } from './lsp-service';
 export interface LSPCompletionItem {
   label: string;
   kind?: number;
-  detail?: string;
+  detail?: unknown;
   insertText?: string;
-  documentation?: string;
+  documentation?: unknown;
 }
 
 @Injectable({
@@ -229,10 +229,88 @@ export class CodeMirrorLspService {
     // Crear extension de autocompletado
     const completionExt = this.createCompletionExtension(fullPath);
 
+    // Tooltip al hover para mostrar diagnósticos (errores/warnings) del LSP
+    const hoverDiagExt = this.createDiagnosticsHoverExtension(fullPath);
+
     console.log(`[CodeMirror-LSP] LSP adjuntado a ${fullPath}`);
 
     // Retornar las extensions que necesitan ser añadidas al EditorView
-    return [updateListener, completionExt, lintExt];
+    return [updateListener, completionExt, lintExt, hoverDiagExt];
+  }
+
+  /**
+   * Crea una extensión de tooltip al hover para mostrar diagnósticos.
+   *
+   * Útil cuando el usuario pasa el mouse por el texto subrayado y espera
+   * ver el error/warning sin abrir paneles adicionales.
+   */
+  private createDiagnosticsHoverExtension(filePath: string): Extension {
+    // Asegurar que los tooltips se rendericen en el body para evitar recortes
+    // por contenedores con overflow/stacking contexts.
+    const tooltipHost = tooltips({ parent: document.body });
+
+    const hoverExt = hoverTooltip((view, pos) => {
+      const diags = this.diagnostics.get(filePath) || [];
+      if (diags.length === 0) return null;
+
+      const matches = diags.filter((d) => {
+        const from = d.from ?? 0;
+        const to = d.to ?? from;
+        // En CodeMirror los rangos suelen ser [from, to) (to exclusivo).
+        // Para errores puntuales (from===to), aceptar también el carácter adyacente.
+        if (from === to) return pos === from || pos === from + 1;
+        return pos >= from && pos < to;
+      });
+
+      if (matches.length === 0) return null;
+
+      const from = Math.min(...matches.map((d) => d.from ?? 0));
+      const to = Math.max(...matches.map((d) => (d.to ?? d.from ?? 0)));
+      const rawMessages = matches.map((d) => d.message).filter(Boolean);
+
+      const normalizeForDedup = (msg: string): string => {
+        // Normalizar whitespace y recortar comillas/puntuación finales para
+        // cubrir casos tipo: "… 'std'" vs "… 'std"
+        let s = msg.trim();
+        s = s.replace(/\s+/g, ' ');
+        s = s.replace(/[\s'"]+$/g, (m) => (m.includes("'") || m.includes('"') ? '' : m));
+        // Recortar signos de puntuación repetidos al final
+        s = s.replace(/[.,;:]+$/g, '');
+        return s.trim();
+      };
+
+      const seen = new Set<string>();
+      const uniqueMessages: string[] = [];
+      for (const m of rawMessages) {
+        const asString = String(m);
+        const key = normalizeForDedup(asString);
+        if (key.length === 0) continue;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        uniqueMessages.push(asString.trim());
+      }
+
+      return {
+        pos: from,
+        end: Math.max(from, to),
+        create: () => {
+          const dom = document.createElement('div');
+          dom.className = 'cm-lsp-hover-diagnostic';
+
+          for (let i = 0; i < uniqueMessages.length; i++) {
+            if (i > 0) dom.appendChild(document.createElement('br'));
+            dom.appendChild(document.createTextNode(String(uniqueMessages[i])));
+          }
+
+          return { dom };
+        },
+      };
+    });
+
+    // `hoverTooltip` devuelve una extensión con propiedad `active` (tipado),
+    // pero internamente incluye también la configuración necesaria para tooltips.
+    // Devolvemos ambos para asegurar el host y el hover.
+    return [tooltipHost, hoverExt];
   }
 
   /**
@@ -390,19 +468,77 @@ export class CodeMirrorLspService {
         return {
           from,
           validFor: /^[\w$]*$/,
-          options: items.map((item: any) => ({
-            label: item.label,
-            type: this.mapCompletionKind(item.kind),
-            detail: item.detail,
-            info: item.documentation,
-            apply: item.insertText || item.label,
-          })),
+          options: items
+            .map((item: any) => {
+              const label = typeof item?.label === 'string' ? item.label : String(item?.label ?? '');
+              if (!label) return null;
+
+              const detail = this.normalizeCompletionText(item?.detail);
+              const info = this.normalizeCompletionInfo(item?.documentation);
+
+              return {
+                label,
+                type: this.mapCompletionKind(item?.kind),
+                ...(detail ? { detail } : {}),
+                ...(info ? { info } : {}),
+                // Mantener `apply` como string para evitar crashes en el picker.
+                apply:
+                  typeof item?.insertText === 'string' && item.insertText.length > 0
+                    ? item.insertText
+                    : label,
+              };
+            })
+            .filter(Boolean) as any[],
         };
       } catch (e) {
         console.error('[LSP] Error en autocompletado:', e);
         return null;
       }
     };
+  }
+
+  /**
+   * Normaliza texto opcional de completions (detail, etc.) a string.
+   * Evita pasar objetos al UI de CodeMirror.
+   */
+  private normalizeCompletionText(value: unknown): string | undefined {
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+    if (value && typeof value === 'object' && 'value' in value && typeof (value as any).value === 'string') {
+      return (value as any).value;
+    }
+    return undefined;
+  }
+
+  /**
+   * Normaliza `documentation` LSP para usarlo en `Completion.info`.
+   *
+   * CodeMirror espera `info` como string o función. Si se pasa un objeto, puede
+   * crashear con "info is not a function" en el picker.
+   */
+  private normalizeCompletionInfo(value: unknown): string | undefined {
+    if (typeof value === 'string') return value;
+
+    // MarkupContent típico de LSP: { kind: 'markdown' | 'plaintext', value: string }
+    if (value && typeof value === 'object' && 'value' in value && typeof (value as any).value === 'string') {
+      return (value as any).value;
+    }
+
+    if (Array.isArray(value)) {
+      const parts = value
+        .map((v) => {
+          if (typeof v === 'string') return v;
+          if (v && typeof v === 'object' && 'value' in v && typeof (v as any).value === 'string') {
+            return (v as any).value;
+          }
+          return '';
+        })
+        .filter((s) => s.trim().length > 0);
+
+      return parts.length ? parts.join('\n\n') : undefined;
+    }
+
+    return undefined;
   }
 
   /**

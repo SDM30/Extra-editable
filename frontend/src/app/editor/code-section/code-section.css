@@ -3,7 +3,8 @@
   flex-direction: column;
   height: 93vh;
   gap: 0;
-  overflow: hidden;
+  /* Permitir que tooltips (autocomplete/hover) puedan "salir" del área del editor */
+  overflow: visible;
 }
 
 /* EDITOR GRANDE */
@@ -11,7 +12,8 @@
   flex: 1;
   min-height: 0;
   display: block;
-  overflow: hidden;
+  /* CodeMirror usa tooltips posicionados absolutamente; no deben recortarse */
+  overflow: visible;
 }
 
 /* TERMINAL PEQUEÑA ABAJO */
@@ -97,4 +99,14 @@
 
 .resize-bar:hover {
   background: #007acc;
+}
+
+/* Tooltips de CodeMirror (autocomplete/hover). Necesitan z-index alto y no recortarse. */
+:host ::ng-deep .cm-tooltip {
+  z-index: 9999;
+}
+
+:host ::ng-deep .cm-lsp-hover-diagnostic {
+  max-width: 520px;
+  white-space: pre-wrap;
 }
