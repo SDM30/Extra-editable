@@ -1,7 +1,7 @@
 {
   "name": "collab-service",
   "version": "1.0.0",
-  "description": "Servicio de edicion colaborativa con Hocuspocus + Yjs",
+  "description": "Servicio de edicion colaborativa con Hocuspocus + Yjs + persistencia en PostgreSQL",
   "main": "src/server.js",
   "type": "module",
   "scripts": {
@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@hocuspocus/server": "^2.13.4",
-    "jsonwebtoken": "^9.0.2"
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.11.3"
   }
 }

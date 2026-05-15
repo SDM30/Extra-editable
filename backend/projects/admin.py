@@ -9,11 +9,8 @@ class ArchivoInline(admin.TabularInline):
 
 @admin.register(Proyecto)
 class ProyectoAdmin(admin.ModelAdmin):
-    list_display = ('nombre', 'lenguaje', 'usuario', 'fechaCreacion')
-    list_filter = ('lenguaje',)
-    inlines = [ArchivoInline]
-
+    list_display = ('nombre', 'lenguaje', 'usuario', 'fecha_creacion')
 
 @admin.register(Archivo)
 class ArchivoAdmin(admin.ModelAdmin):
-    list_display = ('nombre', 'proyecto', 'fechaActualizacion')
+    list_display = ('nombre', 'proyecto', 'fecha_actualizacion')
