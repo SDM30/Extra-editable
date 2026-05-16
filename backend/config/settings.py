@@ -56,13 +56,27 @@ TEMPLATES = [
     },
 ]
 
-# Database — SQLite dev / PostgreSQL prod via env
+# Database — SQLite dev / PostgreSQL via env
+DB_ENGINE = config('DB_ENGINE', default='django.db.backends.sqlite3')
+
 DATABASES = {
     'default': {
-        'ENGINE': config('DB_ENGINE', default='django.db.backends.sqlite3'),
+        'ENGINE': DB_ENGINE,
         'NAME': config('DB_NAME', default=BASE_DIR / 'db.sqlite3'),
     }
 }
+
+if DB_ENGINE == 'django.db.backends.postgresql':
+    DATABASES['default'].update({
+        'HOST': config('DB_HOST', default='localhost'),
+        'PORT': config('DB_PORT', default='5432'),
+        'USER': config('DB_USER', default='postgres'),
+        'PASSWORD': config('DB_PASSWORD', default='postgres'),
+        'CONN_MAX_AGE': config('DB_CONN_MAX_AGE', default=60, cast=int),
+        'OPTIONS': {
+            'options': config('DB_OPTIONS', default=''),
+        },
+    })
 
 # REST Framework
 REST_FRAMEWORK = {

@@ -14,6 +14,7 @@ import { kimbie } from '@uiw/codemirror-theme-kimbie';
 import { ExecutionService } from '../services/execution-service';
 import { CollabService } from '../services/collab.service';
 import { AuthService } from '../services/auth.service';
+import { WorkspaceArchivo, WorkspaceProyecto, WorkspaceService } from '../services/workspace.service';
 
 export type Theme = 'light' | 'dark' | Extension;
 
@@ -25,7 +26,6 @@ export type Theme = 'light' | 'dark' | Extension;
   styleUrls: ['./editor.css'],
 })
 export class Editor implements OnInit, OnDestroy {
-
   value = `#include <iostream>\n\nint main() {\n    std::cout << "Hola C++" << std::endl;\n    return 0;\n}`;
 
   theme: Theme = 'dark';
@@ -52,6 +52,11 @@ export class Editor implements OnInit, OnDestroy {
   resultadoOk?: boolean;
   cargando = false;
   projectId: string = 'default-project';
+  projects: WorkspaceProyecto[] = [];
+  selectedProjectId: number | null = null;
+  selectedArchivoId: number | null = null;
+  selectedRoom = 'default-project:main';
+  currentFilePathBase = 'main';
   lspEnabled: boolean = true;
   terminalHeight: number = 220;
   collaborators: Array<{ userId: string; username: string; color: string }> = [];
@@ -62,27 +67,19 @@ export class Editor implements OnInit, OnDestroy {
     private cdr: ChangeDetectorRef,
     private collab: CollabService,
     private auth: AuthService,
+    private workspace: WorkspaceService,
   ) {}
 
   async ngOnInit() {
     console.log('[Editor] solicitando token collab...');
     // Obtiene (o genera) la identidad del usuario y pide el token al servidor collab
-    const { token, username, userId } = await this.auth.getCollabToken();
-    console.log('[Editor] token recibido para', username);
-    // Conecta al documento compartido. Todos los que entren a 'room-editor-1' comparten el mismo código.
-    console.log('[Editor] llamando collab.connect()');
-    try {
-      this.collaboratorsSub?.unsubscribe();
-      this.collaboratorsSub = this.collab.collaborators$.subscribe((list) => {
-        this.collaborators = list;
-        this.cdr.detectChanges();
-      });
+    await this.loadWorkspace();
 
-      await this.collab.connect('room-editor-1', token, username, userId);
-      console.log('[Editor] collab.connect() completado');
-    } catch (err) {
-      console.error('[Editor] Error en collab.connect():', err);
-    }
+    this.collaboratorsSub?.unsubscribe();
+    this.collaboratorsSub = this.collab.collaborators$.subscribe((list) => {
+      this.collaborators = list;
+      this.cdr.detectChanges();
+    });
   }
 
   ngOnDestroy(): void {
@@ -97,9 +94,141 @@ export class Editor implements OnInit, OnDestroy {
     this.language = newLang;
   }
 
+  async selectProject(projectId: number): Promise<void> {
+    const project = this.projects.find((item) => item.id === projectId);
+    if (!project) return;
+
+    this.selectedProjectId = project.id;
+    this.projectId = String(project.id);
+    this.language = this.mapProjectLanguage(project.lenguaje);
+
+    if (!project.archivos || project.archivos.length === 0) {
+      const created = await this.ensureDefaultArchivo(project);
+      project.archivos = [created];
+    }
+
+    await this.selectArchivo(project.archivos[0].id);
+  }
+
+  async selectArchivo(archivoId: number): Promise<void> {
+    const project = this.projects.find((item) => item.id === this.selectedProjectId);
+    const archivo = project?.archivos?.find((item) => item.id === archivoId);
+    if (!project || !archivo) return;
+
+    this.selectedArchivoId = archivo.id;
+    this.value = archivo.contenido || this.defaultCodeForLanguage(this.language);
+    this.selectedRoom = `${project.id}:${archivo.id}`;
+    this.currentFilePathBase = this.stripFileExtension(archivo.nombre);
+    this.projectId = String(project.id);
+    this.cdr.detectChanges();
+
+    const { token, username, userId } = await this.auth.getCollabToken();
+    await this.connectCollab(token, username, userId);
+  }
+
   startResize(ev: MouseEvent): void {
     // Placeholder: se puede manejar arrastrar tamaño del terminal desde aquí.
     console.log('[Editor] startResize', ev.type);
+  }
+
+  private async loadWorkspace(): Promise<void> {
+    try {
+      const projects = await this.workspace.listProjects();
+      this.projects = projects;
+
+      if (this.projects.length === 0) {
+        const created = await this.createStarterWorkspace();
+        this.projects = [created];
+      }
+
+      await this.selectProject(this.projects[0].id);
+    } catch (error) {
+      console.warn('[Editor] No se pudo cargar el workspace remoto:', error);
+      const fallbackProject: WorkspaceProyecto = {
+        id: 0,
+        nombre: 'Proyecto local',
+        descripcion: 'Fallback local mientras no hay backend autenticado',
+        lenguaje: 'CPP',
+        archivos: [
+          {
+            id: 0,
+            nombre: 'main.cpp',
+            contenido: this.value,
+          },
+        ],
+      };
+      this.projects = [fallbackProject];
+      this.selectedProjectId = fallbackProject.id;
+      this.selectedArchivoId = fallbackProject.archivos?.[0]?.id ?? null;
+      this.selectedRoom = `${fallbackProject.id}:${this.selectedArchivoId ?? 0}`;
+      this.projectId = String(fallbackProject.id);
+      this.cdr.detectChanges();
+    }
+  }
+
+  private async createStarterWorkspace(): Promise<WorkspaceProyecto> {
+    const project = await this.workspace.createProject({
+      nombre: 'Proyecto principal',
+      descripcion: 'Proyecto inicial creado automáticamente',
+      lenguaje: this.mapLanguageToProject(this.language),
+    });
+
+    const archivo = await this.workspace.createArchivo(project.id, {
+      nombre: this.defaultFileNameForLanguage(this.language),
+      contenido: this.defaultCodeForLanguage(this.language),
+    });
+
+    return { ...project, archivos: [archivo] };
+  }
+
+  private async ensureDefaultArchivo(project: WorkspaceProyecto): Promise<WorkspaceArchivo> {
+    return this.workspace.createArchivo(project.id, {
+      nombre: this.defaultFileNameForLanguage(this.language),
+      contenido: this.defaultCodeForLanguage(this.language),
+    });
+  }
+
+  private async connectCollab(token: string, username: string, userId: string): Promise<void> {
+    await this.collab.connect(this.selectedRoom, token, username, userId);
+  }
+
+  private mapProjectLanguage(language: WorkspaceProyecto['lenguaje']): string {
+    const mapping: Record<WorkspaceProyecto['lenguaje'], string> = {
+      CPP: 'cpp',
+      PYTHON: 'python',
+      TYPESCRIPT: 'typescript',
+    };
+    return mapping[language] ?? 'cpp';
+  }
+
+  private mapLanguageToProject(language: string): WorkspaceProyecto['lenguaje'] {
+    if (language === 'python') return 'PYTHON';
+    if (language === 'typescript' || language === 'javascript') return 'TYPESCRIPT';
+    return 'CPP';
+  }
+
+  private defaultFileNameForLanguage(language: string): string {
+    const mapping: Record<string, string> = {
+      cpp: 'main.cpp',
+      python: 'main.py',
+      typescript: 'main.ts',
+      javascript: 'main.js',
+    };
+    return mapping[language] ?? 'main.txt';
+  }
+
+  private defaultCodeForLanguage(language: string): string {
+    if (language === 'python') {
+      return 'print("Hola Python")\n';
+    }
+    if (language === 'typescript' || language === 'javascript') {
+      return 'console.log("Hola JS");\n';
+    }
+    return `#include <iostream>\n\nint main() {\n    std::cout << "Hola C++" << std::endl;\n    return 0;\n}`;
+  }
+
+  private stripFileExtension(fileName: string): string {
+    return fileName.replace(/\.[^.]+$/, '') || 'main';
   }
 
   enviarEntrada(input: string): void {

@@ -10,31 +10,76 @@
   >
   </app-header>
 
-  @if (collaborators.length > 0) {
-    <div class="collaborators-bar">
-      <span class="collaborators-label">Colaboradores</span>
-      @for (user of collaborators; track user.userId) {
-        <span class="collaborator-pill">
-          <span class="collaborator-dot" [style.backgroundColor]="user.color"></span>
-          <span>{{ user.username }}</span>
-        </span>
-      }
-    </div>
-  }
+  <div class="editor-workspace">
+    <aside class="workspace-sidebar">
+      <div class="sidebar-section">
+        <div class="sidebar-title">Proyectos</div>
+        <div class="project-list">
+          @for (project of projects; track project.id) {
+            <button
+              type="button"
+              class="project-item"
+              [class.active]="project.id === selectedProjectId"
+              (click)="selectProject(project.id)"
+            >
+              <strong>{{ project.nombre }}</strong>
+              <span>{{ project.lenguaje }}</span>
+            </button>
+          }
+        </div>
+      </div>
 
-  <app-code-section
-    [(value)]="value"
-    [theme]="theme"
-    [language]="language"
-    [projectId]="projectId"
-    [filePath]="'main'"
-    [lspEnabled]="lspEnabled"
-    [resultado]="resultado"
-    [resultadoOk]="resultadoOk"
-    [cargando]="cargando"
-    [terminalHeight]="terminalHeight"
-    (resizeStart)="startResize($event)"
-    (inputSend)="enviarEntrada($event)"
-  >
-  </app-code-section>
+      @if (projects.length > 0) {
+        <div class="sidebar-section">
+          <div class="sidebar-title">Archivos</div>
+          <div class="file-list">
+            @for (project of projects; track project.id) {
+              @if (project.id === selectedProjectId) {
+                @for (archivo of project.archivos; track archivo.id) {
+                  <button
+                    type="button"
+                    class="file-item"
+                    [class.active]="archivo.id === selectedArchivoId"
+                    (click)="selectArchivo(archivo.id)"
+                  >
+                    {{ archivo.nombre }}
+                  </button>
+                }
+              }
+            }
+          </div>
+        </div>
+      }
+    </aside>
+
+    <section class="workspace-main">
+      @if (collaborators.length > 0) {
+        <div class="collaborators-bar">
+          <span class="collaborators-label">Colaboradores</span>
+          @for (user of collaborators; track user.userId) {
+            <span class="collaborator-pill">
+              <span class="collaborator-dot" [style.backgroundColor]="user.color"></span>
+              <span>{{ user.username }}</span>
+            </span>
+          }
+        </div>
+      }
+
+      <app-code-section
+        [(value)]="value"
+        [theme]="theme"
+        [language]="language"
+        [projectId]="projectId"
+        [filePath]="currentFilePathBase"
+        [lspEnabled]="lspEnabled"
+        [resultado]="resultado"
+        [resultadoOk]="resultadoOk"
+        [cargando]="cargando"
+        [terminalHeight]="terminalHeight"
+        (resizeStart)="startResize($event)"
+        (inputSend)="enviarEntrada($event)"
+      >
+      </app-code-section>
+    </section>
+  </div>
 </div>

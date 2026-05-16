@@ -84,6 +84,16 @@ cd backend
 python manage.py runserver 8081
 ```
 
+Si vas a usar PostgreSQL, agrega estas variables en tu `.env`:
+```bash
+DB_ENGINE=django.db.backends.postgresql
+DB_NAME=extra_editable
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_HOST=localhost
+DB_PORT=5432
+```
+
 ### 2. Servicio de edición colaborativa (Hocuspocus)
 ```bash
 cd collab-service
@@ -92,7 +102,25 @@ npm start
 ```
 *(Corre en el puerto 1234)*
 
+Para persistir el contenido de los documentos y evitar que se reinicien al caer una instancia, este servicio también puede usar PostgreSQL con las mismas variables `DB_*` o `DATABASE_URL`.
+
 Para usar el balanceador de colaboración, levanta varias instancias del servicio en terminales distintas:
+**PowerShell (Windows):**
+```powershell
+# Terminal 1
+cd collab-service
+$env:PORT=1234; $env:JWT_SECRET='dev-secret-change-in-production'; node src/server.js
+
+# Terminal 2
+cd collab-service
+$env:PORT=1235; $env:JWT_SECRET='dev-secret-change-in-production'; node src/server.js
+
+# Terminal 3
+cd collab-service
+$env:PORT=1236; $env:JWT_SECRET='dev-secret-change-in-production'; node src/server.js
+```
+
+**Bash / WSL / Git Bash:**
 ```bash
 # Terminal 1
 cd collab-service

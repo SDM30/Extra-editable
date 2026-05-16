@@ -1,6 +1,6 @@
 import { Server } from '@hocuspocus/server';
-import * as Y from 'yjs';
 import jwt from 'jsonwebtoken';
+import { getStoredDocumentContent, upsertStoredDocumentContent } from './documentStore.js';
 
 const JWT_SECRET = process.env.JWT_SECRET ?? 'dev-secret-change-in-production';
 const PORT = parseInt(process.env.PORT ?? '1234', 10);
@@ -109,7 +109,23 @@ const server = Server.configure({
     const snapshot = documentSnapshots.get(document.name);
 
     if (snapshot) {
-      Y.applyUpdate(document, snapshot);
+      const sharedText = document.getText('codemirror');
+      if (sharedText.length === 0) {
+        sharedText.insert(0, snapshot);
+      }
+      return document;
+    }
+
+    const stored = await getStoredDocumentContent(document.name);
+
+    if (stored.found) {
+      const sharedText = document.getText('codemirror');
+
+      if (sharedText.length === 0) {
+        sharedText.insert(0, stored.content);
+      }
+
+      documentSnapshots.set(document.name, stored.content);
       return document;
     }
 
@@ -117,14 +133,17 @@ const server = Server.configure({
 
     if (sharedText.length === 0) {
       sharedText.insert(0, INITIAL_DOCUMENT);
-      documentSnapshots.set(document.name, Y.encodeStateAsUpdate(document));
+      documentSnapshots.set(document.name, sharedText.toString());
+      await upsertStoredDocumentContent(document.name, sharedText.toString());
     }
 
     return document;
   },
 
   async onStoreDocument({ document }) {
-    documentSnapshots.set(document.name, Y.encodeStateAsUpdate(document));
+    const sharedText = document.getText('codemirror').toString();
+    documentSnapshots.set(document.name, sharedText);
+    await upsertStoredDocumentContent(document.name, sharedText);
   },
 });
 
