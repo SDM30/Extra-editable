@@ -1,92 +1,52 @@
-# FRONTEND
+# Extra Editable
 
-Angular CLI       : 21.1.3
+Aplicación de edición colaborativa con frontend Angular, backend Django/DRF, persistencia en PostgreSQL y un flujo de colaboración protegido por JWT.
 
-Node.js           : 22.19.0
+## Stack
 
-Package Manager   : npm 11.9.0
+- Frontend: Angular 21
+- Backend: Django 4.2 + Django REST Framework
+- Base de datos: PostgreSQL
+- Colaboración en tiempo real: Hocuspocus/Yjs
+- Gateway: Nginx en `8080`
+- Balanceador colaborativo: Nginx en `8083`
 
-## Editor de código
-Envoltorio: https://github.com/acrodata/code-editor
+## Arranque rápido
 
-## Dependencias para colaboración en tiempo real
-Si es la primera vez que levantan el frontend, instalar dependencias:
-```
-cd frontend
-npm install
-npm install yjs @hocuspocus/provider y-codemirror.next
-```
+El script recomendado para levantar todo el stack local es [start-all.ps1](start-all.ps1) en Windows o [start-all.sh](start-all.sh) en Bash/Git Bash/WSL.
 
-# BACKEND
+Ese arranque levanta:
 
-Versión de java: 25 (openjdk)
+- PostgreSQL local
+- backend Django en `8000`
+- frontend Angular en `4200`
+- gateway Nginx en `8080`
+- balanceador colaborativo en `8083`
+- tres instancias de `collab-service` en `1234`, `1235` y `1236`
 
-# SERVICIO DE EDICIÓN COLABORATIVA
+### Windows
 
-Node.js           : 22+
-
-Package Manager   : npm
-
-Puerto por defecto: 1234
-
-## Instalar dependencias
-```
-cd collab-service
-npm install
+```powershell
+.\start-all.ps1
 ```
 
-## Levantar servicio colaborativo
-```
-npm start
-```
+### Bash / Git Bash / WSL
 
-# Ejecutar proyecto
-
-El gateway actualmente está implementado con **Nginx** sirviendo como Proxy Inverso en el puerto 8080.
-
-## Orden de despliegue sugerido:
-
-### 1. Backend (Django)
-
-**Primera vez (Configuración inicial):**
 ```bash
-cd backend
-
-# 1. Crear entorno virtual
-python -m venv venv
-
-# 2. Activarlo
-# Windows:
-.\venv\Scripts\activate
-# Mac/Linux: source venv/bin/activate
-
-# 3. Instalar dependencias
-pip install -r requirements.txt
-
-# 4. Crear archivo .env (copiar el ejemplo)
-# Windows:
-copy .env.example .env
-# Mac/Linux: cp .env.example .env
-
-# 5. Migraciones
-python manage.py makemigrations users projects
-python manage.py migrate
-
-# 6. Datos dummy de la BD
-python manage.py seed
+./start-all.sh
 ```
 
-**Levantar el servidor (ejecuciones posteriores):**
-Una vez hecho lo anterior (o si ya lo habías hecho antes), solo necesitas asegurarte de tener el entorno virtual activado y ejecutar el servidor apuntando al puerto **8081**:
-```bash
-cd backend
-# Activar entorno virtual si no lo está: .\venv\Scripts\activate
-python manage.py runserver 8081
-```
+## Requisitos
 
-> Para el flujo colaborativo, usa la misma variable `JWT_SECRET` en backend y `collab-service`. Si no defines un valor, el ejemplo por defecto es `jwt-secreto`.
+- Python 3.13+ o el launcher `py`
+- Node.js 22+
+- npm
+- Docker
 
-Si vas a usar PostgreSQL, agrega estas variables en tu `.env`:
+## Variables clave
+
+El backend usa PostgreSQL por defecto en desarrollo con estas variables:
+
 ```bash
 DB_ENGINE=django.db.backends.postgresql
 DB_NAME=extra_editable
@@ -96,166 +56,27 @@ DB_HOST=localhost
 DB_PORT=5432
 ```
 
-### 2. Servicio de edición colaborativa (Hocuspocus)
-```bash
-cd collab-service
-npm install
-npm start
-```
-*(Corre en el puerto 1234)*
+El backend y `collab-service` deben compartir el mismo `JWT_SECRET` para que el token de colaboración sea válido en todo el flujo.
 
-Para persistir el contenido de los documentos y evitar que se reinicien al caer una instancia, este servicio también puede usar PostgreSQL con las mismas variables `DB_*` o `DATABASE_URL`.
+## Flujo de colaboración
 
-Para usar el balanceador de colaboración, levanta varias instancias del servicio en terminales distintas:
-**PowerShell (Windows):**
-```powershell
-# Terminal 1
-cd collab-service
-$env:PORT=1234; $env:JWT_SECRET='jwt-secreto'; node src/server.js
+1. El frontend autentica al usuario contra el backend.
+2. Al entrar a un proyecto, el frontend pide un token de colaboración.
+3. Ese token se guarda en la cookie `collab_token`.
+4. El gateway valida la cookie contra el backend antes de reenviar el WebSocket al balanceador colaborativo.
+5. El balanceador distribuye la conexión entre las instancias de `collab-service` usando sticky sessions.
 
-# Terminal 2
-cd collab-service
-$env:PORT=1235; $env:JWT_SECRET='jwt-secreto'; node src/server.js
+## Balanceador colaborativo
 
-# Terminal 3
-cd collab-service
-$env:PORT=1236; $env:JWT_SECRET='jwt-secreto'; node src/server.js
-```
+La configuración del balanceador está en [collab-load-balancer/nginx.config](collab-load-balancer/nginx.config). Está pensada para ejecutarse con Docker y escuchar en `8083`.
 
-**Bash / WSL / Git Bash:**
-```bash
-# Terminal 1
-cd collab-service
-PORT=1234 JWT_SECRET=jwt-secreto node src/server.js
+Si necesitas levantarlo manualmente, usa la misma configuración del balanceador y asegúrate de tener tres instancias de `collab-service` activas en `1234`, `1235` y `1236`.
 
-# Terminal 2
-cd collab-service
-PORT=1235 JWT_SECRET=jwt-secreto node src/server.js
+## Notas
 
-# Terminal 3
-cd collab-service
-PORT=1236 JWT_SECRET=jwt-secreto node src/server.js
-```
-
-> Nota: se puede copiar `.env.example` a `.env` y editar `JWT_SECRET` allí. Siempre asegurarse de usar el mismo `JWT_SECRET` en todas las instancias y en el backend.
-
-## Scripts de arranque 
-
-Se incluyen dos scripts en la raíz para arrancar el backend y tres instancias de `collab-service` con el mismo `JWT_SECRET`.
-
-- `start-all.ps1` — PowerShell, abrir nuevas ventanas para backend y cada instancia de `collab-service`.
-  - Uso recomendado (PowerShell) — ejecuta con el operador `&` para invocar el script y forzar kill si es necesario:
-    ```powershell
-    & .\start-all.ps1 -JwtSecret 'jwt-secreto' -ForceKill -StartFrontend
-    ```
-  - Ejecutar sin forzar kill (preguntará si hay puertos ocupados):
-    ```powershell
-    & .\start-all.ps1 -JwtSecret 'jwt-secreto' -StartFrontend
-    ```
-  - Nota: no pegues el comando dentro de bloques de código cuando lo ejecutes en la terminal; usa `&` antes de la ruta si la ejecutas desde la carpeta del repo.
-
-- `start-all.sh` — Bash, arranca los procesos en background y escribe logs en `logs/`.
-  - Uso básico:
-    ```bash
-    ./start-all.sh jwt-secreto
-    ```
-
-Notas:
-- Ejecuta los scripts desde la raíz del proyecto (`.`). Los puertos por defecto para `collab-service` son `1234`, `1235`, `1236`.
-- Si ya tienes procesos en esos puertos, detenlos antes de ejecutar los scripts (ver `netstat` / `Stop-Process` en Windows).
-- Los logs del script Bash quedan en `logs/`.
-
-
-### 3. Servicio de ejecución de código
-Acceder a la carpeta
-```bash
-cd code-execution-service
-```
-Correr el proyecto
-```bash
-npm run dev
-```
-
-### 4. Nginx (API Gateway)
-Desde la raíz del proyecto, levanta un contenedor de nginx pasando nuestro archivo de configuración.
-
-**Para Windows (PowerShell):**
-```bash
-docker run --rm --name api-gateway -p 8080:8080 -v "${PWD}/nginx.conf:/etc/nginx/nginx.conf:ro" nginx
-```
-
-**Para Mac / Git Bash:**
-```bash
-docker run --rm --name api-gateway -p 8080:8080 -v "$(pwd)/nginx.conf:/etc/nginx/nginx.conf:ro" nginx
-```
-*(Corre en el puerto 8080 y enrutará todo el tráfico hacia tus demás servicios locales)*
-
-**Para Linux:**
-```bash
-# Desarrollo local (todo en misma máquina)
-./start-api-gateway.sh
-
-# Producción (LSP remoto) TODO: PROBAR -SIMON
-./start-api-gateway.sh remote 10.0.0.1
-```
-
-### 5. Frontend (Angular)
-```bash
-cd frontend
-ng serve
-```
-*(Corre en el puerto 4200)*
-
-### 6. Balanceador de cargas
-```bash
-cd lsp-load-balancer
-nginx -c $(pwd)/nginx.conf
-```
-
-### 7. Balanceador de colaboración
-Este balanceador expone Hocuspocus en el puerto **8083** y distribuye el tráfico entre varias instancias de `collab-service`.
-
-> **Estado actual recomendado:** usar Docker para el balanceador y levantar
-> tres instancias del servicio colaborativo en `1234`, `1235` y `1236` con el
-> mismo `JWT_SECRET`. Esa es la forma que estamos usando ahora para probar
-> colaboración, awareness y sticky sessions.
-
-**Opción 1: Nginx instalado en la máquina**
-
-```bash
-cd collab-load-balancer
-
-# Verificar la configuración
-nginx -t -c $(pwd)/nginx.config
-
-# Levantarlo en foreground (desarrollo)
-nginx -c $(pwd)/nginx.config -g "daemon off;"
-
-# O levantarlo en background
-nginx -c $(pwd)/nginx.config
-```
-
-**Opción 2: Nginx en Docker**
-
-Se puede levantar el balanceador con Docker. Este contenedor usa la configuración del proyecto y expone el puerto `8083`.
-
-**Windows / PowerShell:**
-```powershell
- $mount = Join-Path $PWD 'collab-load-balancer\nginx.config'
-docker run -d --name collab-lb -p 8083:8083 `
-  -v "$mount:/etc/nginx/nginx.conf:ro" `
-  nginx:alpine
-```
-
-> La variable se llama `JWT_SECRET`, pero el valor de ejemplo puede ser cualquier texto, por ejemplo `"jwt secreto"`.
-
-**Linux / macOS / Git Bash:**
-```bash
-docker run -d --name collab-lb -p 8083:8083 \
-  --add-host host.docker.internal:host-gateway \
-  -v "$(pwd)/collab-load-balancer/nginx.config:/etc/nginx/nginx.conf:ro" \
-  nginx:alpine
-```
+- El flujo de arranque ya no incluye el servicio de ejecución de código ni el balanceador LSP.
+- Si cambias `JWT_SECRET`, debes usar el mismo valor en backend y en todas las instancias de colaboración.
+- Si limpias cookies o cambias de usuario, vuelve a autenticarse para regenerar `collab_token`.
 
 > En Linux añadir `--add-host host.docker.internal:host-gateway` porque el
 > contenedor tiene que alcanzar las instancias de `collab-service` que corren

@@ -1,48 +1,142 @@
 Param(
     [string]$JwtSecret = "jwt-secreto",
-    [switch]$StartFrontend,
     [switch]$ForceKill
 )
 
 $root = Split-Path -Parent $MyInvocation.MyCommand.Definition
+$backendDir = Join-Path $root 'backend'
+$frontendDir = Join-Path $root 'frontend'
+$collabDir = Join-Path $root 'collab-service'
+$gatewayConfig = Join-Path $root 'nginx.conf'
+$collabLbConfig = Join-Path $root 'collab-load-balancer\nginx.config'
+$postgresContainer = 'extra-editable-postgres'
+$gatewayContainer = 'extra-editable-gateway'
+$collabLbContainer = 'collab-lb'
+$postgresVolume = 'extra-editable-postgres-data'
 
-Write-Host "Starting services from $root with JWT_SECRET=$JwtSecret"
+Write-Host "Starting full local stack from $root"
+Write-Host "JWT_SECRET = $JwtSecret"
 
-# Helper: get PIDs listening on a local port (uses Get-NetTCPConnection when available, else netstat)
+$env:DB_ENGINE = 'django.db.backends.postgresql'
+$env:DB_NAME = 'extra_editable'
+$env:DB_USER = 'postgres'
+$env:DB_PASSWORD = 'postgres'
+$env:DB_HOST = 'localhost'
+$env:DB_PORT = '5432'
+$env:JWT_SECRET = $JwtSecret
+$env:COLLAB_JWT_SECRET = $JwtSecret
+
 function Get-PidsByPort([int]$port) {
     $pids = @()
     if (Get-Command Get-NetTCPConnection -ErrorAction SilentlyContinue) {
         $conns = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue
-        if ($conns) { $conns | ForEach-Object { if ($_.OwningProcess) { $pids += $_.OwningProcess } } }
+        if ($conns) {
+            $conns | ForEach-Object { if ($_.OwningProcess) { $pids += $_.OwningProcess } }
+        }
     } else {
         $lines = netstat -ano | Select-String ":$port\s"
-        foreach ($l in $lines) {
-            $parts = ($l -replace '^\s+','') -split '\s+'
+        foreach ($line in $lines) {
+            $parts = ($line -replace '^\s+', '') -split '\s+'
             $pid = $parts[-1]
-            if ($pid -match '^[0-9]+$') { $pids += [int]$pid }
+            if ($pid -match '^[0-9]+$') {
+                $pids += [int]$pid
+            }
         }
     }
     return $pids | Select-Object -Unique
 }
 
-# If ForceKill not set, show occupied ports and optionally prompt
-if (-not $ForceKill) {
-    $occupied = @{}
-    foreach ($port in 1234,1235,1236) {
-        $pids = Get-PidsByPort $port
-        if ($pids.Count -gt 0) { $occupied[$port] = $pids }
+function Start-Window([string]$workingDir, [string]$command) {
+    $pwshCmd = Get-Command pwsh -ErrorAction SilentlyContinue
+    if ($pwshCmd) {
+        $exe = $pwshCmd.Source
+    } else {
+        $powershellCmd = Get-Command powershell -ErrorAction SilentlyContinue
+        if (-not $powershellCmd) { throw 'No PowerShell executable found in PATH.' }
+        $exe = $powershellCmd.Source
     }
-    if ($occupied.Count -gt 0) {
-        Write-Host "The following ports are occupied:" -ForegroundColor Yellow
-        foreach ($k in $occupied.Keys) { Write-Host "  Port $k -> PIDs: $($occupied[$k] -join ', ')" }
-        $ans = Read-Host "Do you want to continue and skip killing these processes? (Y/N)"
-        if ($ans -match '^[Nn]') { Write-Host "Aborting start."; return }
+
+    Start-Process -FilePath $exe -WorkingDirectory $workingDir -ArgumentList @('-NoExit', '-Command', $command)
+}
+
+function Install-NpmDeps([string]$workingDir) {
+    Push-Location $workingDir
+    try {
+        if (Test-Path 'package-lock.json') {
+            npm ci
+        } else {
+            npm install
+        }
+        if ($LASTEXITCODE -ne 0) { throw "npm install failed in $workingDir" }
+    } finally {
+        Pop-Location
     }
-} else {
-    # Force kill processes on target ports
-    foreach ($port in 1234,1235,1236) {
-        $pids = Get-PidsByPort $port
-        foreach ($pid in $pids) {
+}
+
+function Ensure-BackendPython() {
+    $venvPython = Join-Path $backendDir '.venv\Scripts\python.exe'
+    if (Test-Path $venvPython) {
+        return $venvPython
+    }
+
+    $pyCmd = Get-Command py -ErrorAction SilentlyContinue
+    if (-not $pyCmd) { throw 'No Python launcher found and backend .venv is missing.' }
+
+    Write-Host 'Creating backend virtual environment...'
+    & $pyCmd.Source -3 -m venv (Join-Path $backendDir '.venv')
+    if ($LASTEXITCODE -ne 0) { throw 'Failed to create backend virtual environment.' }
+
+    if (-not (Test-Path $venvPython)) { throw 'Backend virtual environment was not created correctly.' }
+    return $venvPython
+}
+
+function Invoke-Python([string]$pythonExe, [string[]]$pythonArgs, [string]$workingDir) {
+    Push-Location $workingDir
+    try {
+        & $pythonExe @pythonArgs
+        if ($LASTEXITCODE -ne 0) { throw "Python command failed in $workingDir" }
+    } finally {
+        Pop-Location
+    }
+}
+
+function Ensure-PostgresContainer() {
+    & docker volume create $postgresVolume | Out-Null
+
+    $state = & docker inspect -f '{{.State.Running}}' $postgresContainer 2>$null
+    if ($LASTEXITCODE -eq 0) {
+        if ($state -ne 'true') {
+            Write-Host 'Starting existing Postgres container...'
+            & docker start $postgresContainer | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw 'Failed to start Postgres container.' }
+        }
+        return
+    }
+
+    Write-Host 'Creating Postgres container...'
+    & docker run -d --name $postgresContainer `
+        -e POSTGRES_USER=postgres `
+        -e POSTGRES_PASSWORD=postgres `
+        -e POSTGRES_DB=extra_editable `
+        -p 5432:5432 `
+        -v "${postgresVolume}:/var/lib/postgresql/data" `
+        postgres:15-alpine | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'Failed to start Postgres container.' }
+}
+
+function Restart-DockerContainer([string]$name, [string[]]$dockerArgs) {
+    & docker rm -f $name 2>$null | Out-Null
+    & docker run @dockerArgs | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "Failed to start container $name" }
+}
+
+if (-not (Test-Path (Join-Path $backendDir '.env'))) {
+    Copy-Item (Join-Path $backendDir '.env.example') (Join-Path $backendDir '.env') -Force
+}
+
+if ($ForceKill) {
+    foreach ($port in 8000,8080,8083,4200,1234,1235,1236) {
+        foreach ($pid in Get-PidsByPort $port) {
             try {
                 Stop-Process -Id $pid -Force -ErrorAction Stop
                 Write-Host "Killed PID $pid on port $port"
@@ -53,29 +147,62 @@ if (-not $ForceKill) {
     }
 }
 
-# Determine PowerShell executable (prefer pwsh, fallback to powershell)
-$pwshCmd = Get-Command pwsh -ErrorAction SilentlyContinue
-if ($pwshCmd) { $pwshExe = $pwshCmd.Source } else {
-    $psCmd = Get-Command powershell -ErrorAction SilentlyContinue
-    if ($psCmd) { $pwshExe = $psCmd.Source } else { Write-Error "No PowerShell executable (pwsh or powershell) found in PATH."; return }
-}
+if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { throw 'Docker CLI is not available in PATH.' }
+if (-not (Get-Command npm -ErrorAction SilentlyContinue)) { throw 'npm is not available in PATH.' }
 
-# Start backend in a new PowerShell window
-$backendCmd = "Set-Location -LiteralPath '$root\backend'; `$env:JWT_SECRET='$JwtSecret'; python manage.py runserver 8000"
-Start-Process -FilePath $pwshExe -ArgumentList @('-NoExit', '-Command', $backendCmd)
-Write-Host "Backend started (new window)"
+$backendPython = Ensure-BackendPython
+Install-NpmDeps $frontendDir
+Install-NpmDeps $collabDir
+Invoke-Python $backendPython @('-m', 'pip', 'install', '-r', 'requirements.txt') $backendDir
 
-# Start three collab-service instances, each in its own window
+Ensure-PostgresContainer
+
+Write-Host 'Running Django migrations...'
+Invoke-Python $backendPython @('manage.py', 'migrate', '--noinput') $backendDir
+
+$gatewayArgs = @(
+    '-d',
+    '--name', $gatewayContainer,
+    '-p', '8080:8080',
+    '-v', "${gatewayConfig}:/etc/nginx/nginx.conf:ro",
+    'nginx:1.25-alpine'
+)
+Restart-DockerContainer $gatewayContainer $gatewayArgs
+Write-Host 'API gateway started on 8080'
+
+$collabLbArgs = @(
+    '-d',
+    '--name', $collabLbContainer,
+    '-p', '8083:8083',
+    '-v', "${collabLbConfig}:/etc/nginx/nginx.conf:ro",
+    'nginx:alpine'
+)
+Restart-DockerContainer $collabLbContainer $collabLbArgs
+Write-Host 'Collaboration load balancer started on 8083'
+
+$backendCommand = "Set-Location -LiteralPath '$backendDir'; & '$backendPython' manage.py runserver 8000"
+Start-Window $backendDir $backendCommand
+Write-Host 'Backend started (new window)'
+
+$frontendCommand = "Set-Location -LiteralPath '$frontendDir'; npm start"
+Start-Window $frontendDir $frontendCommand
+Write-Host 'Frontend started (new window)'
+
 foreach ($port in 1234,1235,1236) {
-    $cmd = "Set-Location -LiteralPath '$root\collab-service'; `$env:PORT=$port; `$env:JWT_SECRET='$JwtSecret'; node src/server.js"
-    Start-Process -FilePath $pwshExe -ArgumentList @('-NoExit', '-Command', $cmd)
+    $collabCommand = @'
+Set-Location -LiteralPath '__COLLAB_DIR__';
+$env:PORT = '__PORT__';
+$env:JWT_SECRET = '__JWT_SECRET__';
+$env:DB_ENGINE = 'django.db.backends.postgresql';
+$env:DB_NAME = 'extra_editable';
+$env:DB_USER = 'postgres';
+$env:DB_PASSWORD = 'postgres';
+$env:DB_HOST = 'localhost';
+$env:DB_PORT = '5432';
+node src/server.js
+'@.Replace('__COLLAB_DIR__', $collabDir).Replace('__PORT__', $port).Replace('__JWT_SECRET__', $JwtSecret)
+    Start-Window $collabDir $collabCommand
     Write-Host "Started collab-service on port $port"
 }
 
-if ($StartFrontend) {
-    $frontendCmd = "Set-Location -LiteralPath '$root\frontend'; npm start"
-    Start-Process -FilePath $pwshExe -ArgumentList @('-NoExit', '-Command', $frontendCmd)
-    Write-Host "Frontend started (new window)"
-}
-
-Write-Host "All start commands issued. Check the new windows for logs."
+Write-Host 'All services and containers started. Check the new windows and Docker logs if something fails.'

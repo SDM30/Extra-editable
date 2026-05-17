@@ -24,6 +24,10 @@ La solución es **sticky sessions por IP** (`ip_hash` en Nginx): el mismo client
 > conexión nueva. El servidor ya tiene el hook `onLoadDocument`/`onStoreDocument`
 > preparado para eso (`documentSnapshots` en `server.js`).
 
+> El navegador guarda el JWT de colaboración en la cookie `collab_token`.
+> El gateway la lee para validar el acceso antes de reenviar el WebSocket al
+> balanceador.
+
 ---
 
 ## Arquitectura
@@ -109,13 +113,9 @@ nginx -c $(pwd)/nginx.conf
 
 ### 3. Flujo de autenticación del gateway
 
-El balanceador valida el token con el backend en `POST /api/projects/validate-collab-token/` usando `auth_request`. Si la validación es correcta, Nginx reenvía la identidad al `collab-service` en estas cabeceras internas:
+El balanceador valida el token con el backend en `POST /api/projects/validate-collab-token/` usando `auth_request`. La validación toma el JWT desde la cookie `collab_token` del navegador. Si la validación es correcta, Nginx reenvía la conexión WebSocket al `collab-service`.
 
-- `X-Auth-User-Id`
-- `X-Auth-Username`
-- `X-Auth-Room`
-
-El servicio colaborativo acepta esas cabeceras cuando el gateway ya autenticó la petición, y usa JWT como respaldo si la conexión llega sin identidad inyectada.
+El servicio colaborativo sigue aceptando JWT directo como respaldo si la conexión llega sin la cookie del gateway.
 
 ### 4. Actualizar el Nginx principal
 
