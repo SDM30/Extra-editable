@@ -178,6 +178,12 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit, OnChanges 
   @Input() projectId: string = 'default-project';
 
   /**
+   * Room colaborativa actual (projectId:archivoId).
+   * Se usa para evitar enlazar el documento viejo mientras el nuevo aún conecta.
+   */
+  @Input() room: string = '';
+
+  /**
    * Ruta base del archivo sin extensión
    *
    * Se combina con la extensión del lenguaje para formar la ruta completa
@@ -274,6 +280,7 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit, OnChanges 
    * @type {Extension[]}
    */
   private lspExtensions: Extension[] = [];
+  resolvedEditorExtensions: Extension[] = [];
 
   /**
    * Extensiones de colaboración (Yjs + cursores remotos)
@@ -283,6 +290,8 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit, OnChanges 
   private collabUndoManager: Y.UndoManager | null = null;
   private boundCollabConnectionVersion = -1;
   private boundCollabDocumentName: string | null = null;
+  private pendingRoomSwitch = false;
+  private suppressValueEmission = false;
 
   /**
    * Cache de la extensión de lenguaje para evitar crear nuevas instancias en cada getter
@@ -330,6 +339,7 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit, OnChanges 
     console.log(
       `[CodeSection] Init - Proyecto: ${this.projectId}, Lenguaje: ${this.language}, LSP: ${this.lspEnabled}`,
     );
+    this.refreshEditorExtensions();
   }
 
   /**
@@ -381,15 +391,18 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit, OnChanges 
     const languageChanged = Boolean(changes['language']);
     const projectChanged = Boolean(changes['projectId']);
     const fileChanged = Boolean(changes['filePath']);
+    const roomChanged = Boolean(changes['room']);
     const lspToggled = Boolean(changes['lspEnabled']);
 
-    if (!languageChanged && !projectChanged && !fileChanged && !lspToggled) return;
+    if (!languageChanged && !projectChanged && !fileChanged && !roomChanged && !lspToggled) return;
     if (!this.editorView) return;
 
     // Limpiar cache de la extensión de lenguaje si cambió el lenguaje
     if (languageChanged) this.languageExt = null;
 
-    if (projectChanged || fileChanged) {
+    if (projectChanged || fileChanged || roomChanged) {
+      this.pendingRoomSwitch = true;
+      this.suppressValueEmission = true;
       this.resetCollabBinding();
       this.initializeCollab();
     }
@@ -400,6 +413,7 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit, OnChanges 
         this.lspAttachedPath = null;
       }
       this.lspExtensions = [];
+      this.refreshEditorExtensions();
       return;
     }
 
@@ -438,6 +452,14 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit, OnChanges 
 
     if (!shared || !awareness) return;
 
+    if (this.room && currentDocumentName !== this.room) {
+      console.debug('[CodeSection] Waiting for collab room to match:', {
+        requestedRoom: this.room,
+        currentDocumentName,
+      });
+      return;
+    }
+
     const isSameBinding =
       this.collabExtensions.length > 0 &&
       this.boundCollabConnectionVersion === currentConnectionVersion &&
@@ -448,22 +470,34 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit, OnChanges 
     this.resetCollabBinding();
 
     // Normalizar saltos de línea para evitar desalineaciones CRLF/LF
-    const localText = this.editorView.state.doc.toString().replace(/\r\n/g, '\n');
+    // Usar el buffer de entrada (`this._value`) en lugar de leer directamente
+    // desde `editorView.state` porque la vista puede no haber aplicado aún
+    // el `@Input()` cuando se llama a initializeCollab (race condition).
+    const localText = (this._value ?? '').replace(/\r\n/g, '\n');
 
     try {
       const sharedText = shared.toString();
+      const shouldForceRoomHydration = this.pendingRoomSwitch && sharedText.length > 0;
 
       // Si ya existe contenido remoto, hidratar el editor local desde el Y.Text
       // compartido antes de adjuntar yCollab. Para evitar sobrescribir trabajo
       // local en curso, solo hidratamos cuando el editor local está vacío.
       // Esto previene que un documento sincronizado tarde reescriba el archivo
       // activo al cambiar de proyecto/archivo.
-      if (sharedText.length > 0 && localText.length === 0) {
+      if (sharedText.length > 0 && (localText.length === 0 || shouldForceRoomHydration)) {
+        console.log('[CodeSection] Hydrating editor from remote (local empty)');
         this._value = sharedText;
-        setTimeout(() => this.cdr.detectChanges(), 0);
+        this.pendingRoomSwitch = false;
+        this.suppressValueEmission = true;
+        queueMicrotask(() => this.cdr.markForCheck());
       } else if (sharedText.length > 0 && sharedText !== localText) {
         // Log a warning for mismatches so we can diagnose unexpected overwrites.
-        console.warn('[CodeSection] Remote document differs from local buffer; skipping hydration to avoid overwrite.');
+        if (!this.pendingRoomSwitch) {
+          console.warn(
+            '[CodeSection] Remote document differs from local buffer; skipping hydration to avoid overwrite.',
+            { sharedLen: sharedText.length, localLen: localText.length },
+          );
+        }
       }
     } catch (e) {
       console.warn('[CodeSection] Error comprobando/inicializando shared text:', e);
@@ -472,13 +506,15 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit, OnChanges 
     this.collabUndoManager = new Y.UndoManager(shared);
     // yCollab incluye sincronización (ySync) + cursores remotos (awareness).
     this.collabExtensions = [yCollab(shared, awareness, { undoManager: this.collabUndoManager })];
+    this.refreshEditorExtensions();
     this.boundCollabConnectionVersion = currentConnectionVersion;
     this.boundCollabDocumentName = currentDocumentName;
+    this.pendingRoomSwitch = false;
 
-    // El provider se conecta fuera del zone de Angular; programar update en
-    // el siguiente tick para evitar colisiones con el ciclo de renderizado
-    // y errores de `EditorView.update` cuando CodeMirror aplica cambios.
-    setTimeout(() => this.cdr.detectChanges(), 0);
+    queueMicrotask(() => {
+      this.suppressValueEmission = false;
+      this.cdr.markForCheck();
+    });
   }
 
   private resetCollabBinding(): void {
@@ -487,6 +523,7 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit, OnChanges 
     this.collabExtensions = [];
     this.boundCollabConnectionVersion = -1;
     this.boundCollabDocumentName = null;
+    this.refreshEditorExtensions();
   }
 
   /**
@@ -526,6 +563,7 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit, OnChanges 
         this.editorView,
         this.filePath,
       );
+      this.refreshEditorExtensions();
 
       if (seq !== this.lspInitSeq) return;
       this.lspAttachedPath = this.getFullPath();
@@ -545,6 +583,8 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit, OnChanges 
     } catch (error) {
       console.error('[CodeSection] ❌ Error inicializando LSP:', error);
       this.lspEnabled = false;
+      this.lspExtensions = [];
+      this.refreshEditorExtensions();
     }
   }
 
@@ -611,6 +651,9 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit, OnChanges 
    */
   onValueChange(newValue: string) {
     this._value = newValue;
+    if (this.suppressValueEmission) {
+      return;
+    }
     this.valueChange.emit(newValue);
   }
 
@@ -641,24 +684,20 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit, OnChanges 
    * @readonly
    * @returns {Extension[]} Array de extensiones para CodeMirror
    */
-  get editorExtensions(): Extension[] {
+  private refreshEditorExtensions(): void {
     const extensions: Extension[] = [this.languageExtension()];
 
-    // Usar solo UNA extensión de autocompletado:
-    // - si LSP está listo, viene incluido dentro de `lspExtensions`
-    // - si no, usar el autocompletado default
     if (this.lspExtensions.length > 0) {
       extensions.push(...this.lspExtensions);
     } else {
       extensions.push(autocompletion());
     }
 
-    // Colaboración (cursores remotos + sync doc)
     if (this.collabExtensions.length > 0) {
       extensions.push(...this.collabExtensions);
     }
 
-    return extensions;
+    this.resolvedEditorExtensions = extensions;
   }
 
   /**

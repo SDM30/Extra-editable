@@ -69,10 +69,12 @@
       }
 
       <app-code-section
-        [(value)]="value"
+        [value]="value"
+        (valueChange)="onEditorValueChange($event)"
         [theme]="theme"
         [language]="language"
         [projectId]="projectId"
+        [room]="selectedRoom"
         [filePath]="currentFilePathBase"
         [lspEnabled]="lspEnabled"
         [resultado]="resultado"

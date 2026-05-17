@@ -51,51 +51,72 @@ export class CollabService implements OnDestroy {
     this.connectingToDocument = documentName;
     console.log('[collab] 🔗 Iniciando conexión a', documentName);
 
-    // Desconectar si hay una conexión antigua
-    if (this.provider) {
-      this.disconnect();
-    }
+    // Hot-swap strategy: create a new provider and only destroy the old one
+    // after the new one has synchronized to avoid losing awareness/presence
+    // during document switches.
+    const oldProvider = this.provider;
+    const oldYdoc = this.ydoc;
 
-    this.currentDocumentName = documentName;
     this.connectionVersion += 1;
-    this.ydoc = new Y.Doc();
+    const newYdoc = new Y.Doc();
 
     this.connectPromise = new Promise<HocuspocusProvider>((resolve, reject) => {
       try {
-        this.provider = new HocuspocusProvider({
+        const newProvider = new HocuspocusProvider({
           url: 'ws://localhost:8083',
           name: documentName,
-          document: this.ydoc!,
+          document: newYdoc,
           token,
           onConnect: () => {
-            console.log('[collab] ✅ Conectado a', documentName);
+            console.log('[collab] ✅ (new) Conectado a', documentName);
             this.connectingToDocument = null; // Limpiar el flag
-            // Registrar estado de awareness con `id` y `name` para ser compatible
-            // con otros helpers que esperan `{ user: { id, name, color } }`.
             const idToSet = userId || username || 'anon';
-            this.provider?.setAwarenessField('user', {
-              id: idToSet,
-              name: username,
-              color: this.randomColor(),
-            });
+            try {
+              newProvider?.setAwarenessField('user', {
+                id: idToSet,
+                name: username,
+                color: this.randomColor(),
+              });
+            } catch (e) {
+              console.warn('[collab] Warning setting awareness field on new provider', e);
+            }
           },
           onSynced: () => {
-            console.log('[collab] 🔄 Documento sincronizado', documentName);
+            console.log('[collab] 🔄 (new) Documento sincronizado', documentName);
             this._synced = true;
-            // Emitir listo SOLO cuando ya se ha sincronizado el documento remoto
-            this.ready$.next();
-            resolve(this.provider!);
-            this.connectPromise = null;
+            // Swap providers atomically
+            try {
+              if (oldProvider) {
+                try {
+                  oldProvider.destroy();
+                } catch (e) {
+                  console.warn('[collab] Error destroying old provider', e);
+                }
+              }
+              if (oldYdoc) {
+                try {
+                  oldYdoc.destroy();
+                } catch (e) {
+                  /* ignore */
+                }
+              }
+            } finally {
+              this.provider = newProvider;
+              this.ydoc = newYdoc;
+              this.currentDocumentName = documentName;
+              this.ready$.next();
+              resolve(this.provider);
+              this.connectPromise = null;
+            }
           },
           onAwarenessUpdate: (data) => {
+            // Diagnostic: log raw awareness payload
+            console.debug('[collab] Raw awareness payload:', data);
             const rawList: CollabUser[] = [];
-
-            // data may be an object with a `states` array, or the provider's
-            // awareness API may be used to retrieve a Map of clientId → state.
             if (Array.isArray(data?.states)) {
               (data.states as any[]).forEach((entry: any) => {
                 const user = entry?.user ?? entry?.state?.user;
-                const clientId = entry?.clientId ?? entry?.clientId ?? entry?.client;
+                const clientId = entry?.clientId ?? entry?.client;
                 if (user) {
                   rawList.push({
                     userId: String(user.id ?? user.userId ?? clientId ?? 'anon'),
@@ -105,12 +126,10 @@ export class CollabService implements OnDestroy {
                 }
               });
             } else {
-              // Fallback: read from the provider's awareness map if available
               try {
-                const aw = this.provider?.awareness as any;
+                const aw = newProvider?.awareness as any;
                 const statesIter = aw?.getStates ? aw.getStates() : aw?.states;
                 if (statesIter) {
-                  // statesIter may be a Map or an object; normalize to entries
                   const entries = statesIter instanceof Map ? Array.from(statesIter.entries()) : Object.entries(statesIter);
                   entries.forEach(([clientId, state]: any) => {
                     const user = state?.user ?? state?.state?.user;
@@ -128,22 +147,22 @@ export class CollabService implements OnDestroy {
               }
             }
 
-            // Deduplicate by userId to avoid showing the same logical user twice
             const dedup = new Map<string, CollabUser>();
             for (const u of rawList) {
               if (!dedup.has(u.userId)) dedup.set(u.userId, u);
             }
 
             const finalList = Array.from(dedup.values()).slice(0, 4);
+            console.debug('[collab] Parsed collaborators:', finalList);
             this.collaborators$.next(finalList);
           },
           onDisconnect: () => {
-            console.log('[collab] ❌ Desconectado de', documentName);
+            console.log('[collab] ❌ (new) Desconectado de', documentName);
           },
           onAuthenticationFailed: ({ reason }) => {
             const tokenPreview =
               typeof token === 'string' && token.length > 12 ? `${token.slice(0, 12)}…` : token;
-            console.error('[collab] 🔐 Auth fallida:', { reason, token: tokenPreview });
+            console.error('[collab] 🔐 Auth fallida (new):', { reason, token: tokenPreview });
             reject(new Error('Authentication failed'));
             this.connectPromise = null;
           },

@@ -8,7 +8,9 @@ import { AuthTokens, LoginRequest, RegisterRequest, UserProfile } from '../model
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private base = enviroment.apiBaseUrl;
-  // Token fetched from backend join endpoint per project
+  // Tokens are stored per-tab so two tabs can represent two different users.
+  // sessionStorage keeps a stable tab id; localStorage holds the tab-scoped tokens.
+  private readonly authTabKey = 'collab-auth-tab-id';
   private readonly anonStorageKey = 'collab-anon-identity';
 
   constructor(private http: HttpClient, private router: Router) {}
@@ -17,8 +19,8 @@ export class AuthService {
     return this.http.post<AuthTokens>(`${this.base}/auth/login/`, data).pipe(
       tap(tokens => {
         console.log('[AuthService] Login successful, storing tokens');
-        localStorage.setItem('access', tokens.access);
-        localStorage.setItem('refresh', tokens.refresh);
+        localStorage.setItem(this.getAuthStorageKey('access'), tokens.access);
+        localStorage.setItem(this.getAuthStorageKey('refresh'), tokens.refresh);
         console.log('[AuthService] Token stored. Access prefix:', tokens.access.substring(0, 20));
       })
     );
@@ -35,13 +37,13 @@ export class AuthService {
   }
 
   logout(): void {
-    localStorage.removeItem('access');
-    localStorage.removeItem('refresh');
+    localStorage.removeItem(this.getAuthStorageKey('access'));
+    localStorage.removeItem(this.getAuthStorageKey('refresh'));
     this.router.navigate(['/auth']);
   }
 
   getToken(): string | null {
-    return localStorage.getItem('access');
+    return localStorage.getItem(this.getAuthStorageKey('access'));
   }
 
   isLoggedIn(): boolean {
@@ -131,5 +133,24 @@ export class AuthService {
     windowLike.name = `collab-${identity.userId}`;
     sessionStorage.setItem(this.anonStorageKey, JSON.stringify(identity));
     return identity;
+  }
+
+  private getTabId(): string {
+    const existing = sessionStorage.getItem(this.authTabKey);
+    if (existing) {
+      return existing;
+    }
+
+    const randomPart =
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID().slice(0, 12)
+        : Math.random().toString(36).slice(2, 14);
+
+    sessionStorage.setItem(this.authTabKey, randomPart);
+    return randomPart;
+  }
+
+  private getAuthStorageKey(kind: 'access' | 'refresh'): string {
+    return `${kind}:${this.getTabId()}`;
   }
 }

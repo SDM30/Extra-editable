@@ -1,4 +1,4 @@
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Pool } from 'pg';
@@ -9,6 +9,7 @@ let schemaReady = false;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const localDataDir = path.join(__dirname, '..', 'data');
+const localRoomsDir = path.join(localDataDir, 'rooms');
 const localStoreFile = path.join(localDataDir, 'collab_documents.json');
 
 function hasDatabaseConfig() {
@@ -53,15 +54,24 @@ async function ensureSchema() {
   return db;
 }
 
+async function ensureLocalRoomsDir() {
+  await mkdir(localRoomsDir, { recursive: true });
+}
+
 async function readLocalStore() {
+  // Backwards-compat: try the old single JSON store if it exists and is valid.
   try {
     const raw = await readFile(localStoreFile, 'utf8');
-    return JSON.parse(raw);
+    try {
+      return JSON.parse(raw);
+    } catch (err) {
+      console.warn('[collab] local store JSON corrupted, ignoring single-file store:', err?.message ?? err);
+      return {};
+    }
   } catch (error) {
     if (error?.code === 'ENOENT') {
       return {};
     }
-
     throw error;
   }
 }
@@ -71,9 +81,36 @@ async function writeLocalStore(store) {
   await writeFile(localStoreFile, JSON.stringify(store, null, 2), 'utf8');
 }
 
+async function readLocalRoom(roomName) {
+  try {
+    const roomFile = path.join(localRoomsDir, `${encodeURIComponent(roomName)}.txt`);
+    const raw = await readFile(roomFile, 'utf8');
+    return { found: true, content: raw };
+  } catch (err) {
+    if (err?.code === 'ENOENT') {
+      return { found: false, content: '' };
+    }
+    throw err;
+  }
+}
+
+async function writeLocalRoom(roomName, content) {
+  await ensureLocalRoomsDir();
+  const roomFile = path.join(localRoomsDir, `${encodeURIComponent(roomName)}.txt`);
+  await writeFile(roomFile, content ?? '', 'utf8');
+}
+
 export async function getStoredDocumentContent(roomName) {
   const db = await ensureSchema();
   if (!db) {
+    // Prefer per-room files in local fallback to avoid a single huge JSON file.
+    try {
+      const room = await readLocalRoom(roomName);
+      if (room.found) return room;
+    } catch (err) {
+      console.warn('[collab] Error leyendo room local:', err?.message ?? err);
+    }
+
     const store = await readLocalStore();
     const content = typeof store?.[roomName] === 'string' ? store[roomName] : '';
     return { found: content.length > 0 || Object.prototype.hasOwnProperty.call(store, roomName), content };

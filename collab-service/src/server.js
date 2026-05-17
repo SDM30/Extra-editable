@@ -7,6 +7,103 @@ const PORT = parseInt(process.env.PORT ?? '1234', 10);
 const FRONTEND_ORIGIN = 'http://localhost:4200';
 const INITIAL_DOCUMENT = `#include <iostream>\n\nint main() {\n    std::cout << "Hola C++" << std::endl;\n    return 0;\n}`;
 const documentSnapshots = new Map();
+const activeDocuments = new Map();
+const roomConnectionCounts = new Map();
+const suppressPersistCounts = new Map();
+const SYNC_INTERVAL_MS = parseInt(process.env.COLLAB_SYNC_INTERVAL_MS ?? '1000', 10);
+const ENABLE_POLL_SYNC = (process.env.COLLAB_ENABLE_POLL_SYNC ?? 'true').toLowerCase() === 'true';
+
+function incrementRoomConnections(roomName) {
+  const current = roomConnectionCounts.get(roomName) ?? 0;
+  roomConnectionCounts.set(roomName, current + 1);
+}
+
+function decrementRoomConnections(roomName) {
+  const current = roomConnectionCounts.get(roomName) ?? 0;
+  const next = Math.max(0, current - 1);
+  if (next === 0) {
+    roomConnectionCounts.delete(roomName);
+    activeDocuments.delete(roomName);
+    return;
+  }
+  roomConnectionCounts.set(roomName, next);
+}
+
+function hasActiveConnections(roomName) {
+  return (roomConnectionCounts.get(roomName) ?? 0) > 0;
+}
+
+function beginSuppressPersist(roomName) {
+  const current = suppressPersistCounts.get(roomName) ?? 0;
+  suppressPersistCounts.set(roomName, current + 1);
+}
+
+function endSuppressPersist(roomName) {
+  const current = suppressPersistCounts.get(roomName) ?? 0;
+  const next = Math.max(0, current - 1);
+  if (next === 0) {
+    suppressPersistCounts.delete(roomName);
+    return;
+  }
+  suppressPersistCounts.set(roomName, next);
+}
+
+function shouldSuppressPersist(roomName) {
+  return (suppressPersistCounts.get(roomName) ?? 0) > 0;
+}
+
+function applyContentToDocument(document, content) {
+  const sharedText = document.getText('codemirror');
+  const currentText = sharedText.toString();
+
+  if (currentText === content) {
+    return false;
+  }
+
+  beginSuppressPersist(document.name);
+  try {
+    document.transact(() => {
+      sharedText.delete(0, sharedText.length);
+      if (content.length > 0) {
+        sharedText.insert(0, content);
+      }
+    }, 'collab-sync');
+  } finally {
+    endSuppressPersist(document.name);
+  }
+
+  return true;
+}
+
+async function persistDocument(document) {
+  const sharedText = document.getText('codemirror').toString();
+  documentSnapshots.set(document.name, sharedText);
+  await upsertStoredDocumentContent(document.name, sharedText);
+}
+
+async function refreshActiveDocumentsFromStore() {
+  for (const [roomName, document] of activeDocuments.entries()) {
+    try {
+      if (!hasActiveConnections(roomName)) {
+        continue;
+      }
+
+      const stored = await getStoredDocumentContent(roomName);
+
+      if (!stored.found) {
+        continue;
+      }
+
+      const changed = applyContentToDocument(document, stored.content);
+      if (changed) {
+        documentSnapshots.set(roomName, stored.content);
+        console.log(`[collab] Documento sincronizado desde el almacenamiento → "${roomName}"`);
+      }
+    } catch (error) {
+      console.warn(`[collab] No se pudo refrescar "${roomName}" desde el almacenamiento:`, error?.message ?? error);
+    }
+  }
+}
 
 async function isCollabServiceRunningOnPort() {
   const controller = new AbortController();
@@ -103,15 +200,19 @@ const server = Server.configure({
   },
 
   async onConnect({ documentName, connection }) {
+    incrementRoomConnections(documentName);
     console.log(`[collab] Conexión iniciada a "${documentName}"`);
   },
 
   async onDisconnect({ documentName, connection }) {
+    decrementRoomConnections(documentName);
     const user = connection?.context?.user;
     console.log(`[collab] ${user?.name ?? connection?.context?.username ?? '?'} salió de "${documentName}"`);
   },
 
   async onLoadDocument({ document }) {
+    activeDocuments.set(document.name, document);
+
     const snapshot = documentSnapshots.get(document.name);
 
     if (snapshot) {
@@ -132,6 +233,7 @@ const server = Server.configure({
       }
 
       documentSnapshots.set(document.name, stored.content);
+      activeDocuments.set(document.name, document);
       return document;
     }
 
@@ -143,13 +245,19 @@ const server = Server.configure({
       await upsertStoredDocumentContent(document.name, sharedText.toString());
     }
 
+    activeDocuments.set(document.name, document);
     return document;
   },
 
+  async onChange({ document }) {
+    if (shouldSuppressPersist(document.name)) {
+      return;
+    }
+    await persistDocument(document);
+  },
+
   async onStoreDocument({ document }) {
-    const sharedText = document.getText('codemirror').toString();
-    documentSnapshots.set(document.name, sharedText);
-    await upsertStoredDocumentContent(document.name, sharedText);
+    await persistDocument(document);
   },
 });
 
@@ -158,6 +266,14 @@ async function startServer() {
     await server.listen();
     console.log(`[collab] Servidor en http/ws://localhost:${PORT}`);
     console.log(`[collab] Endpoint de token de prueba: POST http://localhost:${PORT}/dev-token`);
+
+    if (ENABLE_POLL_SYNC) {
+      setInterval(() => {
+        refreshActiveDocumentsFromStore().catch((error) => {
+          console.warn('[collab] Error en sincronización periódica desde almacenamiento:', error?.message ?? error);
+        });
+      }, SYNC_INTERVAL_MS);
+    }
   } catch (error) {
     if (error?.code === 'EADDRINUSE') {
       const alreadyRunning = await isCollabServiceRunningOnPort();

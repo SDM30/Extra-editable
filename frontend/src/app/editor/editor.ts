@@ -62,6 +62,8 @@ export class Editor implements OnInit, OnDestroy {
   terminalHeight: number = 220;
   collaborators: Array<{ userId: string; username: string; color: string }> = [];
   private collaboratorsSub?: Subscription;
+  private selectionRequestId = 0;
+  private roomContentCache = new Map<string, string>();
 
   constructor(
     private executionService: ExecutionService,
@@ -103,11 +105,21 @@ export class Editor implements OnInit, OnDestroy {
     this.language = newLang;
   }
 
+  onEditorValueChange(newValue: string): void {
+    this.value = newValue;
+    if (this.selectedRoom) {
+      this.roomContentCache.set(this.selectedRoom, newValue);
+    }
+  }
+
   async selectProject(projectId: number): Promise<void> {
+    const requestId = ++this.selectionRequestId;
     const project = this.projects.find((item) => item.id === projectId);
     if (!project) return;
 
+    this.cacheCurrentRoomContent();
     await this.saveCurrentArchivo();
+    if (requestId !== this.selectionRequestId) return;
 
     if (project.id < 0) {
       this.selectedProjectId = project.id;
@@ -130,31 +142,47 @@ export class Editor implements OnInit, OnDestroy {
 
     if (!project.archivos || project.archivos.length === 0) {
       const created = await this.ensureDefaultArchivo(project);
+      if (requestId !== this.selectionRequestId) return;
       project.archivos = [created];
     }
 
+    if (requestId !== this.selectionRequestId) return;
     await this.selectArchivo(project.archivos[0].id);
   }
 
   async selectArchivo(archivoId: number): Promise<void> {
+    const requestId = ++this.selectionRequestId;
+
+    if (this.selectedArchivoId === archivoId && this.selectedProjectId !== null) {
+      return;
+    }
+
+    this.cacheCurrentRoomContent();
     await this.saveCurrentArchivo();
+    if (requestId !== this.selectionRequestId) return;
 
     const project = this.projects.find((item) => item.id === this.selectedProjectId);
     const archivo = project?.archivos?.find((item) => item.id === archivoId);
     if (!project || !archivo) return;
 
+    if (requestId !== this.selectionRequestId) return;
+
     this.selectedArchivoId = archivo.id;
-    this.value = archivo.contenido || this.defaultCodeForLanguage(this.language);
-    this.selectedRoom = `${project.id}:${archivo.id}`;
+    const selectedRoom = `${project.id}:${archivo.id}`;
+    this.value = this.roomContentCache.get(selectedRoom) ?? archivo.contenido ?? this.defaultCodeForLanguage(this.language);
+    this.selectedRoom = selectedRoom;
     this.currentFilePathBase = this.stripFileExtension(archivo.nombre);
     this.projectId = String(project.id);
+    this.roomContentCache.set(selectedRoom, this.value);
     this.cdr.detectChanges();
 
     if (project.id < 0 || archivo.id < 0) {
       return;
     }
 
+    if (requestId !== this.selectionRequestId) return;
     const { token, username, userId } = await this.auth.getCollabToken(project.id, archivo.id);
+    if (requestId !== this.selectionRequestId) return;
     await this.connectCollab(token, username, userId);
   }
 
@@ -255,6 +283,7 @@ export class Editor implements OnInit, OnDestroy {
     const project = this.projects.find((item) => item.id === this.selectedProjectId);
     if (!project || project.id < 0) return;
 
+    this.cacheCurrentRoomContent();
     await this.saveCurrentArchivo();
 
     const existingNames = new Set((project.archivos ?? []).map((archivo) => archivo.nombre));
@@ -278,6 +307,7 @@ export class Editor implements OnInit, OnDestroy {
     this.currentFilePathBase = this.stripFileExtension(archivo.nombre);
     this.projectId = String(project.id);
     this.selectedRoom = `${project.id}:${archivo.id}`;
+    this.roomContentCache.set(this.selectedRoom, this.value);
     this.lspEnabled = true;
     this.cdr.detectChanges();
 
@@ -304,7 +334,7 @@ export class Editor implements OnInit, OnDestroy {
       return;
     }
 
-    const contenido = this.value;
+    const contenido = this.roomContentCache.get(`${project.id}:${archivo.id}`) ?? this.value;
 
     if (archivo.contenido === contenido) {
       return;
@@ -365,6 +395,14 @@ export class Editor implements OnInit, OnDestroy {
 
   private stripFileExtension(fileName: string): string {
     return fileName.replace(/\.[^.]+$/, '') || 'main';
+  }
+
+  private cacheCurrentRoomContent(): void {
+    if (!this.selectedRoom) {
+      return;
+    }
+
+    this.roomContentCache.set(this.selectedRoom, this.value);
   }
 
   enviarEntrada(input: string): void {

@@ -4,7 +4,7 @@
     class="editor-area"
     [ngModel]="value"
     (ngModelChange)="onValueChange($event)"
-    [extensions]="editorExtensions"
+    [extensions]="resolvedEditorExtensions"
     [theme]="theme">
   </code-editor>
 
