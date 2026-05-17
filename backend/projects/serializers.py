@@ -10,16 +10,16 @@ class ArchivoSerializer(serializers.ModelSerializer):
 
 
 class ProyectoSerializer(serializers.ModelSerializer):
-    """Lista — sin archivos anidados."""
+    """Lista — incluye archivos anidados."""
+    archivos = ArchivoSerializer(many=True, read_only=True)
+    
     class Meta:
         model = Proyecto
-        fields = ('id', 'nombre', 'descripcion', 'lenguaje', 'fechaCreacion')
-        read_only_fields = ('id', 'fechaCreacion')
+        fields = ('id', 'nombre', 'descripcion', 'lenguaje', 'fechaCreacion', 'archivos')
+        read_only_fields = ('id', 'fechaCreacion', 'archivos')
 
 
 class ProyectoDetailSerializer(ProyectoSerializer):
-    """Detalle — incluye archivos."""
-    archivos = ArchivoSerializer(many=True, read_only=True)
-
+    """Detalle — mismo que lista (ya incluye archivos)."""
     class Meta(ProyectoSerializer.Meta):
-        fields = ProyectoSerializer.Meta.fields + ('archivos',)
+        pass

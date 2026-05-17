@@ -2,15 +2,10 @@
 
   <code-editor
     class="editor-area"
-    [value]="value"
-    [extensions]="editorExtensions"
-    [theme]="theme"
-    [indentWithTab]="indentWithTab"
-    [indentUnit]="indentUnit"
-    [lineWrapping]="lineWrapping"
-    [highlightWhitespace]="highlightWhitespace"
-    [placeholder]="placeholder"
-    [autoFocus]="autoFocus">
+    [ngModel]="value"
+    (ngModelChange)="onValueChange($event)"
+    [extensions]="resolvedEditorExtensions"
+    [theme]="theme">
   </code-editor>
 
   <div

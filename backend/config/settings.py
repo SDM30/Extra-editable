@@ -56,22 +56,27 @@ TEMPLATES = [
     },
 ]
 
-# Database — PostgreSQL prod via env
+# Database — SQLite dev / PostgreSQL via env
+DB_ENGINE = config('DB_ENGINE', default='django.db.backends.sqlite3')
+
 DATABASES = {
     'default': {
-        'ENGINE': config('DB_ENGINE'),
-        'NAME': config('DB_NAME'),
-        'USER': config('DB_USER'),
-        'PASSWORD': config('DB_PASSWORD'),
-        'HOST': config('DB_HOST', default='localhost'),
-        'PORT': config('DB_PORT', default='5432'),
+        'ENGINE': DB_ENGINE,
+        'NAME': config('DB_NAME', default=BASE_DIR / 'db.sqlite3'),
     }
 }
 
-MIGRATION_MODULES = {
-    'users': None,
-    'projects': None,
-}
+if DB_ENGINE == 'django.db.backends.postgresql':
+    DATABASES['default'].update({
+        'HOST': config('DB_HOST', default='localhost'),
+        'PORT': config('DB_PORT', default='5432'),
+        'USER': config('DB_USER', default='postgres'),
+        'PASSWORD': config('DB_PASSWORD', default='postgres'),
+        'CONN_MAX_AGE': config('DB_CONN_MAX_AGE', default=60, cast=int),
+        'OPTIONS': {
+            'options': config('DB_OPTIONS', default=''),
+        },
+    })
 
 # REST Framework
 REST_FRAMEWORK = {
@@ -114,3 +119,14 @@ LANGUAGE_CODE = 'es-co'
 TIME_ZONE = 'America/Bogota'
 USE_I18N = True
 USE_TZ = True
+
+# Collab (Hocuspocus) integration settings
+DEFAULT_MAX_COLLAB_USERS = config('DEFAULT_MAX_COLLAB_USERS', default=4, cast=int)
+# Number of seconds to consider a collab session alive without refresh
+DEFAULT_COLLAB_SESSION_TIMEOUT_SECONDS = config('DEFAULT_COLLAB_SESSION_TIMEOUT_SECONDS', default=60, cast=int)
+# Secret used by backend to sign JWTs for the collab service. Prefer `JWT_SECRET`
+# so backend and collab-service share the same environment variable name.
+COLLAB_JWT_SECRET = config(
+    'JWT_SECRET',
+    default=config('COLLAB_JWT_SECRET', default='jwt-secreto')
+)

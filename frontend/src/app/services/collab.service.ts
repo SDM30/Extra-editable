@@ -1,7 +1,7 @@
 import { Injectable, OnDestroy } from '@angular/core';
 import * as Y from 'yjs';
 import { HocuspocusProvider } from '@hocuspocus/provider';
-import { BehaviorSubject, ReplaySubject } from 'rxjs';
+import { BehaviorSubject, Subject } from 'rxjs';
 
 export interface CollabUser {
   userId: string;
@@ -11,19 +11,30 @@ export interface CollabUser {
 
 @Injectable({ providedIn: 'root' })
 export class CollabService implements OnDestroy {
+  // Map para providers de proyecto (project-level room)
+  private projectProviders: Map<string, { provider: HocuspocusProvider; ydoc: Y.Doc }> = new Map();
   private provider: HocuspocusProvider | null = null;
   private ydoc: Y.Doc | null = null;
   private currentDocumentName: string | null = null;
   private connectingToDocument: string | null = null;  // Flag para prevenir múltiples intentos simultáneos
   private connectPromise: Promise<HocuspocusProvider> | null = null;
+  private connectionVersion = 0;
 
   // Emite cuando la conexión está lista y el Y.Text ya existe
-  readonly ready$ = new ReplaySubject<void>(1);
+  readonly ready$ = new Subject<void>();
   readonly collaborators$ = new BehaviorSubject<CollabUser[]>([]);
   private _synced = false;
 
   isReady(): boolean {
     return this._synced;
+  }
+
+  getConnectionVersion(): number {
+    return this.connectionVersion;
+  }
+
+  getCurrentDocumentName(): string | null {
+    return this.currentDocumentName;
   }
 
   async connect(documentName: string, token: string, username: string, userId?: string): Promise<HocuspocusProvider> {
@@ -42,65 +53,118 @@ export class CollabService implements OnDestroy {
     this.connectingToDocument = documentName;
     console.log('[collab] 🔗 Iniciando conexión a', documentName);
 
-    // Desconectar si hay una conexión antigua
-    if (this.provider) {
-      this.disconnect();
-    }
+    // Hot-swap strategy: create a new provider and only destroy the old one
+    // after the new one has synchronized to avoid losing awareness/presence
+    // during document switches.
+    const oldProvider = this.provider;
+    const oldYdoc = this.ydoc;
 
-    this.currentDocumentName = documentName;
-    this.ydoc = new Y.Doc();
+    this.connectionVersion += 1;
+    const newYdoc = new Y.Doc();
 
     this.connectPromise = new Promise<HocuspocusProvider>((resolve, reject) => {
       try {
-        this.provider = new HocuspocusProvider({
-          url: 'ws://localhost:1234',
+        const newProvider = new HocuspocusProvider({
+          url: 'ws://localhost:8083',
           name: documentName,
-          document: this.ydoc!,
+          document: newYdoc,
           token,
           onConnect: () => {
-            console.log('[collab] ✅ Conectado a', documentName);
+            console.log('[collab] ✅ (new) Conectado a', documentName);
             this.connectingToDocument = null; // Limpiar el flag
-            // Registrar estado de awareness con `id` y `name` para ser compatible
-            // con otros helpers que esperan `{ user: { id, name, color } }`.
             const idToSet = userId || username || 'anon';
-            this.provider?.setAwarenessField('user', {
-              id: idToSet,
-              name: username,
-              color: this.randomColor(),
-            });
+            try {
+              newProvider?.setAwarenessField('user', {
+                id: idToSet,
+                name: username,
+                color: this.randomColor(),
+              });
+            } catch (e) {
+              console.warn('[collab] Warning setting awareness field on new provider', e);
+            }
           },
           onSynced: () => {
-            console.log('[collab] 🔄 Documento sincronizado', documentName);
+            console.log('[collab] 🔄 (new) Documento sincronizado', documentName);
             this._synced = true;
-            // Emitir listo SOLO cuando ya se ha sincronizado el documento remoto
-            this.ready$.next();
-            resolve(this.provider!);
-            this.connectPromise = null;
+            // Swap providers atomically
+            try {
+              if (oldProvider) {
+                try {
+                  oldProvider.destroy();
+                } catch (e) {
+                  console.warn('[collab] Error destroying old provider', e);
+                }
+              }
+              if (oldYdoc) {
+                try {
+                  oldYdoc.destroy();
+                } catch (e) {
+                  /* ignore */
+                }
+              }
+            } finally {
+              this.provider = newProvider;
+              this.ydoc = newYdoc;
+              this.currentDocumentName = documentName;
+              this.ready$.next();
+              resolve(this.provider);
+              this.connectPromise = null;
+            }
           },
           onAwarenessUpdate: (data) => {
-            const list: CollabUser[] = [];
-            const states = Array.isArray(data?.states) ? data.states : [];
-
-            states.forEach((entry: any) => {
-              const user = entry?.user;
-              if (user) {
-                list.push({
-                  userId: String(user.id ?? user.userId ?? entry.clientId),
-                  username: String(user.name ?? user.username ?? 'Anónimo'),
-                  color: String(user.color ?? '#94a3b8'),
-                });
+            // Diagnostic: log raw awareness payload
+            console.debug('[collab] Raw awareness payload:', data);
+            const rawList: CollabUser[] = [];
+            if (Array.isArray(data?.states)) {
+              (data.states as any[]).forEach((entry: any) => {
+                const user = entry?.user ?? entry?.state?.user;
+                const clientId = entry?.clientId ?? entry?.client;
+                if (user) {
+                  rawList.push({
+                    userId: String(user.id ?? user.userId ?? clientId ?? 'anon'),
+                    username: String(user.name ?? user.username ?? 'Anónimo'),
+                    color: String(user.color ?? '#94a3b8'),
+                  });
+                }
+              });
+            } else {
+              try {
+                const aw = newProvider?.awareness as any;
+                const statesIter = aw?.getStates ? aw.getStates() : aw?.states;
+                if (statesIter) {
+                  const entries = statesIter instanceof Map ? Array.from(statesIter.entries()) : Object.entries(statesIter);
+                  entries.forEach(([clientId, state]: any) => {
+                    const user = state?.user ?? state?.state?.user;
+                    if (user) {
+                      rawList.push({
+                        userId: String(user.id ?? user.userId ?? clientId ?? 'anon'),
+                        username: String(user.name ?? user.username ?? 'Anónimo'),
+                        color: String(user.color ?? '#94a3b8'),
+                      });
+                    }
+                  });
+                }
+              } catch (e) {
+                console.warn('[collab] Warning reading awareness states:', e);
               }
-            });
+            }
 
-            this.collaborators$.next(list.slice(0, 4));
+            const dedup = new Map<string, CollabUser>();
+            for (const u of rawList) {
+              if (!dedup.has(u.userId)) dedup.set(u.userId, u);
+            }
+
+            const finalList = Array.from(dedup.values()).slice(0, 4);
+            console.debug('[collab] Parsed collaborators:', finalList);
+            this.collaborators$.next(finalList);
           },
           onDisconnect: () => {
-            console.log('[collab] ❌ Desconectado de', documentName);
+            console.log('[collab] ❌ (new) Desconectado de', documentName);
           },
           onAuthenticationFailed: ({ reason }) => {
             const tokenPreview =
               typeof token === 'string' && token.length > 12 ? `${token.slice(0, 12)}…` : token;
-            console.error('[collab] 🔐 Auth fallida:', { reason, token: tokenPreview });
+            console.error('[collab] 🔐 Auth fallida (new):', { reason, token: tokenPreview });
             reject(new Error('Authentication failed'));
             this.connectPromise = null;
           },
@@ -112,6 +176,78 @@ export class CollabService implements OnDestroy {
     });
 
     return this.connectPromise;
+  }
+
+  // Conecta a una sala a nivel de proyecto (ej: project:123) sin reemplazar
+  // la conexión principal de archivo. Permite observar metadata compartida
+  // como la lista de archivos.
+  async connectProject(projectId: number | string, token: string, username: string, userId?: string): Promise<HocuspocusProvider> {
+    const roomName = `project:${projectId}`;
+    if (this.projectProviders.has(roomName)) {
+      return this.projectProviders.get(roomName)!.provider;
+    }
+
+    const projYdoc = new Y.Doc();
+
+    return new Promise<HocuspocusProvider>((resolve, reject) => {
+      try {
+        const projProvider = new HocuspocusProvider({
+          url: 'ws://localhost:8083',
+          name: roomName,
+          document: projYdoc,
+          token,
+          onConnect: () => {
+            try {
+              const idToSet = userId || username || 'anon';
+              projProvider?.setAwarenessField('user', {
+                id: idToSet,
+                name: username,
+                color: this.randomColor(),
+              });
+            } catch (e) {
+              console.warn('[collab] Warning setting awareness on project provider', e);
+            }
+          },
+          onSynced: () => {
+            console.log('[collab] ✅ Project synced', roomName);
+            this.projectProviders.set(roomName, { provider: projProvider, ydoc: projYdoc });
+            resolve(projProvider);
+          },
+          onDisconnect: () => {
+            console.log('[collab] ❌ Project disconnected', roomName);
+            // keep map entry for now; explicit disconnect will clean up
+          },
+          onAuthenticationFailed: ({ reason }) => {
+            console.error('[collab] Project auth failed', { reason });
+            reject(new Error('Project authentication failed'));
+          },
+        });
+      } catch (err) {
+        reject(err);
+      }
+    });
+  }
+
+  getProjectFilesArray(projectId: number | string): Y.Array<any> | null {
+    const roomName = `project:${projectId}`;
+    const entry = this.projectProviders.get(roomName);
+    if (!entry) return null;
+    try {
+      return entry.ydoc.getArray('files');
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Empuja metadata de archivo al Y.Array del proyecto para notificar a otros clientes
+  pushProjectFile(projectId: number | string, fileMeta: any): void {
+    const arr = this.getProjectFilesArray(projectId);
+    if (!arr) return;
+    try {
+      arr.push([fileMeta]);
+    } catch (e) {
+      console.warn('[collab] Could not push project file to Y.Array', e);
+    }
   }
 
   getSharedText(fieldName = 'codemirror'): Y.Text | null {
@@ -131,8 +267,10 @@ export class CollabService implements OnDestroy {
     this.ydoc?.destroy();
     this.provider = null;
     this.ydoc = null;
+    this.currentDocumentName = null;
     this._synced = false;
     this.collaborators$.next([]);
+    this.connectionVersion += 1;
   }
 
   ngOnDestroy(): void {

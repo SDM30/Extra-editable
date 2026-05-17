@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { firstValueFrom, Observable, tap } from 'rxjs';
 import { enviroment } from '../environments/enviroment';
@@ -7,8 +7,10 @@ import { AuthTokens, LoginRequest, RegisterRequest, UserProfile } from '../model
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  private base = enviroment.apiBaseUrl; // http://localhost:8000/api
-  private collabTokenUrl = 'http://localhost:1234/dev-token';
+  private base = enviroment.apiBaseUrl;
+  // Tokens are stored per-tab so two tabs can represent two different users.
+  // sessionStorage keeps a stable tab id; localStorage holds the tab-scoped tokens.
+  private readonly authTabKey = 'collab-auth-tab-id';
   private readonly anonStorageKey = 'collab-anon-identity';
 
   constructor(private http: HttpClient, private router: Router) {}
@@ -16,8 +18,10 @@ export class AuthService {
   login(data: LoginRequest): Observable<AuthTokens> {
     return this.http.post<AuthTokens>(`${this.base}/auth/login/`, data).pipe(
       tap(tokens => {
-        localStorage.setItem('access', tokens.access);
-        localStorage.setItem('refresh', tokens.refresh);
+        console.log('[AuthService] Login successful, storing tokens');
+        localStorage.setItem(this.getAuthStorageKey('access'), tokens.access);
+        localStorage.setItem(this.getAuthStorageKey('refresh'), tokens.refresh);
+        console.log('[AuthService] Token stored. Access prefix:', tokens.access.substring(0, 20));
       })
     );
   }
@@ -27,17 +31,19 @@ export class AuthService {
   }
 
   me(): Observable<UserProfile> {
-    return this.http.get<UserProfile>(`${this.base}/auth/me/`);
+    const token = this.getToken();
+    const headers = token ? new HttpHeaders({ Authorization: `Bearer ${token}` }) : undefined;
+    return this.http.get<UserProfile>(`${this.base}/auth/me/`, { headers });
   }
 
   logout(): void {
-    localStorage.removeItem('access');
-    localStorage.removeItem('refresh');
+    localStorage.removeItem(this.getAuthStorageKey('access'));
+    localStorage.removeItem(this.getAuthStorageKey('refresh'));
     this.router.navigate(['/auth']);
   }
 
   getToken(): string | null {
-    return localStorage.getItem('access');
+    return localStorage.getItem(this.getAuthStorageKey('access'));
   }
 
   isLoggedIn(): boolean {
@@ -50,15 +56,19 @@ export class AuthService {
    * Si el usuario está autenticado, intenta usar `me()` para poblar `userId/username`.
    * Si no, usa valores por defecto.
    */
-  async getCollabToken(): Promise<{ token: string; username: string; userId: string }> {
+  async getCollabToken(projectId: number, archivoId?: number): Promise<{ token: string; username: string; userId: string; room?: string }> {
     let userId = 'anon';
     let username = 'Anónimo';
+    const token = this.getToken();
+    console.log('[AuthService] getCollabToken - has access token:', !!token);
 
     try {
       const profile = await firstValueFrom(this.me());
       userId = String(profile.id);
       username = profile.username || username;
-    } catch {
+      console.log('[AuthService] Got user profile:', { userId, username });
+    } catch (err) {
+      console.warn('[AuthService] Could not fetch user profile, using anonymous:', err);
       // Usuario no autenticado o backend no disponible: generar identidad
       // anónima estable por pestaña para que awareness/collab no colapse
       // todos los tabs como si fueran el mismo usuario.
@@ -67,10 +77,23 @@ export class AuthService {
       username = anonIdentity.username;
     }
 
-    const resp = await firstValueFrom(
-      this.http.post<{ token: string }>(this.collabTokenUrl, { userId, username }),
-    );
-    return { token: resp.token, username, userId };
+    const url = `${this.base}/projects/${projectId}/collab/join/`;
+    const headers: any = {};
+    const access = this.getToken();
+    if (access) {
+      headers['Authorization'] = `Bearer ${access}`;
+    }
+
+    try {
+      const resp = await firstValueFrom(
+        this.http.post<{ token: string; room?: string }>(url, { userId, username, archivo_id: archivoId }, { headers }),
+      );
+      console.log('[AuthService] Got collab token for room:', resp.room);
+      return { token: resp.token, username, userId, room: resp.room };
+    } catch (err) {
+      console.error('[AuthService] Error getting collab token:', err);
+      throw err;
+    }
   }
 
   private getOrCreateAnonymousIdentity(): { userId: string; username: string } {
@@ -110,5 +133,24 @@ export class AuthService {
     windowLike.name = `collab-${identity.userId}`;
     sessionStorage.setItem(this.anonStorageKey, JSON.stringify(identity));
     return identity;
+  }
+
+  private getTabId(): string {
+    const existing = sessionStorage.getItem(this.authTabKey);
+    if (existing) {
+      return existing;
+    }
+
+    const randomPart =
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID().slice(0, 12)
+        : Math.random().toString(36).slice(2, 14);
+
+    sessionStorage.setItem(this.authTabKey, randomPart);
+    return randomPart;
+  }
+
+  private getAuthStorageKey(kind: 'access' | 'refresh'): string {
+    return `${kind}:${this.getTabId()}`;
   }
 }

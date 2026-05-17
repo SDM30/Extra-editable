@@ -1,12 +1,109 @@
 import { Server } from '@hocuspocus/server';
-import * as Y from 'yjs';
 import jwt from 'jsonwebtoken';
+import { getStoredDocumentContent, upsertStoredDocumentContent } from './documentStore.js';
 
-const JWT_SECRET = process.env.JWT_SECRET ?? 'dev-secret-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET ?? 'jwt-secreto';
 const PORT = parseInt(process.env.PORT ?? '1234', 10);
 const FRONTEND_ORIGIN = 'http://localhost:4200';
 const INITIAL_DOCUMENT = `#include <iostream>\n\nint main() {\n    std::cout << "Hola C++" << std::endl;\n    return 0;\n}`;
 const documentSnapshots = new Map();
+const activeDocuments = new Map();
+const roomConnectionCounts = new Map();
+const suppressPersistCounts = new Map();
+const SYNC_INTERVAL_MS = parseInt(process.env.COLLAB_SYNC_INTERVAL_MS ?? '1000', 10);
+const ENABLE_POLL_SYNC = (process.env.COLLAB_ENABLE_POLL_SYNC ?? 'true').toLowerCase() === 'true';
+
+function incrementRoomConnections(roomName) {
+  const current = roomConnectionCounts.get(roomName) ?? 0;
+  roomConnectionCounts.set(roomName, current + 1);
+}
+
+function decrementRoomConnections(roomName) {
+  const current = roomConnectionCounts.get(roomName) ?? 0;
+  const next = Math.max(0, current - 1);
+  if (next === 0) {
+    roomConnectionCounts.delete(roomName);
+    activeDocuments.delete(roomName);
+    return;
+  }
+  roomConnectionCounts.set(roomName, next);
+}
+
+function hasActiveConnections(roomName) {
+  return (roomConnectionCounts.get(roomName) ?? 0) > 0;
+}
+
+function beginSuppressPersist(roomName) {
+  const current = suppressPersistCounts.get(roomName) ?? 0;
+  suppressPersistCounts.set(roomName, current + 1);
+}
+
+function endSuppressPersist(roomName) {
+  const current = suppressPersistCounts.get(roomName) ?? 0;
+  const next = Math.max(0, current - 1);
+  if (next === 0) {
+    suppressPersistCounts.delete(roomName);
+    return;
+  }
+  suppressPersistCounts.set(roomName, next);
+}
+
+function shouldSuppressPersist(roomName) {
+  return (suppressPersistCounts.get(roomName) ?? 0) > 0;
+}
+
+function applyContentToDocument(document, content) {
+  const sharedText = document.getText('codemirror');
+  const currentText = sharedText.toString();
+
+  if (currentText === content) {
+    return false;
+  }
+
+  beginSuppressPersist(document.name);
+  try {
+    document.transact(() => {
+      sharedText.delete(0, sharedText.length);
+      if (content.length > 0) {
+        sharedText.insert(0, content);
+      }
+    }, 'collab-sync');
+  } finally {
+    endSuppressPersist(document.name);
+  }
+
+  return true;
+}
+
+async function persistDocument(document) {
+  const sharedText = document.getText('codemirror').toString();
+  documentSnapshots.set(document.name, sharedText);
+  await upsertStoredDocumentContent(document.name, sharedText);
+}
+
+async function refreshActiveDocumentsFromStore() {
+  for (const [roomName, document] of activeDocuments.entries()) {
+    try {
+      if (!hasActiveConnections(roomName)) {
+        continue;
+      }
+
+      const stored = await getStoredDocumentContent(roomName);
+
+      if (!stored.found) {
+        continue;
+      }
+
+      const changed = applyContentToDocument(document, stored.content);
+      if (changed) {
+        documentSnapshots.set(roomName, stored.content);
+        console.log(`[collab] Documento sincronizado desde el almacenamiento → "${roomName}"`);
+      }
+    } catch (error) {
+      console.warn(`[collab] No se pudo refrescar "${roomName}" desde el almacenamiento:`, error?.message ?? error);
+    }
+  }
+}
 
 async function isCollabServiceRunningOnPort() {
   const controller = new AbortController();
@@ -47,6 +144,7 @@ const server = Server.configure({
 
   async onRequest({ request, response }) {
     setCorsHeaders(response);
+    response.setHeader('X-Instance-Port', String(PORT));
 
     if (request.method === 'OPTIONS') {
       response.writeHead(204);
@@ -82,11 +180,44 @@ const server = Server.configure({
   },
 
   async onAuthenticate({ token, connection }) {
-    if (!token) throw new Error('Token requerido');
+    // Si el gateway ya inyectó identidad en headers (X-Auth-User-Id, X-Auth-Username),
+    // confiar en esa identidad y omitir verificación JWT aquí.
     try {
+      const headers = (connection && (connection.request?.headers || connection.context?.headers || connection.headers)) || {};
+      const forwardedUserId = headers['x-auth-user-id'] || headers['X-Auth-User-Id'];
+      const forwardedUsername = headers['x-auth-username'] || headers['X-Auth-Username'];
+      const forwardedRoom = headers['x-auth-room'] || headers['X-Auth-Room'];
+
+      if (!token && forwardedUserId) {
+        connection.requiresAuthentication = true;
+        console.log(`[collab] Identidad inyectada por gateway: ${forwardedUsername ?? forwardedUserId}`);
+        // Attach context so other hooks can read it
+        connection.context = connection.context || {};
+        connection.context.user = { id: String(forwardedUserId), name: String(forwardedUsername ?? 'anon') };
+        connection.context.userId = String(forwardedUserId);
+        connection.context.username = String(forwardedUsername ?? 'anon');
+        connection.context.room = forwardedRoom;
+
+        return {
+          user: {
+            id: String(forwardedUserId),
+            name: String(forwardedUsername ?? 'Anónimo'),
+          },
+          userId: String(forwardedUserId),
+          username: String(forwardedUsername ?? 'Anónimo'),
+        };
+      }
+
+      if (!token) throw new Error('Token requerido');
+
       const payload = jwt.verify(token, JWT_SECRET);
       connection.requiresAuthentication = true;
+      console.log(`[collab] ${payload.username ?? payload.sub ?? 'Anónimo'} autenticado`);
       return {
+        user: {
+          id: payload.sub ?? 'anon',
+          name: payload.username ?? 'Anónimo',
+        },
         userId: payload.sub ?? 'anon',
         username: payload.username ?? 'Anónimo',
       };
@@ -96,19 +227,41 @@ const server = Server.configure({
     }
   },
 
-  async onConnect({ documentName, context }) {
-    console.log(`[collab] ${context?.username ?? context?.userId ?? 'Anónimo'} se unió a "${documentName}"`);
+  async onConnect({ documentName, connection }) {
+    incrementRoomConnections(documentName);
+    console.log(`[collab] Conexión iniciada a "${documentName}"`);
   },
 
-  async onDisconnect({ documentName, context }) {
-    console.log(`[collab] ${context?.username ?? '?'} salió de "${documentName}"`);
+  async onDisconnect({ documentName, connection }) {
+    decrementRoomConnections(documentName);
+    const user = connection?.context?.user;
+    console.log(`[collab] ${user?.name ?? connection?.context?.username ?? '?'} salió de "${documentName}"`);
   },
 
   async onLoadDocument({ document }) {
+    activeDocuments.set(document.name, document);
+
     const snapshot = documentSnapshots.get(document.name);
 
     if (snapshot) {
-      Y.applyUpdate(document, snapshot);
+      const sharedText = document.getText('codemirror');
+      if (sharedText.length === 0) {
+        sharedText.insert(0, snapshot);
+      }
+      return document;
+    }
+
+    const stored = await getStoredDocumentContent(document.name);
+
+    if (stored.found) {
+      const sharedText = document.getText('codemirror');
+
+      if (sharedText.length === 0) {
+        sharedText.insert(0, stored.content);
+      }
+
+      documentSnapshots.set(document.name, stored.content);
+      activeDocuments.set(document.name, document);
       return document;
     }
 
@@ -116,14 +269,23 @@ const server = Server.configure({
 
     if (sharedText.length === 0) {
       sharedText.insert(0, INITIAL_DOCUMENT);
-      documentSnapshots.set(document.name, Y.encodeStateAsUpdate(document));
+      documentSnapshots.set(document.name, sharedText.toString());
+      await upsertStoredDocumentContent(document.name, sharedText.toString());
     }
 
+    activeDocuments.set(document.name, document);
     return document;
   },
 
+  async onChange({ document }) {
+    if (shouldSuppressPersist(document.name)) {
+      return;
+    }
+    await persistDocument(document);
+  },
+
   async onStoreDocument({ document }) {
-    documentSnapshots.set(document.name, Y.encodeStateAsUpdate(document));
+    await persistDocument(document);
   },
 });
 
@@ -132,6 +294,14 @@ async function startServer() {
     await server.listen();
     console.log(`[collab] Servidor en http/ws://localhost:${PORT}`);
     console.log(`[collab] Endpoint de token de prueba: POST http://localhost:${PORT}/dev-token`);
+
+    if (ENABLE_POLL_SYNC) {
+      setInterval(() => {
+        refreshActiveDocumentsFromStore().catch((error) => {
+          console.warn('[collab] Error en sincronización periódica desde almacenamiento:', error?.message ?? error);
+        });
+      }, SYNC_INTERVAL_MS);
+    }
   } catch (error) {
     if (error?.code === 'EADDRINUSE') {
       const alreadyRunning = await isCollabServiceRunningOnPort();
