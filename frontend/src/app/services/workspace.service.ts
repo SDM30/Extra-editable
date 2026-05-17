@@ -21,6 +21,13 @@ export interface WorkspaceProyecto {
   archivos?: WorkspaceArchivo[];
 }
 
+interface PaginatedProjectsResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: WorkspaceProyecto[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class WorkspaceService {
   private readonly baseUrl = enviroment.apiBaseUrl;
@@ -29,20 +36,28 @@ export class WorkspaceService {
 
   private authOptions() {
     const token = this.auth.getToken();
-    if (!token) {
-      throw new Error('No hay sesión autenticada para consultar proyectos');
-    }
-
     return {
-      headers: new HttpHeaders({ Authorization: `Bearer ${token}` }),
+      headers: new HttpHeaders({
+        ...(token && { Authorization: `Bearer ${token}` }),
+      }),
     };
   }
 
   async listProjects(): Promise<WorkspaceProyecto[]> {
-    const response = await firstValueFrom(
-      this.http.get<WorkspaceProyecto[]>(`${this.baseUrl}/projects/`, this.authOptions()),
-    );
-    return response;
+    try {
+      const response = await firstValueFrom(
+        this.http.get<WorkspaceProyecto[] | PaginatedProjectsResponse>(`${this.baseUrl}/projects/`, this.authOptions()),
+      );
+
+      if (Array.isArray(response)) {
+        return response;
+      }
+
+      return response?.results ?? [];
+    } catch (error) {
+      console.error('[WorkspaceService] Error fetching projects:', error);
+      return [];
+    }
   }
 
   async getProject(projectId: number): Promise<WorkspaceProyecto> {
@@ -56,22 +71,32 @@ export class WorkspaceService {
     descripcion: string;
     lenguaje: WorkspaceProyecto['lenguaje'];
   }): Promise<WorkspaceProyecto> {
-    return firstValueFrom(
-      this.http.post<WorkspaceProyecto>(`${this.baseUrl}/projects/`, payload, this.authOptions()),
-    );
+    try {
+      return await firstValueFrom(
+        this.http.post<WorkspaceProyecto>(`${this.baseUrl}/projects/`, payload, this.authOptions()),
+      );
+    } catch (error) {
+      console.error('[WorkspaceService] Error creating project:', error);
+      throw error;
+    }
   }
 
   async createArchivo(
     projectId: number,
     payload: { nombre: string; contenido: string },
   ): Promise<WorkspaceArchivo> {
-    return firstValueFrom(
-      this.http.post<WorkspaceArchivo>(
-        `${this.baseUrl}/projects/${projectId}/archivos/`,
-        payload,
-        this.authOptions(),
-      ),
-    );
+    try {
+      return await firstValueFrom(
+        this.http.post<WorkspaceArchivo>(
+          `${this.baseUrl}/projects/${projectId}/archivos/`,
+          payload,
+          this.authOptions(),
+        ),
+      );
+    } catch (error) {
+      console.error('[WorkspaceService] Error creating archivo:', error);
+      throw error;
+    }
   }
 
   async updateArchivo(

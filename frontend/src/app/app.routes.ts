@@ -8,5 +8,6 @@ export const routes: Routes = [
     title: 'Editor',
   },
   { path: 'auth', loadComponent: () => import('./auth/auth-wrap/auth-wrap.component').then(m => m.AuthWrapComponent) },
-  { path: '', redirectTo: '/editor', pathMatch: 'full' },
+  { path: '', redirectTo: '/auth', pathMatch: 'full' },
+  { path: '**', redirectTo: '/auth' },
 ];

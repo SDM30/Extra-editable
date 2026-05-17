@@ -2,7 +2,8 @@
 
   <code-editor
     class="editor-area"
-    [value]="value"
+    [ngModel]="value"
+    (ngModelChange)="onValueChange($event)"
     [extensions]="editorExtensions"
     [theme]="theme">
   </code-editor>

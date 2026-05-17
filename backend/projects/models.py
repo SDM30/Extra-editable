@@ -44,3 +44,26 @@ class Archivo(models.Model):
 
     def __str__(self):
         return f'{self.proyecto.nombre}/{self.nombre}'
+
+
+class CollabSession(models.Model):
+    proyecto = models.ForeignKey(
+        Proyecto,
+        on_delete=models.CASCADE,
+        related_name='collab_sessions'
+    )
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='collab_sessions'
+    )
+    token = models.CharField(max_length=512, blank=True)
+    last_seen = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-last_seen']
+
+    def __str__(self):
+        return f'CollabSession(project={self.proyecto_id}, user={self.usuario_id})'

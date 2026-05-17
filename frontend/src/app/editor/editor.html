@@ -31,7 +31,10 @@
 
       @if (projects.length > 0) {
         <div class="sidebar-section">
-          <div class="sidebar-title">Archivos</div>
+          <div class="sidebar-title" style="display: flex; justify-content: space-between; align-items: center; gap: 0.75rem;">
+            <span>Archivos</span>
+            <button type="button" class="project-item" (click)="createFileInSelectedProject()">+ Nuevo</button>
+          </div>
           <div class="file-list">
             @for (project of projects; track project.id) {
               @if (project.id === selectedProjectId) {

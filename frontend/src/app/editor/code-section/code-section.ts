@@ -281,6 +281,8 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit, OnChanges 
    */
   private collabExtensions: Extension[] = [];
   private collabUndoManager: Y.UndoManager | null = null;
+  private boundCollabConnectionVersion = -1;
+  private boundCollabDocumentName: string | null = null;
 
   /**
    * Cache de la extensión de lenguaje para evitar crear nuevas instancias en cada getter
@@ -378,13 +380,19 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit, OnChanges 
   ngOnChanges(changes: SimpleChanges): void {
     const languageChanged = Boolean(changes['language']);
     const projectChanged = Boolean(changes['projectId']);
+    const fileChanged = Boolean(changes['filePath']);
     const lspToggled = Boolean(changes['lspEnabled']);
 
-    if (!languageChanged && !projectChanged && !lspToggled) return;
+    if (!languageChanged && !projectChanged && !fileChanged && !lspToggled) return;
     if (!this.editorView) return;
 
     // Limpiar cache de la extensión de lenguaje si cambió el lenguaje
     if (languageChanged) this.languageExt = null;
+
+    if (projectChanged || fileChanged) {
+      this.resetCollabBinding();
+      this.initializeCollab();
+    }
 
     if (!this.lspEnabled) {
       if (this.lspAttachedPath) {
@@ -411,8 +419,7 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit, OnChanges 
   ngOnDestroy(): void {
     this.collabReadySub?.unsubscribe();
     this.collabReadySub = null;
-    this.collabUndoManager?.destroy();
-    this.collabUndoManager = null;
+    this.resetCollabBinding();
 
     if (this.lspEnabled) {
       const fullPath = this.lspAttachedPath ?? this.getFullPath();
@@ -422,13 +429,23 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit, OnChanges 
 
   private async initializeCollab(): Promise<void> {
     if (!this.editorView) return;
-    if (this.collabExtensions.length > 0) return;
 
     const shared = this.collab.getSharedText('codemirror');
     const provider = this.collab.getProvider();
     const awareness = provider?.awareness;
+    const currentDocumentName = this.collab.getCurrentDocumentName();
+    const currentConnectionVersion = this.collab.getConnectionVersion();
 
     if (!shared || !awareness) return;
+
+    const isSameBinding =
+      this.collabExtensions.length > 0 &&
+      this.boundCollabConnectionVersion === currentConnectionVersion &&
+      this.boundCollabDocumentName === currentDocumentName;
+
+    if (isSameBinding) return;
+
+    this.resetCollabBinding();
 
     // Normalizar saltos de línea para evitar desalineaciones CRLF/LF
     const localText = this.editorView.state.doc.toString().replace(/\r\n/g, '\n');
@@ -437,11 +454,16 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit, OnChanges 
       const sharedText = shared.toString();
 
       // Si ya existe contenido remoto, hidratar el editor local desde el Y.Text
-      // compartido antes de adjuntar yCollab. Así un tab nuevo arranca con el
-      // documento real en vez del texto predeterminado del componente.
-      if (sharedText.length > 0 && sharedText !== localText) {
+      // compartido antes de adjuntar yCollab. Para evitar sobrescribir trabajo
+      // local en curso, solo hidratamos cuando el editor local está vacío.
+      // Esto previene que un documento sincronizado tarde reescriba el archivo
+      // activo al cambiar de proyecto/archivo.
+      if (sharedText.length > 0 && localText.length === 0) {
         this._value = sharedText;
-        this.cdr.detectChanges();
+        setTimeout(() => this.cdr.detectChanges(), 0);
+      } else if (sharedText.length > 0 && sharedText !== localText) {
+        // Log a warning for mismatches so we can diagnose unexpected overwrites.
+        console.warn('[CodeSection] Remote document differs from local buffer; skipping hydration to avoid overwrite.');
       }
     } catch (e) {
       console.warn('[CodeSection] Error comprobando/inicializando shared text:', e);
@@ -450,10 +472,21 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit, OnChanges 
     this.collabUndoManager = new Y.UndoManager(shared);
     // yCollab incluye sincronización (ySync) + cursores remotos (awareness).
     this.collabExtensions = [yCollab(shared, awareness, { undoManager: this.collabUndoManager })];
+    this.boundCollabConnectionVersion = currentConnectionVersion;
+    this.boundCollabDocumentName = currentDocumentName;
 
-    // El provider se conecta fuera del zone de Angular; forzar update para que
-    // `code-editor` reciba las nuevas extensiones.
-    this.cdr.detectChanges();
+    // El provider se conecta fuera del zone de Angular; programar update en
+    // el siguiente tick para evitar colisiones con el ciclo de renderizado
+    // y errores de `EditorView.update` cuando CodeMirror aplica cambios.
+    setTimeout(() => this.cdr.detectChanges(), 0);
+  }
+
+  private resetCollabBinding(): void {
+    this.collabUndoManager?.destroy();
+    this.collabUndoManager = null;
+    this.collabExtensions = [];
+    this.boundCollabConnectionVersion = -1;
+    this.boundCollabDocumentName = null;
   }
 
   /**

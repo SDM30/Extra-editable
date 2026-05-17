@@ -119,3 +119,10 @@ LANGUAGE_CODE = 'es-co'
 TIME_ZONE = 'America/Bogota'
 USE_I18N = True
 USE_TZ = True
+
+# Collab (Hocuspocus) integration settings
+DEFAULT_MAX_COLLAB_USERS = config('DEFAULT_MAX_COLLAB_USERS', default=4, cast=int)
+# Number of seconds to consider a collab session alive without refresh
+DEFAULT_COLLAB_SESSION_TIMEOUT_SECONDS = config('DEFAULT_COLLAB_SESSION_TIMEOUT_SECONDS', default=60, cast=int)
+# Secret used by backend to sign JWTs for the collab service. Must match collab-service `JWT_SECRET` in env.
+COLLAB_JWT_SECRET = config('COLLAB_JWT_SECRET', default="dev-secret-change-in-production")

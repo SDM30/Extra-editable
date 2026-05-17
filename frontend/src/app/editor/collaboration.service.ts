@@ -36,6 +36,10 @@ export class CollaborationService implements OnDestroy {
     token?: string,
     userInfo?: { id: string; name: string; color: string }
   ): { yText: Y.Text; awareness: any } {
+    if (!token) {
+      throw new Error('Missing collab JWT token');
+    }
+
     this.disconnect();
 
     this.ydoc = new Y.Doc();
@@ -45,7 +49,7 @@ export class CollaborationService implements OnDestroy {
       url: this.serverUrl,
       name: documentName,
       document: this.ydoc,
-      token: token ?? 'dev-token',
+      token,
 
       onConnect: () => {
         console.log(`[collab] conectado → ${documentName}`);

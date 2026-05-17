@@ -87,7 +87,12 @@ const server = Server.configure({
     try {
       const payload = jwt.verify(token, JWT_SECRET);
       connection.requiresAuthentication = true;
+      console.log(`[collab] ${payload.username ?? payload.sub ?? 'Anónimo'} autenticado`);
       return {
+        user: {
+          id: payload.sub ?? 'anon',
+          name: payload.username ?? 'Anónimo',
+        },
         userId: payload.sub ?? 'anon',
         username: payload.username ?? 'Anónimo',
       };
@@ -97,12 +102,13 @@ const server = Server.configure({
     }
   },
 
-  async onConnect({ documentName, context }) {
-    console.log(`[collab] ${context?.username ?? context?.userId ?? 'Anónimo'} se unió a "${documentName}"`);
+  async onConnect({ documentName, connection }) {
+    console.log(`[collab] Conexión iniciada a "${documentName}"`);
   },
 
-  async onDisconnect({ documentName, context }) {
-    console.log(`[collab] ${context?.username ?? '?'} salió de "${documentName}"`);
+  async onDisconnect({ documentName, connection }) {
+    const user = connection?.context?.user;
+    console.log(`[collab] ${user?.name ?? connection?.context?.username ?? '?'} salió de "${documentName}"`);
   },
 
   async onLoadDocument({ document }) {

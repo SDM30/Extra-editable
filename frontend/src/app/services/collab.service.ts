@@ -1,7 +1,7 @@
 import { Injectable, OnDestroy } from '@angular/core';
 import * as Y from 'yjs';
 import { HocuspocusProvider } from '@hocuspocus/provider';
-import { BehaviorSubject, ReplaySubject } from 'rxjs';
+import { BehaviorSubject, Subject } from 'rxjs';
 
 export interface CollabUser {
   userId: string;
@@ -16,14 +16,23 @@ export class CollabService implements OnDestroy {
   private currentDocumentName: string | null = null;
   private connectingToDocument: string | null = null;  // Flag para prevenir múltiples intentos simultáneos
   private connectPromise: Promise<HocuspocusProvider> | null = null;
+  private connectionVersion = 0;
 
   // Emite cuando la conexión está lista y el Y.Text ya existe
-  readonly ready$ = new ReplaySubject<void>(1);
+  readonly ready$ = new Subject<void>();
   readonly collaborators$ = new BehaviorSubject<CollabUser[]>([]);
   private _synced = false;
 
   isReady(): boolean {
     return this._synced;
+  }
+
+  getConnectionVersion(): number {
+    return this.connectionVersion;
+  }
+
+  getCurrentDocumentName(): string | null {
+    return this.currentDocumentName;
   }
 
   async connect(documentName: string, token: string, username: string, userId?: string): Promise<HocuspocusProvider> {
@@ -48,6 +57,7 @@ export class CollabService implements OnDestroy {
     }
 
     this.currentDocumentName = documentName;
+    this.connectionVersion += 1;
     this.ydoc = new Y.Doc();
 
     this.connectPromise = new Promise<HocuspocusProvider>((resolve, reject) => {
@@ -78,21 +88,54 @@ export class CollabService implements OnDestroy {
             this.connectPromise = null;
           },
           onAwarenessUpdate: (data) => {
-            const list: CollabUser[] = [];
-            const states = Array.isArray(data?.states) ? data.states : [];
+            const rawList: CollabUser[] = [];
 
-            states.forEach((entry: any) => {
-              const user = entry?.user;
-              if (user) {
-                list.push({
-                  userId: String(user.id ?? user.userId ?? entry.clientId),
-                  username: String(user.name ?? user.username ?? 'Anónimo'),
-                  color: String(user.color ?? '#94a3b8'),
-                });
+            // data may be an object with a `states` array, or the provider's
+            // awareness API may be used to retrieve a Map of clientId → state.
+            if (Array.isArray(data?.states)) {
+              (data.states as any[]).forEach((entry: any) => {
+                const user = entry?.user ?? entry?.state?.user;
+                const clientId = entry?.clientId ?? entry?.clientId ?? entry?.client;
+                if (user) {
+                  rawList.push({
+                    userId: String(user.id ?? user.userId ?? clientId ?? 'anon'),
+                    username: String(user.name ?? user.username ?? 'Anónimo'),
+                    color: String(user.color ?? '#94a3b8'),
+                  });
+                }
+              });
+            } else {
+              // Fallback: read from the provider's awareness map if available
+              try {
+                const aw = this.provider?.awareness as any;
+                const statesIter = aw?.getStates ? aw.getStates() : aw?.states;
+                if (statesIter) {
+                  // statesIter may be a Map or an object; normalize to entries
+                  const entries = statesIter instanceof Map ? Array.from(statesIter.entries()) : Object.entries(statesIter);
+                  entries.forEach(([clientId, state]: any) => {
+                    const user = state?.user ?? state?.state?.user;
+                    if (user) {
+                      rawList.push({
+                        userId: String(user.id ?? user.userId ?? clientId ?? 'anon'),
+                        username: String(user.name ?? user.username ?? 'Anónimo'),
+                        color: String(user.color ?? '#94a3b8'),
+                      });
+                    }
+                  });
+                }
+              } catch (e) {
+                console.warn('[collab] Warning reading awareness states:', e);
               }
-            });
+            }
 
-            this.collaborators$.next(list.slice(0, 4));
+            // Deduplicate by userId to avoid showing the same logical user twice
+            const dedup = new Map<string, CollabUser>();
+            for (const u of rawList) {
+              if (!dedup.has(u.userId)) dedup.set(u.userId, u);
+            }
+
+            const finalList = Array.from(dedup.values()).slice(0, 4);
+            this.collaborators$.next(finalList);
           },
           onDisconnect: () => {
             console.log('[collab] ❌ Desconectado de', documentName);
@@ -131,8 +174,10 @@ export class CollabService implements OnDestroy {
     this.ydoc?.destroy();
     this.provider = null;
     this.ydoc = null;
+    this.currentDocumentName = null;
     this._synced = false;
     this.collaborators$.next([]);
+    this.connectionVersion += 1;
   }
 
   ngOnDestroy(): void {

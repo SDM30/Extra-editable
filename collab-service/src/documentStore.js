@@ -1,7 +1,15 @@
+import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Pool } from 'pg';
 
 let pool;
 let schemaReady = false;
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const localDataDir = path.join(__dirname, '..', 'data');
+const localStoreFile = path.join(localDataDir, 'collab_documents.json');
 
 function hasDatabaseConfig() {
   return Boolean(process.env.DATABASE_URL || process.env.DB_HOST || process.env.PGHOST);
@@ -45,10 +53,30 @@ async function ensureSchema() {
   return db;
 }
 
+async function readLocalStore() {
+  try {
+    const raw = await readFile(localStoreFile, 'utf8');
+    return JSON.parse(raw);
+  } catch (error) {
+    if (error?.code === 'ENOENT') {
+      return {};
+    }
+
+    throw error;
+  }
+}
+
+async function writeLocalStore(store) {
+  await mkdir(localDataDir, { recursive: true });
+  await writeFile(localStoreFile, JSON.stringify(store, null, 2), 'utf8');
+}
+
 export async function getStoredDocumentContent(roomName) {
   const db = await ensureSchema();
   if (!db) {
-    return { found: false, content: '' };
+    const store = await readLocalStore();
+    const content = typeof store?.[roomName] === 'string' ? store[roomName] : '';
+    return { found: content.length > 0 || Object.prototype.hasOwnProperty.call(store, roomName), content };
   }
 
   const result = await db.query(
@@ -66,7 +94,10 @@ export async function getStoredDocumentContent(roomName) {
 export async function upsertStoredDocumentContent(roomName, content) {
   const db = await ensureSchema();
   if (!db) {
-    return false;
+    const store = await readLocalStore();
+    store[roomName] = content;
+    await writeLocalStore(store);
+    return true;
   }
 
   await db.query(

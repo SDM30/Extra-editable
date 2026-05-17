@@ -1,4 +1,5 @@
 import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
+import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { finalize, timeout } from 'rxjs';
 import { Extension } from '@codemirror/state';
@@ -51,13 +52,13 @@ export class Editor implements OnInit, OnDestroy {
   resultado?: string;
   resultadoOk?: boolean;
   cargando = false;
-  projectId: string = 'default-project';
+  projectId: string = '';
   projects: WorkspaceProyecto[] = [];
   selectedProjectId: number | null = null;
   selectedArchivoId: number | null = null;
-  selectedRoom = 'default-project:main';
+  selectedRoom = '';
   currentFilePathBase = 'main';
-  lspEnabled: boolean = true;
+  lspEnabled: boolean = false;
   terminalHeight: number = 220;
   collaborators: Array<{ userId: string; username: string; color: string }> = [];
   private collaboratorsSub?: Subscription;
@@ -68,10 +69,18 @@ export class Editor implements OnInit, OnDestroy {
     private collab: CollabService,
     private auth: AuthService,
     private workspace: WorkspaceService,
+    private router: Router,
   ) {}
 
   async ngOnInit() {
-    console.log('[Editor] solicitando token collab...');
+    console.log('[Editor] ngOnInit starting');
+    console.log('[Editor] isLoggedIn:', this.auth.isLoggedIn());
+    if (!this.auth.isLoggedIn()) {
+      console.log('[Editor] Not logged in, redirecting to /auth');
+      await this.router.navigate(['/auth']);
+      return;
+    }
+    console.log('[Editor] Loading workspace...');
     // Obtiene (o genera) la identidad del usuario y pide el token al servidor collab
     await this.loadWorkspace();
 
@@ -98,9 +107,26 @@ export class Editor implements OnInit, OnDestroy {
     const project = this.projects.find((item) => item.id === projectId);
     if (!project) return;
 
+    await this.saveCurrentArchivo();
+
+    if (project.id < 0) {
+      this.selectedProjectId = project.id;
+      this.selectedArchivoId = project.archivos?.[0]?.id ?? null;
+      this.projectId = '';
+      this.selectedRoom = '';
+      this.lspEnabled = false;
+      if (project.archivos?.[0]) {
+        this.value = project.archivos[0].contenido ?? this.value;
+        this.currentFilePathBase = this.stripFileExtension(project.archivos[0].nombre);
+      }
+      this.cdr.detectChanges();
+      return;
+    }
+
     this.selectedProjectId = project.id;
     this.projectId = String(project.id);
     this.language = this.mapProjectLanguage(project.lenguaje);
+    this.lspEnabled = true;
 
     if (!project.archivos || project.archivos.length === 0) {
       const created = await this.ensureDefaultArchivo(project);
@@ -111,6 +137,8 @@ export class Editor implements OnInit, OnDestroy {
   }
 
   async selectArchivo(archivoId: number): Promise<void> {
+    await this.saveCurrentArchivo();
+
     const project = this.projects.find((item) => item.id === this.selectedProjectId);
     const archivo = project?.archivos?.find((item) => item.id === archivoId);
     if (!project || !archivo) return;
@@ -122,7 +150,11 @@ export class Editor implements OnInit, OnDestroy {
     this.projectId = String(project.id);
     this.cdr.detectChanges();
 
-    const { token, username, userId } = await this.auth.getCollabToken();
+    if (project.id < 0 || archivo.id < 0) {
+      return;
+    }
+
+    const { token, username, userId } = await this.auth.getCollabToken(project.id, archivo.id);
     await this.connectCollab(token, username, userId);
   }
 
@@ -133,52 +165,124 @@ export class Editor implements OnInit, OnDestroy {
 
   private async loadWorkspace(): Promise<void> {
     try {
+      console.log('[Editor] Fetching projects from backend...');
       const projects = await this.workspace.listProjects();
+      console.log('[Editor] Projects received:', projects.length > 0 ? projects : 'empty array');
       this.projects = projects;
 
       if (this.projects.length === 0) {
-        const created = await this.createStarterWorkspace();
-        this.projects = [created];
+        console.log('[Editor] No projects found, creating starter workspace...');
+        try {
+          const created = await this.createStarterWorkspace();
+          console.log('[Editor] Starter workspace created:', created.id);
+          this.projects = [created];
+        } catch (createError) {
+          console.error('[Editor] Failed to create starter workspace, using local fallback:', createError);
+          this.useLocalFallbackProject();
+          return;
+        }
       }
 
-      await this.selectProject(this.projects[0].id);
+      // If still no projects after attempts, use local fallback
+      if (this.projects.length === 0) {
+        console.log('[Editor] Using local fallback project');
+        this.useLocalFallbackProject();
+        return;
+      }
+
+      const firstProject = this.projects[0];
+      if (!firstProject) {
+        this.useLocalFallbackProject();
+        return;
+      }
+
+      console.log('[Editor] Selecting first project:', firstProject.id);
+      await this.selectProject(firstProject.id);
     } catch (error) {
-      console.warn('[Editor] No se pudo cargar el workspace remoto:', error);
-      const fallbackProject: WorkspaceProyecto = {
-        id: 0,
-        nombre: 'Proyecto local',
-        descripcion: 'Fallback local mientras no hay backend autenticado',
-        lenguaje: 'CPP',
-        archivos: [
-          {
-            id: 0,
-            nombre: 'main.cpp',
-            contenido: this.value,
-          },
-        ],
-      };
-      this.projects = [fallbackProject];
-      this.selectedProjectId = fallbackProject.id;
-      this.selectedArchivoId = fallbackProject.archivos?.[0]?.id ?? null;
-      this.selectedRoom = `${fallbackProject.id}:${this.selectedArchivoId ?? 0}`;
-      this.projectId = String(fallbackProject.id);
-      this.cdr.detectChanges();
+      console.error('[Editor] Fatal error in loadWorkspace:', error);
+      this.useLocalFallbackProject();
     }
   }
 
+  private useLocalFallbackProject(): void {
+    const fallbackArchivo = {
+      id: -1,
+      nombre: 'main.cpp',
+      contenido: this.value,
+    };
+
+    const fallbackProject: WorkspaceProyecto = {
+      id: -1,
+      nombre: 'Proyecto local',
+      descripcion: 'Fallback local - sincronización no disponible',
+      lenguaje: 'CPP',
+      archivos: [fallbackArchivo],
+    };
+
+    this.projects = [fallbackProject];
+    this.selectedProjectId = fallbackProject.id;
+    this.selectedArchivoId = fallbackArchivo.id;
+    this.selectedRoom = `${fallbackProject.id}:${fallbackArchivo.id}`;
+    this.currentFilePathBase = this.stripFileExtension(fallbackArchivo.nombre);
+    this.projectId = '';
+    this.lspEnabled = false;
+    this.cdr.detectChanges();
+  }
+
   private async createStarterWorkspace(): Promise<WorkspaceProyecto> {
-    const project = await this.workspace.createProject({
-      nombre: 'Proyecto principal',
-      descripcion: 'Proyecto inicial creado automáticamente',
-      lenguaje: this.mapLanguageToProject(this.language),
-    });
+    try {
+      console.log('[Editor] Creating starter project...');
+      const project = await this.workspace.createProject({
+        nombre: 'Proyecto principal',
+        descripcion: 'Proyecto inicial creado automáticamente',
+        lenguaje: this.mapLanguageToProject(this.language),
+      });
+      console.log('[Editor] Project created:', project);
+
+      const archivo = await this.workspace.createArchivo(project.id, {
+        nombre: this.defaultFileNameForLanguage(this.language),
+        contenido: this.defaultCodeForLanguage(this.language),
+      });
+      console.log('[Editor] Archivo created:', archivo);
+
+      return { ...project, archivos: [archivo] };
+    } catch (error) {
+      console.error('[Editor] Failed to create starter workspace:', error);
+      throw error;
+    }
+  }
+  async createFileInSelectedProject(): Promise<void> {
+    const project = this.projects.find((item) => item.id === this.selectedProjectId);
+    if (!project || project.id < 0) return;
+
+    await this.saveCurrentArchivo();
+
+    const existingNames = new Set((project.archivos ?? []).map((archivo) => archivo.nombre));
+    const baseName = this.defaultFileNameForLanguage(this.language);
+    const candidateNames = [
+      baseName,
+      `main-2${this.fileExtensionForLanguage(this.language)}`,
+      `main-3${this.fileExtensionForLanguage(this.language)}`,
+      `file-${Date.now()}${this.fileExtensionForLanguage(this.language)}`,
+    ];
+    const nombre = candidateNames.find((name) => !existingNames.has(name)) ?? `file-${Date.now()}${this.fileExtensionForLanguage(this.language)}`;
 
     const archivo = await this.workspace.createArchivo(project.id, {
-      nombre: this.defaultFileNameForLanguage(this.language),
+      nombre,
       contenido: this.defaultCodeForLanguage(this.language),
     });
 
-    return { ...project, archivos: [archivo] };
+    project.archivos = [...(project.archivos ?? []), archivo];
+    this.selectedArchivoId = archivo.id;
+    this.value = archivo.contenido;
+    this.currentFilePathBase = this.stripFileExtension(archivo.nombre);
+    this.projectId = String(project.id);
+    this.selectedRoom = `${project.id}:${archivo.id}`;
+    this.lspEnabled = true;
+    this.cdr.detectChanges();
+
+    const { token, username, userId } = await this.auth.getCollabToken(project.id, archivo.id);
+    await this.connectCollab(token, username, userId);
   }
 
   private async ensureDefaultArchivo(project: WorkspaceProyecto): Promise<WorkspaceArchivo> {
@@ -190,6 +294,28 @@ export class Editor implements OnInit, OnDestroy {
 
   private async connectCollab(token: string, username: string, userId: string): Promise<void> {
     await this.collab.connect(this.selectedRoom, token, username, userId);
+  }
+
+  private async saveCurrentArchivo(): Promise<void> {
+    const project = this.projects.find((item) => item.id === this.selectedProjectId);
+    const archivo = project?.archivos?.find((item) => item.id === this.selectedArchivoId);
+
+    if (!project || !archivo || project.id < 0 || archivo.id < 0) {
+      return;
+    }
+
+    const contenido = this.value;
+
+    if (archivo.contenido === contenido) {
+      return;
+    }
+
+    try {
+      const updated = await this.workspace.updateArchivo(project.id, archivo.id, { contenido });
+      archivo.contenido = updated.contenido;
+    } catch (error) {
+      console.warn('[Editor] No se pudo guardar el archivo actual antes de cambiar:', error);
+    }
   }
 
   private mapProjectLanguage(language: WorkspaceProyecto['lenguaje']): string {
@@ -215,6 +341,16 @@ export class Editor implements OnInit, OnDestroy {
       javascript: 'main.js',
     };
     return mapping[language] ?? 'main.txt';
+  }
+
+  private fileExtensionForLanguage(language: string): string {
+    const mapping: Record<string, string> = {
+      cpp: '.cpp',
+      python: '.py',
+      typescript: '.ts',
+      javascript: '.js',
+    };
+    return mapping[language] ?? '.txt';
   }
 
   private defaultCodeForLanguage(language: string): string {
