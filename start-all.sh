@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Simple helper to start backend and three collab-service instances in background
+# Simple helper to start the local stack used in development:
+# backend, frontend, Postgres, API gateway, and collaboration services.
 # Usage: ./start-all.sh [JWT_SECRET]
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -7,12 +8,88 @@ JWT_SECRET="${1:-jwt-secreto}"
 
 mkdir -p "$ROOT_DIR/logs"
 
-echo "Starting backend with JWT_SECRET=$JWT_SECRET"
-(cd "$ROOT_DIR/backend" && JWT_SECRET="$JWT_SECRET" python3 manage.py runserver 8000) &> "$ROOT_DIR/logs/backend.log" &
+export DB_ENGINE="django.db.backends.postgresql"
+export DB_NAME="extra_editable"
+export DB_USER="postgres"
+export DB_PASSWORD="postgres"
+export DB_HOST="localhost"
+export DB_PORT="5432"
+export JWT_SECRET="$JWT_SECRET"
+export COLLAB_JWT_SECRET="$JWT_SECRET"
+
+ensure_npm_deps() {
+  local dir="$1"
+  if [ -f "$dir/package-lock.json" ]; then
+    (cd "$dir" && npm ci)
+  else
+    (cd "$dir" && npm install)
+  fi
+}
+
+ensure_python_deps() {
+  (cd "$ROOT_DIR/backend" && python3 -m pip install -r requirements.txt)
+}
+
+ensure_postgres() {
+  docker volume create extra-editable-postgres-data >/dev/null
+  if docker inspect -f '{{.State.Running}}' extra-editable-postgres >/dev/null 2>&1; then
+    if [ "$(docker inspect -f '{{.State.Running}}' extra-editable-postgres)" != "true" ]; then
+      docker start extra-editable-postgres >/dev/null
+    fi
+  else
+    docker run -d --name extra-editable-postgres \
+      -e POSTGRES_USER=postgres \
+      -e POSTGRES_PASSWORD=postgres \
+      -e POSTGRES_DB=extra_editable \
+      -p 5432:5432 \
+      -v extra-editable-postgres-data:/var/lib/postgresql/data \
+      postgres:15-alpine >/dev/null
+  fi
+}
+
+start_docker_nginx() {
+  local name="$1"
+  local config_path="$2"
+  local port="$3"
+  docker rm -f "$name" >/dev/null 2>&1 || true
+  docker run -d --name "$name" -p "$port:$port" \
+    -v "$config_path:/etc/nginx/nginx.conf:ro" \
+    nginx:alpine >/dev/null
+}
+
+ensure_npm_deps "$ROOT_DIR/frontend"
+ensure_npm_deps "$ROOT_DIR/collab-service"
+ensure_python_deps
+ensure_postgres
+
+echo "Running Django migrations"
+(cd "$ROOT_DIR/backend" && python3 manage.py migrate --noinput) \
+  &> "$ROOT_DIR/logs/backend-migrate.log"
+
+start_docker_nginx extra-editable-gateway "$ROOT_DIR/nginx.conf" 8080
+start_docker_nginx collab-lb "$ROOT_DIR/collab-load-balancer/nginx.config" 8083
+
+echo "Starting backend"
+(cd "$ROOT_DIR/backend" && python3 manage.py runserver 8000) \
+  &> "$ROOT_DIR/logs/backend.log" &
+
+echo "Starting frontend"
+(cd "$ROOT_DIR/frontend" && npm start) \
+  &> "$ROOT_DIR/logs/frontend.log" &
 
 for port in 1234 1235 1236; do
   echo "Starting collab-service on port $port"
-  (cd "$ROOT_DIR/collab-service" && PORT=$port JWT_SECRET="$JWT_SECRET" node src/server.js) &> "$ROOT_DIR/logs/collab-$port.log" &
+  (
+    cd "$ROOT_DIR/collab-service" && \
+    PORT=$port JWT_SECRET="$JWT_SECRET" \
+    DB_ENGINE=django.db.backends.postgresql \
+    DB_NAME=extra_editable \
+    DB_USER=postgres \
+    DB_PASSWORD=postgres \
+    DB_HOST=localhost \
+    DB_PORT=5432 \
+    node src/server.js
+  ) &> "$ROOT_DIR/logs/collab-$port.log" &
 done
 
-echo "Started backend and collab instances. Logs: $ROOT_DIR/logs"
+echo "Started backend, frontend, Postgres, gateway, collab LB, and collab instances. Logs: $ROOT_DIR/logs"
