@@ -139,6 +139,7 @@ export class Editor implements OnInit, OnDestroy {
     this.projectId = String(project.id);
     this.language = this.mapProjectLanguage(project.lenguaje);
     this.lspEnabled = true;
+    this.cdr.detectChanges();
 
     if (!project.archivos || project.archivos.length === 0) {
       const created = await this.ensureDefaultArchivo(project);
@@ -230,6 +231,7 @@ export class Editor implements OnInit, OnDestroy {
       const projects = await this.workspace.listProjects();
       console.log('[Editor] Projects received:', projects.length > 0 ? projects : 'empty array');
       this.projects = projects;
+      this.cdr.detectChanges();
 
       if (this.projects.length === 0) {
         console.log('[Editor] No projects found, creating starter workspace...');

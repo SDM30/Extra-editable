@@ -39,6 +39,7 @@ export class AuthService {
   logout(): void {
     localStorage.removeItem(this.getAuthStorageKey('access'));
     localStorage.removeItem(this.getAuthStorageKey('refresh'));
+    document.cookie = 'collab_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax';
     this.router.navigate(['/auth']);
   }
 
@@ -88,6 +89,7 @@ export class AuthService {
       const resp = await firstValueFrom(
         this.http.post<{ token: string; room?: string }>(url, { userId, username, archivo_id: archivoId }, { headers }),
       );
+      document.cookie = `collab_token=${encodeURIComponent(resp.token)}; path=/; SameSite=Lax`;
       console.log('[AuthService] Got collab token for room:', resp.room);
       return { token: resp.token, username, userId, room: resp.room };
     } catch (err) {
