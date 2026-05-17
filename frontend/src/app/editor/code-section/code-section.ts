@@ -487,6 +487,7 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit, OnChanges 
       if (sharedText.length > 0 && (localText.length === 0 || shouldForceRoomHydration)) {
         console.log('[CodeSection] Hydrating editor from remote (local empty)');
         this._value = sharedText;
+        this.replaceEditorContent(sharedText);
         this.pendingRoomSwitch = false;
         this.suppressValueEmission = true;
         queueMicrotask(() => this.cdr.markForCheck());
@@ -524,6 +525,25 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit, OnChanges 
     this.boundCollabConnectionVersion = -1;
     this.boundCollabDocumentName = null;
     this.refreshEditorExtensions();
+  }
+
+  /**
+   * Reemplaza el contenido del EditorView de forma atómica para evitar
+   * que yCollab mezcle buffers viejo/nuevo durante cambios de room.
+   */
+  private replaceEditorContent(nextText: string): void {
+    if (!this.editorView) return;
+
+    const current = this.editorView.state.doc.toString();
+    if (current === nextText) return;
+
+    this.editorView.dispatch({
+      changes: {
+        from: 0,
+        to: this.editorView.state.doc.length,
+        insert: nextText,
+      },
+    });
   }
 
   /**

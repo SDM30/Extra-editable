@@ -11,6 +11,8 @@ export interface CollabUser {
 
 @Injectable({ providedIn: 'root' })
 export class CollabService implements OnDestroy {
+  // Map para providers de proyecto (project-level room)
+  private projectProviders: Map<string, { provider: HocuspocusProvider; ydoc: Y.Doc }> = new Map();
   private provider: HocuspocusProvider | null = null;
   private ydoc: Y.Doc | null = null;
   private currentDocumentName: string | null = null;
@@ -174,6 +176,78 @@ export class CollabService implements OnDestroy {
     });
 
     return this.connectPromise;
+  }
+
+  // Conecta a una sala a nivel de proyecto (ej: project:123) sin reemplazar
+  // la conexión principal de archivo. Permite observar metadata compartida
+  // como la lista de archivos.
+  async connectProject(projectId: number | string, token: string, username: string, userId?: string): Promise<HocuspocusProvider> {
+    const roomName = `project:${projectId}`;
+    if (this.projectProviders.has(roomName)) {
+      return this.projectProviders.get(roomName)!.provider;
+    }
+
+    const projYdoc = new Y.Doc();
+
+    return new Promise<HocuspocusProvider>((resolve, reject) => {
+      try {
+        const projProvider = new HocuspocusProvider({
+          url: 'ws://localhost:8083',
+          name: roomName,
+          document: projYdoc,
+          token,
+          onConnect: () => {
+            try {
+              const idToSet = userId || username || 'anon';
+              projProvider?.setAwarenessField('user', {
+                id: idToSet,
+                name: username,
+                color: this.randomColor(),
+              });
+            } catch (e) {
+              console.warn('[collab] Warning setting awareness on project provider', e);
+            }
+          },
+          onSynced: () => {
+            console.log('[collab] ✅ Project synced', roomName);
+            this.projectProviders.set(roomName, { provider: projProvider, ydoc: projYdoc });
+            resolve(projProvider);
+          },
+          onDisconnect: () => {
+            console.log('[collab] ❌ Project disconnected', roomName);
+            // keep map entry for now; explicit disconnect will clean up
+          },
+          onAuthenticationFailed: ({ reason }) => {
+            console.error('[collab] Project auth failed', { reason });
+            reject(new Error('Project authentication failed'));
+          },
+        });
+      } catch (err) {
+        reject(err);
+      }
+    });
+  }
+
+  getProjectFilesArray(projectId: number | string): Y.Array<any> | null {
+    const roomName = `project:${projectId}`;
+    const entry = this.projectProviders.get(roomName);
+    if (!entry) return null;
+    try {
+      return entry.ydoc.getArray('files');
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Empuja metadata de archivo al Y.Array del proyecto para notificar a otros clientes
+  pushProjectFile(projectId: number | string, fileMeta: any): void {
+    const arr = this.getProjectFilesArray(projectId);
+    if (!arr) return;
+    try {
+      arr.push([fileMeta]);
+    } catch (e) {
+      console.warn('[collab] Could not push project file to Y.Array', e);
+    }
   }
 
   getSharedText(fieldName = 'codemirror'): Y.Text | null {

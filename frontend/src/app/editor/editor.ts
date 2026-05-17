@@ -147,6 +147,39 @@ export class Editor implements OnInit, OnDestroy {
     }
 
     if (requestId !== this.selectionRequestId) return;
+
+    // Conectar a la sala del proyecto para sincronizar metadata (lista de archivos)
+    try {
+      const projectTokenRes = await this.auth.getCollabToken(project.id);
+      await this.collab.connectProject(project.id, projectTokenRes.token, projectTokenRes.username, projectTokenRes.userId);
+
+      // Si existe el array compartido 'files', observar cambios y refrescar desde backend
+      const filesArr = this.collab.getProjectFilesArray(project.id);
+      if (filesArr) {
+        // Observador que recarga la lista de archivos desde el backend
+        filesArr.observe(async () => {
+          try {
+            const fresh = await this.workspace.getProject(project.id);
+            const idx = this.projects.findIndex((p) => p.id === project.id);
+            if (idx >= 0) {
+              const freshArch = fresh.archivos ?? [];
+              this.projects[idx].archivos = freshArch;
+              // Si el archivo actualmente seleccionado fue borrado, ajustar selección
+              if (this.selectedArchivoId && !freshArch.find((a) => a.id === this.selectedArchivoId)) {
+                this.selectedArchivoId = freshArch[0]?.id ?? null;
+              }
+              this.cdr.detectChanges();
+            }
+          } catch (e) {
+            console.warn('[Editor] Could not refresh project files on project-array change', e);
+          }
+        });
+      }
+
+    } catch (e) {
+      console.warn('[Editor] Could not connect to project-level collab room', e);
+    }
+
     await this.selectArchivo(project.archivos[0].id);
   }
 
@@ -313,6 +346,13 @@ export class Editor implements OnInit, OnDestroy {
 
     const { token, username, userId } = await this.auth.getCollabToken(project.id, archivo.id);
     await this.connectCollab(token, username, userId);
+
+    // Notify other clients via project-level Y.Array if available
+    try {
+      this.collab.pushProjectFile(project.id, { id: archivo.id, nombre: archivo.nombre });
+    } catch (e) {
+      // ignore if push fails
+    }
   }
 
   private async ensureDefaultArchivo(project: WorkspaceProyecto): Promise<WorkspaceArchivo> {
