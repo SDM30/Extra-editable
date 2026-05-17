@@ -144,14 +144,15 @@ PORT=1236 JWT_SECRET=jwt-secreto node src/server.js
 Se incluyen dos scripts en la raíz para arrancar el backend y tres instancias de `collab-service` con el mismo `JWT_SECRET`.
 
 - `start-all.ps1` — PowerShell, abrir nuevas ventanas para backend y cada instancia de `collab-service`.
-  - Uso básico (desde la raíz del repo):
+  - Uso recomendado (PowerShell) — ejecuta con el operador `&` para invocar el script y forzar kill si es necesario:
     ```powershell
-    .\start-all.ps1
+    & .\start-all.ps1 -JwtSecret 'jwt-secreto' -ForceKill -StartFrontend
     ```
-  - Especificar secreto y arrancar frontend:
+  - Ejecutar sin forzar kill (preguntará si hay puertos ocupados):
     ```powershell
-    .\start-all.ps1 -JwtSecret 'jwt-secreto' -StartFrontend
+    & .\start-all.ps1 -JwtSecret 'jwt-secreto' -StartFrontend
     ```
+  - Nota: no pegues el comando dentro de bloques de código cuando lo ejecutes en la terminal; usa `&` antes de la ruta si la ejecutas desde la carpeta del repo.
 
 - `start-all.sh` — Bash, arranca los procesos en background y escribe logs en `logs/`.
   - Uso básico:
