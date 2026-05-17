@@ -58,13 +58,13 @@ Cada instancia necesita su propio puerto y, opcionalmente, su propio secreto JWT
 ```bash
 # Instancia 1 (ya existente)
 cd collab-service
-PORT=1234 JWT_SECRET=dev-secret-change-in-production node src/server.js
+PORT=1234 JWT_SECRET=jwt-secreto node src/server.js
 
 # Instancia 2 (nueva terminal)
-PORT=1235 JWT_SECRET=dev-secret-change-in-production node src/server.js
+PORT=1235 JWT_SECRET=jwt-secreto node src/server.js
 
 # Instancia 3 (nueva terminal, opcional)
-PORT=1236 JWT_SECRET=dev-secret-change-in-production node src/server.js
+PORT=1236 JWT_SECRET=jwt-secreto node src/server.js
 ```
 
 Si usas `npm start` el puerto viene del `.env`. Puedes crear múltiples archivos
@@ -75,10 +75,13 @@ Si usas `npm start` el puerto viene del `.env`. Puedes crear múltiples archivos
 **Recomendado en el flujo actual: Docker**
 
 ```powershell
+ $mount = Join-Path $PWD 'collab-load-balancer\nginx.config'
 docker run -d --name collab-lb -p 8083:8083 `
-    -v "${PWD}\nginx.config:/etc/nginx/nginx.conf:ro" `
+    -v "$mount:/etc/nginx/nginx.conf:ro" `
     nginx:alpine
 ```
+
+> La variable sigue llamándose `JWT_SECRET`; para el ejemplo usar un valor como `"jwt-secreto"`.
 
 En Linux/macOS/Git Bash:
 
@@ -104,7 +107,17 @@ nginx -c $(pwd)/nginx.conf -g "daemon off;"
 nginx -c $(pwd)/nginx.conf
 ```
 
-### 3. Actualizar el Nginx principal
+### 3. Flujo de autenticación del gateway
+
+El balanceador valida el token con el backend en `POST /api/projects/validate-collab-token/` usando `auth_request`. Si la validación es correcta, Nginx reenvía la identidad al `collab-service` en estas cabeceras internas:
+
+- `X-Auth-User-Id`
+- `X-Auth-Username`
+- `X-Auth-Room`
+
+El servicio colaborativo acepta esas cabeceras cuando el gateway ya autenticó la petición, y usa JWT como respaldo si la conexión llega sin identidad inyectada.
+
+### 4. Actualizar el Nginx principal
 
 En `nginx.conf` (raíz del proyecto), cambia el upstream de `/collab/` y `/collab` para que apunten a este balanceador en lugar de directamente a `:1234`:
 
@@ -145,6 +158,10 @@ curl -X POST http://localhost:8083/dev-token \
   -d '{"userId":"user-1","username":"Tester"}'
 # → {"token":"eyJ..."}
 
+# 2b. Validar el token por el backend (flujo usado por auth_request)
+curl "http://localhost:8000/api/projects/validate-collab-token/?token=TU_TOKEN"
+# → {"ok":true}
+
 # 3. Probar conexión WebSocket
 npx wscat -c "ws://localhost:8083?token=TU_TOKEN"
 # → Connected
@@ -161,9 +178,9 @@ npx wscat -c "ws://localhost:8083?token=TU_TOKEN"
 3. Levantar tres instancias de `collab-service`:
 
 ```powershell
-$env:JWT_SECRET='dev-secret-change-in-production'; $env:PORT=1234; node src/server.js
-$env:JWT_SECRET='dev-secret-change-in-production'; $env:PORT=1235; node src/server.js
-$env:JWT_SECRET='dev-secret-change-in-production'; $env:PORT=1236; node src/server.js
+$env:JWT_SECRET='jwt-secreto'; $env:PORT=1234; node src/server.js
+$env:JWT_SECRET='jwt-secreto'; $env:PORT=1235; node src/server.js
+$env:JWT_SECRET='jwt-secreto'; $env:PORT=1236; node src/server.js
 ```
 
 4. Levantar el balanceador en `http://localhost:8083`.

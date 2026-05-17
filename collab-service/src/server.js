@@ -2,7 +2,7 @@ import { Server } from '@hocuspocus/server';
 import jwt from 'jsonwebtoken';
 import { getStoredDocumentContent, upsertStoredDocumentContent } from './documentStore.js';
 
-const JWT_SECRET = process.env.JWT_SECRET ?? 'dev-secret-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET ?? 'jwt-secreto';
 const PORT = parseInt(process.env.PORT ?? '1234', 10);
 const FRONTEND_ORIGIN = 'http://localhost:4200';
 const INITIAL_DOCUMENT = `#include <iostream>\n\nint main() {\n    std::cout << "Hola C++" << std::endl;\n    return 0;\n}`;
@@ -180,8 +180,36 @@ const server = Server.configure({
   },
 
   async onAuthenticate({ token, connection }) {
-    if (!token) throw new Error('Token requerido');
+    // Si el gateway ya inyectó identidad en headers (X-Auth-User-Id, X-Auth-Username),
+    // confiar en esa identidad y omitir verificación JWT aquí.
     try {
+      const headers = (connection && (connection.request?.headers || connection.context?.headers || connection.headers)) || {};
+      const forwardedUserId = headers['x-auth-user-id'] || headers['X-Auth-User-Id'];
+      const forwardedUsername = headers['x-auth-username'] || headers['X-Auth-Username'];
+      const forwardedRoom = headers['x-auth-room'] || headers['X-Auth-Room'];
+
+      if (!token && forwardedUserId) {
+        connection.requiresAuthentication = true;
+        console.log(`[collab] Identidad inyectada por gateway: ${forwardedUsername ?? forwardedUserId}`);
+        // Attach context so other hooks can read it
+        connection.context = connection.context || {};
+        connection.context.user = { id: String(forwardedUserId), name: String(forwardedUsername ?? 'anon') };
+        connection.context.userId = String(forwardedUserId);
+        connection.context.username = String(forwardedUsername ?? 'anon');
+        connection.context.room = forwardedRoom;
+
+        return {
+          user: {
+            id: String(forwardedUserId),
+            name: String(forwardedUsername ?? 'Anónimo'),
+          },
+          userId: String(forwardedUserId),
+          username: String(forwardedUsername ?? 'Anónimo'),
+        };
+      }
+
+      if (!token) throw new Error('Token requerido');
+
       const payload = jwt.verify(token, JWT_SECRET);
       connection.requiresAuthentication = true;
       console.log(`[collab] ${payload.username ?? payload.sub ?? 'Anónimo'} autenticado`);

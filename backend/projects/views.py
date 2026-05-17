@@ -10,6 +10,56 @@ from django.conf import settings
 from datetime import datetime, timedelta, timezone
 import jwt
 from .models import CollabSession
+from rest_framework.views import APIView
+from rest_framework.response import Response as DRFResponse
+from rest_framework import status as drf_status
+
+
+class ValidateCollabTokenView(APIView):
+    """Endpoint utilizado por el API Gateway / Load Balancer para validar
+    un token JWT emitido por el backend y propagar identidad al servicio
+    colaborativo.
+
+    Lee token desde: Authorization header (Bearer ...) o parámetro `token`.
+    Si es válido, devuelve 200 con headers:
+      - X-Auth-User-Id
+      - X-Auth-Username
+      - X-Auth-Room
+    Si inválido, devuelve 401.
+    """
+    authentication_classes = []
+    permission_classes = []
+
+    def get(self, request):
+        token = None
+        auth = request.META.get('HTTP_AUTHORIZATION')
+        if auth and auth.lower().startswith('bearer '):
+            token = auth.split(None, 1)[1]
+        if not token:
+            token = request.query_params.get('token')
+
+        if not token:
+            return DRFResponse({'detail': 'token required'}, status=drf_status.HTTP_400_BAD_REQUEST)
+
+        secret = getattr(settings, 'COLLAB_JWT_SECRET', settings.SECRET_KEY)
+        try:
+            payload = jwt.decode(token, secret, algorithms=['HS256'])
+        except Exception as e:
+            return DRFResponse({'detail': 'invalid token'}, status=drf_status.HTTP_401_UNAUTHORIZED)
+
+        user_id = payload.get('sub')
+        username = payload.get('username') or payload.get('user') or 'anon'
+        room = payload.get('room')
+
+        resp = DRFResponse({'ok': True})
+        if user_id:
+            resp['X-Auth-User-Id'] = str(user_id)
+        if username:
+            resp['X-Auth-Username'] = str(username)
+        if room:
+            resp['X-Auth-Room'] = str(room)
+
+        return resp
 
 
 class ProyectoViewSet(viewsets.ModelViewSet):

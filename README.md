@@ -84,6 +84,8 @@ cd backend
 python manage.py runserver 8081
 ```
 
+> Para el flujo colaborativo, usa la misma variable `JWT_SECRET` en backend y `collab-service`. Si no defines un valor, el ejemplo por defecto es `jwt-secreto`.
+
 Si vas a usar PostgreSQL, agrega estas variables en tu `.env`:
 ```bash
 DB_ENGINE=django.db.backends.postgresql
@@ -109,31 +111,59 @@ Para usar el balanceador de colaboración, levanta varias instancias del servici
 ```powershell
 # Terminal 1
 cd collab-service
-$env:PORT=1234; $env:JWT_SECRET='dev-secret-change-in-production'; node src/server.js
+$env:PORT=1234; $env:JWT_SECRET='jwt-secreto'; node src/server.js
 
 # Terminal 2
 cd collab-service
-$env:PORT=1235; $env:JWT_SECRET='dev-secret-change-in-production'; node src/server.js
+$env:PORT=1235; $env:JWT_SECRET='jwt-secreto'; node src/server.js
 
 # Terminal 3
 cd collab-service
-$env:PORT=1236; $env:JWT_SECRET='dev-secret-change-in-production'; node src/server.js
+$env:PORT=1236; $env:JWT_SECRET='jwt-secreto'; node src/server.js
 ```
 
 **Bash / WSL / Git Bash:**
 ```bash
 # Terminal 1
 cd collab-service
-PORT=1234 JWT_SECRET=dev-secret-change-in-production node src/server.js
+PORT=1234 JWT_SECRET=jwt-secreto node src/server.js
 
 # Terminal 2
 cd collab-service
-PORT=1235 JWT_SECRET=dev-secret-change-in-production node src/server.js
+PORT=1235 JWT_SECRET=jwt-secreto node src/server.js
 
 # Terminal 3
 cd collab-service
-PORT=1236 JWT_SECRET=dev-secret-change-in-production node src/server.js
+PORT=1236 JWT_SECRET=jwt-secreto node src/server.js
 ```
+
+> Nota: se puede copiar `.env.example` a `.env` y editar `JWT_SECRET` allí. Siempre asegurarse de usar el mismo `JWT_SECRET` en todas las instancias y en el backend.
+
+## Scripts de arranque 
+
+Se incluyen dos scripts en la raíz para arrancar el backend y tres instancias de `collab-service` con el mismo `JWT_SECRET`.
+
+- `start-all.ps1` — PowerShell, abrir nuevas ventanas para backend y cada instancia de `collab-service`.
+  - Uso básico (desde la raíz del repo):
+    ```powershell
+    .\start-all.ps1
+    ```
+  - Especificar secreto y arrancar frontend:
+    ```powershell
+    .\start-all.ps1 -JwtSecret 'jwt-secreto' -StartFrontend
+    ```
+
+- `start-all.sh` — Bash, arranca los procesos en background y escribe logs en `logs/`.
+  - Uso básico:
+    ```bash
+    ./start-all.sh jwt-secreto
+    ```
+
+Notas:
+- Ejecuta los scripts desde la raíz del proyecto (`.`). Los puertos por defecto para `collab-service` son `1234`, `1235`, `1236`.
+- Si ya tienes procesos en esos puertos, detenlos antes de ejecutar los scripts (ver `netstat` / `Stop-Process` en Windows).
+- Los logs del script Bash quedan en `logs/`.
+
 
 ### 3. Servicio de ejecución de código
 Acceder a la carpeta
@@ -209,10 +239,13 @@ Se puede levantar el balanceador con Docker. Este contenedor usa la configuraci�
 
 **Windows / PowerShell:**
 ```powershell
+ $mount = Join-Path $PWD 'collab-load-balancer\nginx.config'
 docker run -d --name collab-lb -p 8083:8083 `
-  -v "${PWD}\nginx.config:/etc/nginx/nginx.conf:ro" `
+  -v "$mount:/etc/nginx/nginx.conf:ro" `
   nginx:alpine
 ```
+
+> La variable se llama `JWT_SECRET`, pero el valor de ejemplo puede ser cualquier texto, por ejemplo `"jwt secreto"`.
 
 **Linux / macOS / Git Bash:**
 ```bash
