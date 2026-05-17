@@ -183,6 +183,11 @@ nginx -c $(pwd)/nginx.conf
 ### 7. Balanceador de colaboración
 Este balanceador expone Hocuspocus en el puerto **8083** y distribuye el tráfico entre varias instancias de `collab-service`.
 
+> **Estado actual recomendado:** usar Docker para el balanceador y levantar
+> tres instancias del servicio colaborativo en `1234`, `1235` y `1236` con el
+> mismo `JWT_SECRET`. Esa es la forma que estamos usando ahora para probar
+> colaboración, awareness y sticky sessions.
+
 **Opción 1: Nginx instalado en la máquina**
 
 ```bash
@@ -204,27 +209,50 @@ Se puede levantar el balanceador con Docker. Este contenedor usa la configuraci�
 
 **Windows / PowerShell:**
 ```powershell
-docker run --rm --name collab-lb -p 8083:8083 `
-  -v "${PWD}\collab-load-balancer\nginx.config:/etc/nginx/nginx.conf:ro" `
-  nginx:stable
+docker run -d --name collab-lb -p 8083:8083 `
+  -v "${PWD}\nginx.config:/etc/nginx/nginx.conf:ro" `
+  nginx:alpine
 ```
 
-**Mac / Git Bash:**
+**Linux / macOS / Git Bash:**
 ```bash
-docker run --rm --name collab-lb -p 8083:8083 \
-  -v "$(pwd)/collab-load-balancer/nginx.config:/etc/nginx/nginx.conf:ro" \
-  nginx:stable
-```
-
-**Linux:**
-```bash
-docker run --rm --name collab-lb -p 8083:8083 \
+docker run -d --name collab-lb -p 8083:8083 \
   --add-host host.docker.internal:host-gateway \
   -v "$(pwd)/collab-load-balancer/nginx.config:/etc/nginx/nginx.conf:ro" \
-  nginx:stable
+  nginx:alpine
 ```
+
+> En Linux añadir `--add-host host.docker.internal:host-gateway` porque el
+> contenedor tiene que alcanzar las instancias de `collab-service` que corren
+> en el host. En Windows/macOS Docker Desktop ya resuelve ese nombre.
 
 Después, el frontend y el gateway principal deben apuntar al balanceador de colaboración:
 
 - `http://localhost:8083/dev-token`
 - `ws://localhost:8083`
+
+### 8. Pruebas rápidas del servicio colaborativo
+
+Para validar que todo quedó levantado y que la colaboración no pierde estado al cambiar de archivo o de pestaña, usar esta secuencia:
+
+```bash
+# 1. Verificar el balanceador
+curl http://localhost:8083/health
+
+# 2. Pedir un token de prueba
+curl -X POST http://localhost:8083/dev-token \
+  -H "Content-Type: application/json" \
+  -d '{"userId":"user-1","username":"Tester"}'
+
+# 3. Probar WebSocket
+npx wscat -c "ws://localhost:8083?token=TU_TOKEN"
+```
+
+Si el editor sigue perdiendo contenido al cambiar de archivo, revisar también que:
+
+- `backend` esté corriendo en `http://localhost:8000`
+- `frontend` esté corriendo en `http://localhost:4200`
+- `collab-service` tenga instancias activas en `1234`, `1235` y `1236`
+- todas las instancias compartan el mismo `JWT_SECRET`
+
+Para comprobar sticky sessions de forma manual, abrir dos pestañas del mismo navegador y verificar que ambas mantengan su presencia/cambios al alternar entre archivos.
