@@ -4,24 +4,28 @@ from django.db import models
 
 class Proyecto(models.Model):
     class Lenguaje(models.TextChoices):
-        CPP = 'CPP', 'C++'
-        PYTHON = 'PYTHON', 'Python'
+        CPP        = 'CPP',        'C++'
+        PYTHON     = 'PYTHON',     'Python'
         TYPESCRIPT = 'TYPESCRIPT', 'TypeScript'
 
-    nombre = models.CharField(max_length=255)
-    descripcion = models.TextField(blank=True)
+    nombre         = models.CharField(max_length=255)
+    descripcion    = models.TextField(blank=True)
     fecha_creacion = models.DateTimeField(auto_now_add=True)
-    lenguaje = models.CharField(max_length=10, choices=Lenguaje.choices)
-    usuario = models.ForeignKey(
+    lenguaje       = models.CharField(max_length=10, choices=Lenguaje.choices)
+    usuario        = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name='proyectos'
     )
 
+    # Límites de seguridad — reflejados también como constraints en esquema.sql
+    max_archivos    = models.IntegerField(default=10)
+    max_bytes_total = models.IntegerField(default=524288)  # 512 KB
+
     class Meta:
-        managed = False
-        db_table = 'proyectos'
-        ordering = ['-fecha_creacion']
+        managed    = False
+        db_table   = 'proyectos'
+        ordering   = ['-fecha_creacion']
         verbose_name = 'proyecto'
 
     def __str__(self):
@@ -29,45 +33,47 @@ class Proyecto(models.Model):
 
 
 class Archivo(models.Model):
-    nombre = models.CharField(max_length=255)
-    contenido = models.TextField(blank=True)
-    ydoc = models.BinaryField(blank=True, null=True)  # estado binario Yjs (HocusPocus)
-    proyecto = models.ForeignKey(
+    nombre      = models.CharField(max_length=255)
+    contenido   = models.TextField(blank=True)
+    ydoc        = models.BinaryField(blank=True, null=True)
+    proyecto    = models.ForeignKey(
         Proyecto,
         on_delete=models.CASCADE,
         related_name='archivos'
     )
-    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_creacion      = models.DateTimeField(auto_now_add=True)
     fecha_actualizacion = models.DateTimeField(auto_now=True)
 
     class Meta:
-        managed = False
-        db_table = 'archivos'
+        managed        = False
+        db_table       = 'archivos'
         unique_together = ('proyecto', 'nombre')
-        ordering = ['nombre']
-        verbose_name = 'archivo'
+        ordering       = ['nombre']
+        verbose_name   = 'archivo'
 
     def __str__(self):
         return f'{self.proyecto.nombre}/{self.nombre}'
 
 
 class CollabSession(models.Model):
-    proyecto = models.ForeignKey(
+    proyecto  = models.ForeignKey(
         Proyecto,
         on_delete=models.CASCADE,
         related_name='collab_sessions'
     )
-    usuario = models.ForeignKey(
+    usuario   = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name='collab_sessions'
     )
-    token = models.CharField(max_length=512, blank=True)
+    token     = models.CharField(max_length=512, blank=True)
     last_seen = models.DateTimeField(auto_now=True)
 
     class Meta:
+        managed  = False
+        db_table = 'collab_sessions'
         ordering = ['-last_seen']
 
     def __str__(self):
