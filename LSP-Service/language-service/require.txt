@@ -4,3 +4,4 @@ docker
 python-dotenv
 websocket-client
 redis>=5.0.0
+httpx

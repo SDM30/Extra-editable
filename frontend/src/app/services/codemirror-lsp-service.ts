@@ -592,6 +592,7 @@ export class CodeMirrorLspService {
       python: '.py',
       cpp: '.cpp',
       typescript: '.ts',
+      javascript: '.ts',
     };
     return extensions[language] || '.txt';
   }

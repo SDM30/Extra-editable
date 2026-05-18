@@ -1,34 +1,61 @@
+# docker-compose.yml — Servicio de Lenguaje (LSP Management)
+# Soporta despliegue single-machine y multi-machine.
+#
+# Single-machine (local, con Redis incluido):
+#   docker compose up -d
+#
+# Multi-machine (Redis externo, NFS compartido):
+#   cp .env.multi .env  →  editar WS_PUBLIC_HOST y REDIS_HOST por máquina
+#   ./deploy-multi.sh
 services:
   language-service:
     build: ./language-service
     labels:
       - "lsp.service=api"
       - "lsp.component=language-service"
+    # Puerto fijo por máquina: cada instancia escucha en su propio puerto.
+    # En single-machine con --scale se usan puertos dinámicos; en multi-machine
+    # cada máquina expone exactamente un puerto fijo (default 8135).
     ports:
-      - "8135"
+      - "${PORT:-8135}:8135"
     environment:
-      - HOST_IP=${HOST_IP:-127.0.0.1}
-      - WS_PUBLIC_HOST=${HOST_IP:-127.0.0.1}
+      - WS_PUBLIC_HOST=${WS_PUBLIC_HOST:-127.0.0.1}
       - PROJECTS_DIR=/home/projects
-      - CONTAINER_IDLE_TIMEOUT=300000
+      - CONTAINER_IDLE_TIMEOUT=${CONTAINER_IDLE_TIMEOUT:-300000}
       - MAX_CLIENTS_PER_CONTAINER=4
-      - REDIS_HOST=redis-lsp
-      - REDIS_PORT=6379
-      - REDIS_DB=0
+      # Redis: en single-machine usa el servicio redis-lsp; en multi-machine
+      # se configura como host externo (IP de la máquina que corre Redis).
+      - REDIS_HOST=${REDIS_HOST:-redis-lsp}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_DB=${REDIS_DB:-0}
+      # Secreto para comunicación interna entre instancias (cross-machine).
+      # En redes privadas puede dejarse vacío. En producción, configurar.
+      - LSP_INTERNAL_SECRET=${LSP_INTERNAL_SECRET:-}
+      - PORT=${PORT:-8135}
     volumes:
+      # Docker socket: necesario para crear/destruir contenedores LSP.
       - /var/run/docker.sock:/var/run/docker.sock
-      - projects_data:/home/projects
+      # Proyectos: bind mount directo al host. En multi-machine este path
+      # debe ser un montaje NFS compartido entre todas las máquinas.
+      - /home/projects:/home/projects
+      # Hot-reload del código fuente (solo desarrollo).
       - ./language-service:/app
     networks:
       - lsp-network
-    depends_on:
-      redis-lsp:
-        condition: service_healthy
+    # depends_on solo aplica en single-machine (Redis como servicio interno).
+    # En multi-machine se omite porque Redis es externo y se asume disponible.
     restart: unless-stopped
 
+  # Redis (solo para despliegue single-machine / testing local).
+  # En multi-machine, Redis se ejecuta como servicio standalone externo.
+  # Ver docs/multi-machine-setup.md para instrucciones.
   redis-lsp:
     image: redis:7-alpine
     container_name: redis-lsp
+    # En multi-machine: exponer a la red para que otras máquinas accedan.
+    # Descomentar la línea de abajo y comentar la de arriba.
+    # ports:
+    #   - "0.0.0.0:6379:6379"
     ports:
       - "6379:6379"
     command: >
@@ -48,7 +75,6 @@ services:
       retries: 5
 
 volumes:
-  projects_data:
   redis_data:
 
 networks:

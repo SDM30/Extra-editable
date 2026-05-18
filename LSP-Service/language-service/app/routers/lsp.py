@@ -1,7 +1,10 @@
 # lsp.py
 # Define los endpoints HTTP que expone el servicio.
+# Incluye endpoints públicos (REST) y un endpoint interno para operaciones
+# cross-machine (/_internal/destroy) usado por otras instancias del servicio.
 
-from fastapi import APIRouter, HTTPException, Query
+import os
+from fastapi import APIRouter, HTTPException, Query, Header
 from pydantic import BaseModel, Field
 from typing import Optional
 from app.services import lifecycle
@@ -18,6 +21,7 @@ class CreateResponse(BaseModel):
     project_id: str
     container_id: str
     language: str
+    host: str
     ws_url: str
     ws_port: int
     max_clients: int
@@ -27,6 +31,7 @@ class StatusResponse(BaseModel):
     container_id: Optional[str] = None
     language: Optional[str] = None
     status: str
+    host: Optional[str] = None
     ws_url: Optional[str] = None
     ws_port: Optional[int] = None
     max_clients: Optional[int] = None
@@ -53,6 +58,7 @@ def create_lsp(project_id: str, body: CreateRequest):
             "project_id": project_id,
             "container_id": container_info["container_id"][:12],
             "language": body.language,
+            "host": container_info.get("host", ""),
             "ws_url": container_info["ws_url"],
             "ws_port": container_info["ws_port"],
             "max_clients": body.max_clients
@@ -166,3 +172,33 @@ def cleanup_inactive(idle_timeout: int = Query(1800, description="Timeout de ina
         "message": f"Limpieza completada",
         "containers_cleaned": cleaned
     }
+
+
+@router.delete("/{project_id}/_internal/destroy")
+def internal_destroy(
+    project_id: str,
+    language: str = Query(..., description="Lenguaje (python, cpp, typescript)"),
+    x_lsp_internal: Optional[str] = Header(None, alias="X-LSP-Internal")
+):
+    """
+    Endpoint interno para que otras instancias del servicio puedan
+    destruir contenedores en esta máquina.
+    
+    Usado por el mecanismo de forward cross-machine. Solo accesible desde
+    la red interna. Si se configura LSP_INTERNAL_SECRET, requiere el header
+    X-LSP-Internal con el secreto correcto.
+    """
+    expected_secret = os.environ.get("LSP_INTERNAL_SECRET", "")
+    if expected_secret and x_lsp_internal != expected_secret:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    try:
+        deleted = lifecycle.destroy_container_local(project_id, language)
+        if not deleted:
+            raise HTTPException(status_code=404, detail="No existe el contenedor")
+        return {
+            "message": "Contenedor eliminado (forward cross-machine)",
+            "project_id": project_id,
+            "language": language
+        }
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e))

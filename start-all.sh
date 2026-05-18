@@ -8,6 +8,13 @@ JWT_SECRET="${1:-jwt-secreto}"
 
 mkdir -p "$ROOT_DIR/logs"
 
+VENV_PY="$ROOT_DIR/backend/.venv/bin/python"
+if [ -x "$VENV_PY" ]; then
+  PYTHON="$VENV_PY"
+else
+  PYTHON="python3"
+fi
+
 export DB_ENGINE="django.db.backends.postgresql"
 export DB_NAME="extra_editable"
 export DB_USER="postgres"
@@ -16,6 +23,10 @@ export DB_HOST="localhost"
 export DB_PORT="5432"
 export JWT_SECRET="$JWT_SECRET"
 export COLLAB_JWT_SECRET="$JWT_SECRET"
+# Evita que un DEBUG="release" (u otro valor no booleano) rompa python-decouple.
+if [ "${DEBUG:-}" = "release" ]; then
+  export DEBUG="False"
+fi
 
 ensure_npm_deps() {
   local dir="$1"
@@ -27,7 +38,7 @@ ensure_npm_deps() {
 }
 
 ensure_python_deps() {
-  (cd "$ROOT_DIR/backend" && python3 -m pip install -r requirements.txt)
+  (cd "$ROOT_DIR/backend" && "$PYTHON" -m pip install -r requirements.txt)
 }
 
 ensure_postgres() {
@@ -53,6 +64,7 @@ start_docker_nginx() {
   local port="$3"
   docker rm -f "$name" >/dev/null 2>&1 || true
   docker run -d --name "$name" -p "$port:$port" \
+    --add-host=host.docker.internal:host-gateway \
     -v "$config_path:/etc/nginx/nginx.conf:ro" \
     nginx:alpine >/dev/null
 }
@@ -63,14 +75,18 @@ ensure_python_deps
 ensure_postgres
 
 echo "Running Django migrations"
-(cd "$ROOT_DIR/backend" && python3 manage.py migrate --noinput) \
+(cd "$ROOT_DIR/backend" && "$PYTHON" manage.py migrate --noinput) \
   &> "$ROOT_DIR/logs/backend-migrate.log"
+
+echo "Seeding initial users"
+(cd "$ROOT_DIR/backend" && "$PYTHON" manage.py seed --force) \
+  &> "$ROOT_DIR/logs/backend-seed.log"
 
 start_docker_nginx extra-editable-gateway "$ROOT_DIR/nginx.conf" 8080
 start_docker_nginx collab-lb "$ROOT_DIR/collab-load-balancer/nginx.config" 8083
 
 echo "Starting backend"
-(cd "$ROOT_DIR/backend" && python3 manage.py runserver 8000) \
+(cd "$ROOT_DIR/backend" && "$PYTHON" manage.py runserver 8000) \
   &> "$ROOT_DIR/logs/backend.log" &
 
 echo "Starting frontend"

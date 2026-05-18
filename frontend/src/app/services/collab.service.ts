@@ -2,6 +2,7 @@ import { Injectable, OnDestroy } from '@angular/core';
 import * as Y from 'yjs';
 import { HocuspocusProvider } from '@hocuspocus/provider';
 import { BehaviorSubject, Subject } from 'rxjs';
+import { enviroment } from '../environments/enviroment';
 
 export interface CollabUser {
   userId: string;
@@ -45,8 +46,8 @@ export class CollabService implements OnDestroy {
     }
 
     // Si ya hay una promesa de conexión en curso, retornarla
-    if (this.connectPromise) {
-      console.log('[collab] ⏳ Esperando conexión en progreso a', this.connectingToDocument);
+    // Evitar race condition: solo retornar la promesa en curso si es para el mismo room
+    if (this.connectPromise && this.connectingToDocument === documentName) {
       return this.connectPromise;
     }
 
@@ -65,7 +66,7 @@ export class CollabService implements OnDestroy {
     this.connectPromise = new Promise<HocuspocusProvider>((resolve, reject) => {
       try {
         const newProvider = new HocuspocusProvider({
-          url: 'ws://localhost:8083',
+          url: enviroment.collabUrl.replace(/^http/, 'ws'),
           name: documentName,
           document: newYdoc,
           token,
@@ -182,7 +183,7 @@ export class CollabService implements OnDestroy {
   // la conexión principal de archivo. Permite observar metadata compartida
   // como la lista de archivos.
   async connectProject(projectId: number | string, token: string, username: string, userId?: string): Promise<HocuspocusProvider> {
-    const roomName = `project:${projectId}`;
+    const roomName = `${projectId}`;
     if (this.projectProviders.has(roomName)) {
       return this.projectProviders.get(roomName)!.provider;
     }
@@ -192,7 +193,7 @@ export class CollabService implements OnDestroy {
     return new Promise<HocuspocusProvider>((resolve, reject) => {
       try {
         const projProvider = new HocuspocusProvider({
-          url: 'ws://localhost:8083',
+          url: enviroment.collabUrl.replace(/^http/, 'ws'),
           name: roomName,
           document: projYdoc,
           token,
@@ -229,7 +230,7 @@ export class CollabService implements OnDestroy {
   }
 
   getProjectFilesArray(projectId: number | string): Y.Array<any> | null {
-    const roomName = `project:${projectId}`;
+    const roomName = `${projectId}`;
     const entry = this.projectProviders.get(roomName);
     if (!entry) return null;
     try {
@@ -250,6 +251,46 @@ export class CollabService implements OnDestroy {
     }
   }
 
+  /** Notifica a otros clientes que un archivo fue eliminado.
+   * Siempre empuja un marcador al Y.Array para que el observer se dispare,
+   * incluso si el elemento no está presente en el array compartido. */
+  deleteProjectFile(projectId: number | string, fileId: number): void {
+    const arr = this.getProjectFilesArray(projectId);
+    if (!arr) return;
+    try {
+      arr.push([{ _op: 'delete', id: fileId, _ts: Date.now() }]);
+      for (let i = 0; i < arr.length; i++) {
+        const el = arr.get(i);
+        if (el && el.id === fileId && !el._op) {
+          arr.delete(i);
+          break;
+        }
+      }
+    } catch (e) {
+      console.warn('[collab] Could not delete project file from Y.Array', e);
+    }
+  }
+
+  /** Notifica a otros clientes que un archivo fue renombrado.
+   * Siempre empuja un marcador al Y.Array para que el observer se dispare. */
+  renameProjectFile(projectId: number | string, fileId: number, newName: string): void {
+    const arr = this.getProjectFilesArray(projectId);
+    if (!arr) return;
+    try {
+      arr.push([{ _op: 'rename', id: fileId, nombre: newName, _ts: Date.now() }]);
+      for (let i = 0; i < arr.length; i++) {
+        const el = arr.get(i);
+        if (el && el.id === fileId && !el._op) {
+          arr.delete(i);
+          arr.insert(i, [{ ...el, nombre: newName }]);
+          break;
+        }
+      }
+    } catch (e) {
+      console.warn('[collab] Could not rename project file in Y.Array', e);
+    }
+  }
+
   getSharedText(fieldName = 'codemirror'): Y.Text | null {
     return this.ydoc?.getText(fieldName) ?? null;
   }
@@ -262,6 +303,7 @@ export class CollabService implements OnDestroy {
     return this.provider;
   }
 
+  /** Desconecta todas las conexiones WebSocket (archivo + proyecto). */
   disconnect(): void {
     this.provider?.destroy();
     this.ydoc?.destroy();
@@ -271,6 +313,11 @@ export class CollabService implements OnDestroy {
     this._synced = false;
     this.collaborators$.next([]);
     this.connectionVersion += 1;
+    for (const entry of this.projectProviders.values()) {
+      try { entry.provider.destroy(); } catch { /* ignore */ }
+      try { entry.ydoc.destroy(); } catch { /* ignore */ }
+    }
+    this.projectProviders.clear();
   }
 
   ngOnDestroy(): void {

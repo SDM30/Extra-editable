@@ -1,0 +1,83 @@
+<div class="selector-shell">
+  <header class="selector-header">
+    <div class="header-left">
+      <h1>Mis Proyectos</h1>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-new" (click)="showForm = true">+ Nuevo proyecto</button>
+      <button class="btn btn-logout" (click)="logout()">Salir</button>
+    </div>
+  </header>
+
+  <section class="selector-content">
+    @if (loading) {
+      <div class="state-message">Cargando proyectos...</div>
+    } @else if (error) {
+      <div class="state-message error">{{ error }}</div>
+    } @else if (projects.length === 0) {
+      <div class="state-message empty">
+        <p>No tienes proyectos aún.</p>
+        <button class="btn btn-new" (click)="showForm = true">+ Crear proyecto</button>
+      </div>
+    } @else {
+      <div class="card-grid">
+        @for (project of projects; track project.id) {
+          <div class="project-card" (click)="openProject(project.id)">
+            <button class="card-delete-btn" title="Eliminar proyecto" (click)="deleteProject(project, $event)">&times;</button>
+            <div class="card-header">
+              <h3>{{ project.nombre }}</h3>
+              <span class="badge-lang">{{ project.lenguaje }}</span>
+            </div>
+            <p class="card-desc">{{ project.descripcion || 'Sin descripción' }}</p>
+            <div class="card-stats">
+              <span class="stat">
+                <span class="stat-icon">&#128196;</span>
+                {{ project.num_archivos }} {{ project.num_archivos === 1 ? 'archivo' : 'archivos' }}
+              </span>
+              <button class="btn-collab" (click)="openDetail(project, $event)">Ver colaboradores</button>
+            </div>
+            <p class="card-owner">Creado por {{ project.usuario }}</p>
+          </div>
+        }
+      </div>
+    }
+  </section>
+</div>
+
+@if (selectedProject) {
+  <div class="detail-overlay" (click)="closeDetail()">
+    <div class="detail-panel" (click)="$event.stopPropagation()">
+      <div class="detail-header">
+        <h2>{{ selectedProject.nombre }}</h2>
+        <span class="badge-lang">{{ selectedProject.lenguaje }}</span>
+      </div>
+      <p class="detail-desc">{{ selectedProject.descripcion || 'Sin descripción' }}</p>
+      <div class="detail-stats">
+        <span>{{ selectedProject.num_archivos }} archivos</span>
+        <span>Creado por {{ selectedProject.usuario }}</span>
+      </div>
+      <div class="detail-collaborators">
+        <h3>Colaboradores activos</h3>
+        @if (loadingCollaborators) {
+          <span class="detail-loading">Cargando...</span>
+        } @else if (detailCollaborators.length === 0) {
+          <span class="detail-empty">Sin colaboradores activos</span>
+        } @else {
+          <ul class="collab-list">
+            @for (c of detailCollaborators; track c.id) {
+              <li>{{ c.username }}</li>
+            }
+          </ul>
+        }
+      </div>
+      <div class="detail-actions">
+        <button class="btn btn-open" (click)="openProject(selectedProject.id)">Abrir editor</button>
+        <button class="btn btn-close" (click)="closeDetail()">Cerrar</button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (showForm) {
+  <app-project-form (created)="onProjectCreated($event)" (cancelled)="onFormCancelled()"></app-project-form>
+}

@@ -17,14 +17,20 @@ export class Header {
 
   @Input() language!: string;
   @Input() languageOptions: { label: string; value: string }[] = [];
+  @Input() languageDisabled = false;
 
   @Output() themeChange = new EventEmitter<Theme>();
   @Output() languageChange = new EventEmitter<string>();
 
   @Output() runCode = new EventEmitter<void>();  // ← Evento para ejecutar código
-  
+  @Output() logout = new EventEmitter<void>();
+
   onRunClick() {
     console.log('Botón Run clickeado');
     this.runCode.emit();  // Emitir evento al componente padre
+  }
+
+  onLogoutClick() {
+    this.logout.emit();
   }
 }

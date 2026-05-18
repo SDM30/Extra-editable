@@ -68,3 +68,17 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER trg_archivos_actualizacion
     BEFORE UPDATE ON archivos
     FOR EACH ROW EXECUTE FUNCTION set_fecha_actualizacion();
+
+-- ============================================================
+-- COLABORADORES DE PROYECTO
+-- ============================================================
+CREATE TABLE proyecto_colaboradores (
+    id              BIGSERIAL PRIMARY KEY,
+    proyecto_id     BIGINT NOT NULL REFERENCES proyectos(id) ON DELETE CASCADE,
+    usuario_id      BIGINT NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    fecha_agregado  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE(proyecto_id, usuario_id)
+);
+
+CREATE INDEX idx_colaboradores_proyecto ON proyecto_colaboradores(proyecto_id);
+CREATE INDEX idx_colaboradores_usuario ON proyecto_colaboradores(usuario_id);

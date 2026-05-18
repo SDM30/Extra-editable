@@ -3,13 +3,17 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from .models import Archivo, Proyecto
-from .permissions import IsProjectOwner
-from .serializers import ArchivoSerializer, ProyectoDetailSerializer, ProyectoSerializer
 from django.conf import settings
+from django.db.models import Count, Q
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 from datetime import datetime, timedelta, timezone
 import jwt
-from .models import CollabSession
+
+from .models import Archivo, Proyecto, CollabSession, ProyectoColaborador
+from .permissions import IsProjectOwner
+from .serializers import ArchivoSerializer, ProyectoDetailSerializer, ProyectoSerializer, ProyectoListaSerializer
 from rest_framework.views import APIView
 from rest_framework.response import Response as DRFResponse
 from rest_framework import status as drf_status
@@ -66,19 +70,34 @@ class ProyectoViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsProjectOwner]
 
     def get_queryset(self):
-        return Proyecto.objects.all()
+        """Para list: proyectos propios + compartidos via ProyectoColaborador."""
+        qs = Proyecto.objects.all()
+        if self.action == 'list':
+            qs = qs.filter(
+                Q(usuario=self.request.user) |
+                Q(colaboraciones__usuario=self.request.user)
+            ).distinct().annotate(num_archivos=Count('archivos'))
+        return qs
 
     def get_serializer_class(self):
+        if self.action == 'list':
+            return ProyectoListaSerializer
         if self.action == 'retrieve':
             return ProyectoDetailSerializer
         return ProyectoSerializer
 
     def perform_create(self, serializer):
-        serializer.save(usuario=self.request.user)
+        proyecto = serializer.save(usuario=self.request.user)
+        colaboradores_ids = getattr(serializer, '_colaboradores', [])
+        for uid in colaboradores_ids:
+            try:
+                user = User.objects.get(pk=uid)
+                ProyectoColaborador.objects.create(proyecto=proyecto, usuario=user)
+            except (User.DoesNotExist, Exception):
+                pass
 
     def get_permissions(self):
-        # list/retrieve/create/collab_join: sólo autenticación; escritura destructiva: dueño
-        if self.action in ('list', 'retrieve', 'create', 'collab_join'):
+        if self.action in ('list', 'retrieve', 'create', 'collab_join', 'collaborators'):
             return [IsAuthenticated()]
         return [IsAuthenticated(), IsProjectOwner()]
 
@@ -92,13 +111,21 @@ class ProyectoViewSet(viewsets.ModelViewSet):
         proyecto = self.get_object()
         archivo_id = request.data.get('archivo_id')
 
-        # Clean up stale sessions
+        # Verificar que el usuario es dueño o colaborador
+        if proyecto.usuario != request.user:
+            if not ProyectoColaborador.objects.filter(
+                proyecto=proyecto, usuario=request.user
+            ).exists():
+                return Response(
+                    {'detail': 'No tienes acceso a este proyecto.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
         timeout_seconds = getattr(settings, 'DEFAULT_COLLAB_SESSION_TIMEOUT_SECONDS', 60)
         cutoff = datetime.now(timezone.utc) - timedelta(seconds=timeout_seconds)
-        CollabSession.objects.filter(last_seen__lt=cutoff).delete()
 
         max_users = getattr(settings, 'DEFAULT_MAX_COLLAB_USERS', 4)
-        current = CollabSession.objects.filter(proyecto=proyecto).count()
+        current = CollabSession.objects.filter(proyecto=proyecto, last_seen__gte=cutoff).count()
         if current >= max_users:
             return Response({'detail': 'Project collaboration limit reached.'}, status=status.HTTP_429_TOO_MANY_REQUESTS)
 
@@ -109,9 +136,9 @@ class ProyectoViewSet(viewsets.ModelViewSet):
         )
 
         # Build token payload (collab-service expects sub/user and room info)
-        room = f'project:{proyecto.id}'
+        room = str(proyecto.id)
         if archivo_id:
-            room = f'{room}:archivo:{archivo_id}'
+            room = f'{proyecto.id}:{archivo_id}'
 
         payload = {
             'sub': str(request.user.id) if request.user and request.user.is_authenticated else f'anon-{session.id}',
@@ -128,6 +155,49 @@ class ProyectoViewSet(viewsets.ModelViewSet):
 
         return Response({'token': token, 'room': room})
 
+    @action(detail=True, methods=['get'], permission_classes=[IsAuthenticated], url_path='collaborators')
+    def collaborators(self, request, pk=None):
+        """Endpoint: GET /api/projects/{pk}/collaborators/
+
+        Retorna todos los colaboradores (activos e inactivos) del proyecto.
+        """
+        proyecto = self.get_object()
+
+        timeout_seconds = getattr(settings, 'DEFAULT_COLLAB_SESSION_TIMEOUT_SECONDS', 60)
+        cutoff = datetime.now(timezone.utc) - timedelta(seconds=timeout_seconds)
+
+        sessions = CollabSession.objects.filter(
+            proyecto=proyecto, usuario__isnull=False
+        ).select_related('usuario')
+
+        usuarios_activos = {
+            s.usuario.id: s.last_seen >= cutoff
+            for s in sessions if s.usuario
+        }
+
+        colaboradores_perm = ProyectoColaborador.objects.filter(
+            proyecto=proyecto
+        ).select_related('usuario')
+
+        usuarios_set = {}
+        for c in colaboradores_perm:
+            usuarios_set[c.usuario.id] = {
+                'id': c.usuario.id,
+                'username': c.usuario.username,
+                'activo': usuarios_activos.get(c.usuario.id, False)
+            }
+        # Agregar usuarios que tienen sesión pero no son colaboradores permanentes
+        for s in sessions:
+            if s.usuario and s.usuario.id not in usuarios_set:
+                usuarios_set[s.usuario.id] = {
+                    'id': s.usuario.id,
+                    'username': s.usuario.username,
+                    'activo': s.last_seen >= cutoff
+                }
+
+        usuarios = list(usuarios_set.values())
+        return Response({'count': len(usuarios), 'usuarios': usuarios})
+
 
 class ArchivoViewSet(viewsets.ModelViewSet):
     serializer_class = ArchivoSerializer
@@ -138,13 +208,21 @@ class ArchivoViewSet(viewsets.ModelViewSet):
             proyecto_id=self.kwargs.get('proyecto_pk')
         )
 
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        try:
+            context['proyecto'] = Proyecto.objects.get(
+                pk=self.kwargs['proyecto_pk']
+            )
+        except Proyecto.DoesNotExist:
+            pass
+        return context
+
     def perform_create(self, serializer):
-        proyecto = Proyecto.objects.get(
-            pk=self.kwargs['proyecto_pk']
-        )
+        proyecto = self.get_serializer_context().get('proyecto')
         serializer.save(proyecto=proyecto)
 
     def get_permissions(self):
-        if self.action in ('list', 'create', 'retrieve', 'update', 'partial_update'):
+        if self.action in ('list', 'create', 'retrieve'):
             return [IsAuthenticated()]
         return [IsAuthenticated(), IsProjectOwner()]

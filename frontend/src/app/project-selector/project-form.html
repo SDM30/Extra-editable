@@ -1,0 +1,97 @@
+<div class="modal-overlay" (click)="cancel()">
+  <div class="modal-panel" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h2>Crear nuevo proyecto</h2>
+      <button class="modal-close" (click)="cancel()">&times;</button>
+    </div>
+
+    <div class="form-body">
+      <div class="form-group">
+        <label for="nombre">Nombre</label>
+        <input
+          id="nombre"
+          type="text"
+          [(ngModel)]="nombre"
+          placeholder="Nombre del proyecto"
+          maxlength="255"
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="descripcion">Descripción</label>
+        <textarea
+          id="descripcion"
+          [(ngModel)]="descripcion"
+          placeholder="Descripción del proyecto (opcional)"
+          rows="3"
+        ></textarea>
+      </div>
+
+      <div class="form-group">
+        <label>Lenguaje</label>
+        <div class="lang-options">
+          <label class="lang-radio" [class.selected]="lenguaje === 'CPP'">
+            <input type="radio" name="lenguaje" value="CPP" [(ngModel)]="lenguaje" />
+            <span>C++</span>
+          </label>
+          <label class="lang-radio" [class.selected]="lenguaje === 'PYTHON'">
+            <input type="radio" name="lenguaje" value="PYTHON" [(ngModel)]="lenguaje" />
+            <span>Python</span>
+          </label>
+          <label class="lang-radio" [class.selected]="lenguaje === 'TYPESCRIPT'">
+            <input type="radio" name="lenguaje" value="TYPESCRIPT" [(ngModel)]="lenguaje" />
+            <span>TypeScript</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Colaboradores (máximo 4)</label>
+        <div class="collab-search">
+          <input
+            type="text"
+            [(ngModel)]="searchQuery"
+            (ngModelChange)="onSearchInput()"
+            placeholder="Buscar usuario por nombre..."
+            [disabled]="colaboradores.length >= 4"
+          />
+          @if (searchQuery.length >= 2 && suggestions.length > 0) {
+            <ul class="search-dropdown">
+              @for (s of suggestions; track s.id) {
+                <li (mousedown)="addColaborador(s); $event.preventDefault()">
+                  {{ s.username }}
+                </li>
+              }
+            </ul>
+          }
+          @if (searchQuery.length >= 2 && !searching && suggestions.length === 0) {
+            <ul class="search-dropdown">
+              <li class="no-results">Sin resultados</li>
+            </ul>
+          }
+        </div>
+        @if (colaboradores.length > 0) {
+          <div class="collab-pills">
+            @for (c of colaboradores; track c.id) {
+              <span class="collab-pill">
+                {{ c.username }}
+                <button type="button" (click)="removeColaborador(c.id)">&times;</button>
+              </span>
+            }
+          </div>
+        }
+      </div>
+
+      @if (error) {
+        <div class="form-error">{{ error }}</div>
+      }
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-cancel" (click)="cancel()" [disabled]="creating">Cancelar</button>
+      <button class="btn btn-create" (click)="create()" [disabled]="creating || !nombre.trim()">
+        {{ creating ? 'Creando...' : 'Crear proyecto' }}
+      </button>
+    </div>
+  </div>
+</div>

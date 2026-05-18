@@ -4,7 +4,9 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
-from .models import Usuario
+from django.db.models import Q
+
+from .models import User
 from .permissions import IsAdmin, IsOwnerOrAdmin
 from .serializers import UserCreateSerializer, UserDetailSerializer, UserSerializer
 
@@ -12,7 +14,7 @@ from .serializers import UserCreateSerializer, UserDetailSerializer, UserSeriali
 # ---------- Auth ----------
 
 class RegisterView(generics.CreateAPIView):
-    queryset = Usuario.objects.all()
+    queryset = User.objects.all()
     serializer_class = UserCreateSerializer
     permission_classes = [AllowAny]
 
@@ -23,12 +25,27 @@ def me(request):
     return Response(UserSerializer(request.user).data)
 
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def search_usuarios(request):
+    q = request.query_params.get('q', '').strip()
+    if len(q) < 2:
+        return Response([])
+    users = User.objects.filter(
+        Q(username__icontains=q) | Q(email__icontains=q)
+    ).exclude(id=request.user.id)[:10]
+    return Response([
+        {'id': u.id, 'username': u.username}
+        for u in users
+    ])
+
+
 # ---------- Admin CRUD ----------
 
 class UserViewSet(ModelViewSet):
-    queryset = Usuario.objects.all()
+    queryset = User.objects.all()
     serializer_class = UserDetailSerializer
     permission_classes = [IsAdmin]
 
     def get_queryset(self):
-        return Usuario.objects.all().order_by('date_joined')
+        return User.objects.all().order_by('date_joined')

@@ -97,5 +97,16 @@
 }
 
 .btn.submit:hover {
-	background: #27ae60;
+  background: #27ae60;
+}
+
+.btn.logout {
+  background: transparent;
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.btn.logout:hover {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.5);
 }

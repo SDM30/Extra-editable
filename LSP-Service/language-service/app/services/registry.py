@@ -59,14 +59,20 @@ def _all_pattern() -> str:
 # ──────────────────────────────────────────────────────────────────────────────
 
 def add(project_id: str, language: str, container_id: str,
-        ws_port: int = None, ws_url: str = None, max_clients: int = 4):
-    """Registra un contenedor nuevo en Redis."""
+        ws_port: int = None, ws_url: str = None, max_clients: int = 4,
+        host: str = None):
+    """Registra un contenedor nuevo en Redis.
+
+    El campo `host` identifica la máquina dueña del contenedor. Si no se
+    especifica, se toma de la variable de entorno WS_PUBLIC_HOST, permitiendo
+    que múltiples máquinas compartan el registro sin colisiones."""
     entry = {
         "container_id": container_id,
         "language": language,
         "ws_port": ws_port,
         "ws_url": ws_url,
         "max_clients": max_clients,
+        "host": host or os.environ.get("WS_PUBLIC_HOST", "127.0.0.1"),
         "created_at": datetime.utcnow().isoformat(),
     }
     try:
