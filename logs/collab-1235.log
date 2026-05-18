@@ -1,20 +1,49 @@
-node:events:497
-      throw er; // Unhandled 'error' event
-      ^
 
-Error: listen EADDRINUSE: address already in use 0.0.0.0:1235
-    at Server.setupListenHandle [as _listen2] (node:net:1940:16)
-    at listenInCluster (node:net:1997:12)
-    at node:net:2206:7
-    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
-Emitted 'error' event on Server instance at:
-    at emitErrorNT (node:net:1976:8)
-    at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
-  code: 'EADDRINUSE',
-  errno: -98,
-  syscall: 'listen',
-  address: '0.0.0.0',
-  port: 1235
-}
+  Hocuspocus v2.15.3 running at:
 
-Node.js v22.19.0
+  > HTTP: http://0.0.0.0:1235
+  > WebSocket: ws://0.0.0.0:1235
+[collab] Servidor en http/ws://localhost:1235
+[collab] Endpoint de token de prueba: POST http://localhost:1235/dev-token
+[collab] gabriel autenticado
+[collab] Conexión iniciada a "8"
+[collab] gabriel autenticado
+[collab] Conexión iniciada a "8:13"
+[collab] simon autenticado
+[collab] Conexión iniciada a "8"
+[collab] simon autenticado
+[collab] Conexión iniciada a "8:13"
+[collab] simon autenticado
+[collab] Conexión iniciada a "8:14"
+[collab] ? salió de "8:13"
+[collab] Conexión iniciada a "8:13"
+[collab] simon autenticado
+[collab] Conexión iniciada a "8:13"
+[collab] ? salió de "8:14"
+[collab] simon autenticado
+[collab] Conexión iniciada a "8:14"
+[collab] ? salió de "8:13"
+[collab] Conexión iniciada a "8:13"
+[collab] simon autenticado
+[collab] Conexión iniciada a "8:12"
+[collab] ? salió de "8:14"
+[collab] Conexión iniciada a "8:14"
+[collab] simon autenticado
+[collab] Conexión iniciada a "8:14"
+[collab] ? salió de "8:12"
+[collab] Conexión iniciada a "8:12"
+[collab] gabriel autenticado
+[collab] Conexión iniciada a "8:14"
+[collab] ? salió de "8:13"
+[collab] gabriel autenticado
+[collab] Conexión iniciada a "8:13"
+[collab] ? salió de "8:14"
+[collab] gabriel autenticado
+[collab] Conexión iniciada a "8:12"
+[collab] ? salió de "8:13"
+[collab] simon autenticado
+[collab] Conexión iniciada a "8:12"
+[collab] ? salió de "8:14"
+[collab] simon autenticado
+[collab] Conexión iniciada a "8:15"
+[collab] ? salió de "8:12"
