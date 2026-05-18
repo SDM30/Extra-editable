@@ -29,7 +29,7 @@ lsp_nodes:
   - "10.43.99.67"     # Simon (réplica)
 
 # ── Proyecto ──
-project_repo: "https://github.com/Soboque/Extra-editable.git"
+project_repo: "https://github.com/SDM30/Extra-editable.git"
 project_branch: main
 project_dir: /opt/extra-editable
 

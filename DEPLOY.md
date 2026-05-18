@@ -7,7 +7,7 @@
 | VM        | IP            | Servicios                                 |
 |-----------|---------------|-------------------------------------------|
 | Samuel    | 10.43.99.252  | Control Node (solo Ansible)               |
-| David     | 10.43.98.3     | Backend + Frontend + Gateway + Collab LB  |
+| David     | 10.43.98.3    | Backend + Frontend + Gateway + Collab LB  |
 | Melissa   | 10.43.100.126 | Collab Service (3 instancias)             |
 | Chitiva   | 10.43.99.41   | Code Execution Service                    |
 | Gabriel   | 10.43.100.88  | LSP Service (primario)                    |
@@ -28,7 +28,7 @@ ansible --version
 ## Paso 2 — Clonar el repositorio en Samuel
 
 ```bash
-git clone https://github.com/Soboque/Extra-editable.git
+git clone https://github.com/SDM30/Extra-editable.git
 cd Extra-editable/ansible
 ```
 
