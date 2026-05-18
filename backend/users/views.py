@@ -4,8 +4,11 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
+<<<<<<< HEAD
 from django.db.models import Q
 
+=======
+>>>>>>> b93e8d684ed12eb2733f7727e71bd33cd95f754d
 from .models import User
 from .permissions import IsAdmin, IsOwnerOrAdmin
 from .serializers import UserCreateSerializer, UserDetailSerializer, UserSerializer
