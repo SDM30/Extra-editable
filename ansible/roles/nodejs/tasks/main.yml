@@ -31,8 +31,6 @@
     msg: "Node.js {{ node_version.stdout }} instalado"
 
 - name: Instalar Angular CLI globalmente (solo en nodo principal)
-  npm:
-    name: "@angular/cli"
-    global: yes
-    state: latest
+  command: npm install -g @angular/cli --force
   when: inventory_hostname in groups.get('main_node', [])
+  changed_when: true
