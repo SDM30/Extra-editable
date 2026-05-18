@@ -36,17 +36,17 @@ cd Extra-editable/ansible
 
 ## Paso 3 — Cifrar las credenciales con Vault *(solo la primera vez o si cambiaron)*
 
-El archivo `inventory/vault.yml` contiene contraseñas en texto plano. Hay que cifrarlo antes de cualquier despliegue.
+El archivo `inventory/group_vars/all/vault.yml` contiene contraseñas en texto plano. Hay que cifrarlo antes de cualquier despliegue.
 
 ```bash
-ansible-vault encrypt inventory/vault.yml
+ansible-vault encrypt inventory/group_vars/all/vault.yml
 # Ingresa una contraseña maestra y recuérdala — se necesita en cada deploy
 ```
 
 Para editarlo después:
 
 ```bash
-ansible-vault edit inventory/vault.yml --ask-vault-pass
+ansible-vault edit inventory/group_vars/all/vault.yml --ask-vault-pass
 ```
 
 ---

@@ -19,7 +19,7 @@ ansible --version
 
 ```bash
 cd ansible/
-ansible-vault encrypt inventory/vault.yml
+ansible-vault encrypt inventory/group_vars/all/vault.yml
 # Ingresa una contraseña maestra que recuerdes
 ```
 

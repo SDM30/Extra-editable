@@ -1,7 +1,7 @@
 ---
 # ╔══════════════════════════════════════════════════════════════╗
 # ║  CIFRAR ESTE ARCHIVO CON:                                   ║
-# ║  ansible-vault encrypt ansible/inventory/vault.yml           ║
+# ║  ansible-vault encrypt inventory/group_vars/all/vault.yml    ║
 # ╚══════════════════════════════════════════════════════════════╝
 
 # Contraseñas SSH de las VMs
