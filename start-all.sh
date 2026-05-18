@@ -23,10 +23,24 @@ export DB_HOST="localhost"
 export DB_PORT="5432"
 export JWT_SECRET="$JWT_SECRET"
 export COLLAB_JWT_SECRET="$JWT_SECRET"
+export ALLOWED_HOSTS="localhost,127.0.0.1,172.17.0.1,host.docker.internal"
 # Evita que un DEBUG="release" (u otro valor no booleano) rompa python-decouple.
 if [ "${DEBUG:-}" = "release" ]; then
   export DEBUG="False"
 fi
+
+# Mata procesos previos para asegurar un arranque limpio
+stop_previous() {
+  echo "Stopping previous services..."
+  sudo pkill -f "manage.py runserver" 2>/dev/null || true
+  sudo pkill -f "node src/server.js" 2>/dev/null || true
+  sudo pkill -f "ng serve" 2>/dev/null || true
+  sudo pkill -f "Angular CLI" 2>/dev/null || true
+  sleep 2
+  echo "Previous services stopped."
+}
+
+stop_previous
 
 ensure_npm_deps() {
   local dir="$1"
@@ -86,7 +100,7 @@ start_docker_nginx extra-editable-gateway "$ROOT_DIR/nginx.conf" 8080
 start_docker_nginx collab-lb "$ROOT_DIR/collab-load-balancer/nginx.config" 8083
 
 echo "Starting backend"
-(cd "$ROOT_DIR/backend" && "$PYTHON" manage.py runserver 8000) \
+(cd "$ROOT_DIR/backend" && "$PYTHON" manage.py runserver 0.0.0.0:8000) \
   &> "$ROOT_DIR/logs/backend.log" &
 
 echo "Starting frontend"

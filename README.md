@@ -45,7 +45,9 @@ Ese arranque levanta:
 
 ## Variables clave
 
-El backend usa PostgreSQL por defecto en desarrollo con estas variables:
+El script `start-all.sh` acepta un argumento opcional para el secreto JWT y exporta las siguientes variables de entorno para todos los servicios:
+
+### Base de datos
 
 ```bash
 DB_ENGINE=django.db.backends.postgresql
@@ -56,7 +58,64 @@ DB_HOST=localhost
 DB_PORT=5432
 ```
 
-El backend y `collab-service` deben compartir el mismo `JWT_SECRET` para que el token de colaboración sea válido en todo el flujo.
+### Autenticación y colaboración
+
+```bash
+JWT_SECRET="${1:-jwt-secreto}"       # Argumento opcional del script
+COLLAB_JWT_SECRET="$JWT_SECRET"      # Mismo secreto que JWT (compartido entre backend y collab-service)
+```
+
+> El backend y `collab-service` deben compartir el mismo `JWT_SECRET` para que el token de colaboración sea válido en todo el flujo.
+
+### Red (Docker ↔ host)
+
+```bash
+ALLOWED_HOSTS="localhost,127.0.0.1,172.17.0.1,host.docker.internal"
+```
+
+> `172.17.0.1` es la IP del gateway de Docker en Linux. Necesaria para que los contenedores nginx (gateway y balanceador) puedan alcanzar el backend via `host.docker.internal`.
+
+### Depuración
+
+```bash
+# Si DEBUG está seteado como "release", se fuerza a "False"
+if [ "${DEBUG:-}" = "release" ]; then
+  export DEBUG="False"
+fi
+```
+
+### Configuración de Docker
+
+El script usa `--add-host=host.docker.internal:host-gateway` en los contenedores nginx para que resuelvan `host.docker.internal` a la IP del host. En macOS/Windows con Docker Desktop esto se resuelve automáticamente; en Linux es necesario el flag.
+
+### Servicio colaborativo
+
+Cada instancia del collab-service recibe las mismas variables de base de datos que el backend:
+
+```bash
+PORT=1234                           # 1234, 1235 o 1236 según la instancia
+JWT_SECRET="$JWT_SECRET"           # Compartido con el backend
+DB_ENGINE=django.db.backends.postgresql
+DB_NAME=extra_editable
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_HOST=localhost
+DB_PORT=5432
+```
+
+### Usuarios iniciales
+
+El script ejecuta `manage.py seed --force` que crea 7 usuarios y resetea sus passwords cada vez que arranca:
+
+| Usuario | Rol | Contraseña |
+|---|---|---|
+| admin1 | ADMIN | Admin1234! |
+| david | USUARIO | User1234! |
+| samuel | USUARIO | User1234! |
+| santiago | USUARIO | User1234! |
+| simon | USUARIO | User1234! |
+| melissa | USUARIO | User1234! |
+| gabriel | USUARIO | User1234! |
 
 ## Flujo de colaboración
 
@@ -77,10 +136,8 @@ Si necesitas levantarlo manualmente, usa la misma configuración del balanceador
 - El flujo de arranque ya no incluye el servicio de ejecución de código ni el balanceador LSP.
 - Si cambias `JWT_SECRET`, debes usar el mismo valor en backend y en todas las instancias de colaboración.
 - Si limpias cookies o cambias de usuario, vuelve a autenticarse para regenerar `collab_token`.
-
-> En Linux añadir `--add-host host.docker.internal:host-gateway` porque el
-> contenedor tiene que alcanzar las instancias de `collab-service` que corren
-> en el host. En Windows/macOS Docker Desktop ya resuelve ese nombre.
+- **Linux:** El script ya incluye `--add-host host.docker.internal:host-gateway` y `ALLOWED_HOSTS` con `172.17.0.1` para que los contenedores Docker puedan alcanzar los servicios del host. En Windows/macOS Docker Desktop resuelve `host.docker.internal` automáticamente.
+- Si el backend se inicia manualmente (sin `start-all.sh`), asegúrate de usar `0.0.0.0:8000` para que sea accesible desde los contenedores Docker.
 
 Después, el frontend y el gateway principal deben apuntar al balanceador de colaboración:
 
