@@ -1,0 +1,7 @@
+---
+- name: restart collab instances
+  systemd:
+    name: "extra-collab@{{ item }}"
+    state: restarted
+    daemon_reload: yes
+  loop: "{{ collab_ports }}"

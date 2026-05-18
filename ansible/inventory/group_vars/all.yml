@@ -1,0 +1,48 @@
+---
+# ═══════════════════════════════════════════════════════════════
+#  Variables globales — Extra-editable deployment
+# ═══════════════════════════════════════════════════════════════
+
+# ── IPs de servicios ──
+backend_host: "10.43.98.3"
+frontend_host: "10.43.98.3"
+gateway_host: "10.43.98.3"
+collab_host: "10.43.100.126"
+code_exec_host: "10.43.99.41"
+lsp_balancer_host: "10.43.99.20"
+
+# ── Puertos ──
+backend_port: 8000
+frontend_port: 4200
+gateway_port: 8080
+collab_lb_port: 8083
+collab_ports:
+  - 1234
+  - 1235
+  - 1236
+code_exec_port: 8081
+lsp_balancer_port: 8085
+
+# ── Nodos LSP (para el balanceador de Campos) ──
+lsp_nodes:
+  - "10.43.100.88"    # Gabriel (primario)
+  - "10.43.99.67"     # Simon (réplica)
+
+# ── Proyecto ──
+project_repo: "https://github.com/Soboque/Extra-editable.git"
+project_branch: main
+project_dir: /opt/extra-editable
+
+# ── JWT ──
+jwt_secret: "{{ vault_jwt_secret }}"
+
+# ── Django ──
+django_secret_key: "{{ vault_django_secret_key }}"
+
+# ── PostgreSQL (en David — 10.43.9.3) ──
+db_engine: "django.db.backends.postgresql"
+db_name: "extra_editable"
+db_user: "{{ vault_db_user }}"
+db_password: "{{ vault_db_password }}"
+db_host: "10.43.98.3"
+db_port: "5432"

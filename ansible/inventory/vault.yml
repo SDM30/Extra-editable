@@ -1,0 +1,23 @@
+---
+# ╔══════════════════════════════════════════════════════════════╗
+# ║  CIFRAR ESTE ARCHIVO CON:                                   ║
+# ║  ansible-vault encrypt ansible/inventory/vault.yml           ║
+# ╚══════════════════════════════════════════════════════════════╝
+
+# Contraseñas SSH de las VMs
+vault_david_password: "arquiDavid911"
+vault_melissa_password: "Pulp0/373l3f"
+vault_chitiva_password: "Ll4m4/47M0n0"
+vault_gabriel_password: "Gorila/32Ard"
+vault_campos_password: "C4m4l30n+26C"
+vault_simon_password: "F0c4-16M4p4c"
+
+# JWT Secret compartido entre backend y collab-service
+vault_jwt_secret: "jwt-secreto"
+
+# Django SECRET_KEY
+vault_django_secret_key: "U203OqYJFHbsbLoNjIEoirDDL9FU9fzTiu9VvLTqlrAWcBm6ShI"
+
+# Base de datos PostgreSQL (David)
+vault_db_user: "postgres"
+vault_db_password: "postgres"

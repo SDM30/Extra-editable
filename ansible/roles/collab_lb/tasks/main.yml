@@ -1,0 +1,32 @@
+---
+# Role: collab_lb — Collab Load Balancer Docker Nginx (David)
+
+- name: Abrir puerto del collab LB en UFW
+  ufw:
+    rule: allow
+    port: "{{ collab_lb_port }}"
+    proto: tcp
+
+- name: Generar nginx config del collab LB
+  template:
+    src: collab_nginx.conf.j2
+    dest: "{{ project_dir }}/collab-lb-nginx.conf"
+    owner: estudiante
+    group: estudiante
+    mode: '0644'
+  notify: restart collab lb
+
+- name: Detener contenedor collab-lb previo
+  command: docker rm -f collab-lb
+  ignore_errors: yes
+  changed_when: false
+
+- name: Levantar contenedor Collab Load Balancer
+  command: >
+    docker run -d
+    --name collab-lb
+    --restart unless-stopped
+    -p {{ collab_lb_port }}:8083
+    --add-host host.docker.internal:host-gateway
+    -v {{ project_dir }}/collab-lb-nginx.conf:/etc/nginx/nginx.conf:ro
+    nginx

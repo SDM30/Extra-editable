@@ -1,0 +1,6 @@
+---
+- name: restart backend
+  systemd:
+    name: extra-backend
+    state: restarted
+    daemon_reload: yes

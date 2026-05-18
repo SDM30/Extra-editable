@@ -1,0 +1,22 @@
+[Unit]
+Description=LSP Load Balancer Watcher
+After=network.target lsp-nginx.service
+Wants=lsp-nginx.service
+
+[Service]
+Type=simple
+User=estudiante
+WorkingDirectory={{ project_dir }}/lsp-load-balancer
+ExecStart=/usr/bin/python3 {{ project_dir }}/lsp-load-balancer/update_nginx.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+Environment=NGINX_TEMPLATE_PATH={{ project_dir }}/lsp-load-balancer/nginx_template.conf
+Environment=NGINX_CONF_PATH={{ project_dir }}/lsp-load-balancer/nginx.conf
+Environment=POLL_INTERVAL=1
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

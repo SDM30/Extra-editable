@@ -1,0 +1,10 @@
+---
+- name: reload lsp nginx
+  systemd:
+    name: lsp-nginx
+    state: reloaded
+
+- name: restart lsp watcher
+  systemd:
+    name: lsp-watcher
+    state: restarted

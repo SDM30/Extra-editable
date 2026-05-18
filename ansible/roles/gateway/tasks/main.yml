@@ -1,0 +1,42 @@
+---
+# Role: gateway — API Gateway Docker Nginx (David)
+
+- name: Abrir puerto del gateway en UFW
+  ufw:
+    rule: allow
+    port: "{{ gateway_port }}"
+    proto: tcp
+
+- name: Generar nginx.conf del gateway con IPs reales
+  template:
+    src: nginx.conf.j2
+    dest: "{{ project_dir }}/nginx-gateway.conf"
+    owner: estudiante
+    group: estudiante
+    mode: '0644'
+  notify: restart gateway
+
+- name: Detener contenedor gateway previo
+  command: docker rm -f api-gateway
+  ignore_errors: yes
+  changed_when: false
+
+- name: Levantar contenedor API Gateway
+  command: >
+    docker run -d
+    --name api-gateway
+    --restart unless-stopped
+    -p {{ gateway_port }}:8080
+    --add-host host.docker.internal:host-gateway
+    -v {{ project_dir }}/nginx-gateway.conf:/etc/nginx/nginx.conf:ro
+    nginx
+  register: gateway_container
+
+- name: Verificar que el gateway está corriendo
+  command: docker ps --filter "name=api-gateway" --format "{% raw %}{{.Status}}{% endraw %}"
+  register: gateway_status
+  changed_when: false
+
+- name: Mostrar estado del gateway
+  debug:
+    msg: "API Gateway: {{ gateway_status.stdout }}"

@@ -1,0 +1,51 @@
+---
+# Role: common — Paquetes base y clonado del repositorio
+
+- name: Actualizar cache de apt
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+
+- name: Instalar paquetes base
+  apt:
+    name:
+      - git
+      - curl
+      - wget
+      - build-essential
+      - python3
+      - python3-venv
+      - python3-pip
+      - ufw
+      - apt-transport-https
+      - ca-certificates
+      - gnupg
+      - lsb-release
+    state: present
+
+- name: Crear directorio del proyecto
+  file:
+    path: "{{ project_dir }}"
+    state: directory
+    owner: estudiante
+    group: estudiante
+    mode: '0755'
+
+- name: Clonar repositorio Extra-editable
+  git:
+    repo: "{{ project_repo }}"
+    dest: "{{ project_dir }}"
+    version: "{{ project_branch }}"
+    force: yes
+  become_user: estudiante
+
+- name: Habilitar UFW
+  ufw:
+    state: enabled
+    policy: deny
+
+- name: Permitir SSH
+  ufw:
+    rule: allow
+    port: '22'
+    proto: tcp

@@ -1,0 +1,6 @@
+---
+- name: restart frontend
+  systemd:
+    name: extra-frontend
+    state: restarted
+    daemon_reload: yes

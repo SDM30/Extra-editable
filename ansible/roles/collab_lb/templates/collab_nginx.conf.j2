@@ -1,0 +1,85 @@
+worker_processes auto;
+
+events {
+    worker_connections 2048;
+}
+
+http {
+
+    upstream collab_backend {
+        ip_hash;   # Sticky sessions — imprescindible para Yjs/Hocuspocus
+{% for port in collab_ports %}
+        server {{ collab_host }}:{{ port }} max_fails=3 fail_timeout=30s;
+{% endfor %}
+    }
+
+    map $http_upgrade $connection_upgrade {
+        default upgrade;
+        ''      close;
+    }
+
+    server {
+        listen 8083;
+        server_name localhost;
+
+        # ── Health check ──
+        location = /health {
+            default_type application/json;
+            add_header Cache-Control "no-store" always;
+            return 200 '{"status":"ok","service":"collab-load-balancer"}';
+        }
+
+        # ── Token de desarrollo ──
+        location = /dev-token {
+            proxy_pass http://collab_backend;
+            proxy_http_version 1.1;
+            proxy_set_header Host              $host;
+            proxy_set_header X-Real-IP         $remote_addr;
+            proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_read_timeout    10s;
+            proxy_connect_timeout  5s;
+            proxy_next_upstream error timeout invalid_header http_500 http_502 http_503;
+        }
+
+        # ── Auth subrequest contra el backend ──
+        location = /_auth {
+            internal;
+            proxy_pass http://{{ backend_host }}:{{ backend_port }}/api/projects/validate-collab-token/?token=$arg_token;
+            proxy_pass_request_body off;
+            proxy_set_header Content-Length "";
+            proxy_set_header Host $host;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header Authorization $http_authorization;
+        }
+
+        # ── WebSocket de colaboración ──
+        location / {
+            auth_request /_auth;
+            auth_request_set $auth_user_id $upstream_http_x_auth_user_id;
+            auth_request_set $auth_username $upstream_http_x_auth_username;
+            auth_request_set $auth_room $upstream_http_x_auth_room;
+
+            proxy_pass http://collab_backend;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade    $http_upgrade;
+            proxy_set_header Connection $connection_upgrade;
+            proxy_set_header Host       $host;
+            proxy_set_header X-Real-IP  $remote_addr;
+            proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+
+            # Identidad validada por el gateway
+            proxy_set_header X-Auth-User-Id $auth_user_id;
+            proxy_set_header X-Auth-Username $auth_username;
+            proxy_set_header X-Auth-Room $auth_room;
+
+            proxy_read_timeout    3600s;
+            proxy_send_timeout    3600s;
+            proxy_connect_timeout    10s;
+            proxy_buffering off;
+            proxy_next_upstream error timeout;
+        }
+    }
+}

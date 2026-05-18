@@ -1,0 +1,11 @@
+---
+- name: restart gateway
+  shell: |
+    docker rm -f api-gateway 2>/dev/null || true
+    docker run -d \
+      --name api-gateway \
+      --restart unless-stopped \
+      -p {{ gateway_port }}:8080 \
+      --add-host host.docker.internal:host-gateway \
+      -v {{ project_dir }}/nginx-gateway.conf:/etc/nginx/nginx.conf:ro \
+      nginx

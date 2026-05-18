@@ -1,0 +1,7 @@
+---
+- name: restart lsp service
+  shell: |
+    cd {{ project_dir }}/LSP-Service
+    HOST_IP=$(hostname -I | awk '{print $1}')
+    docker compose down
+    HOST_IP=$HOST_IP docker compose up -d --build

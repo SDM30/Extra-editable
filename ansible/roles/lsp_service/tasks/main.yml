@@ -1,0 +1,38 @@
+---
+# Role: lsp_service — LSP Service Docker Compose (Gabriel + Simon)
+
+- name: Abrir puertos LSP en UFW
+  ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop:
+    - '8135'
+    - '8136'
+    - '8137'
+
+- name: Obtener IP de la interfaz principal
+  shell: hostname -I | awk '{print $1}'
+  register: host_ip_result
+  changed_when: false
+
+- name: Levantar LSP Service con Docker Compose
+  shell: HOST_IP={{ host_ip_result.stdout }} docker compose up -d --build
+  args:
+    chdir: "{{ project_dir }}/LSP-Service"
+  become_user: estudiante
+
+- name: Esperar a que Redis esté saludable
+  command: docker exec redis-lsp redis-cli ping
+  register: redis_ping
+  retries: 10
+  delay: 3
+  until: redis_ping.stdout == "PONG"
+  changed_when: false
+
+- name: Ejecutar discover-and-create para contenedores LSP
+  command: bash discover-and-create.sh
+  args:
+    chdir: "{{ project_dir }}/LSP-Service"
+  become_user: estudiante
+  ignore_errors: yes

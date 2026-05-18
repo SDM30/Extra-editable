@@ -1,0 +1,51 @@
+---
+# Role: docker — Instalación de Docker CE + Docker Compose
+
+- name: Instalar dependencias de Docker
+  apt:
+    name:
+      - ca-certificates
+      - curl
+      - gnupg
+      - lsb-release
+    state: present
+
+- name: Agregar clave GPG de Docker
+  shell: |
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg --yes
+    chmod a+r /etc/apt/keyrings/docker.gpg
+  args:
+    creates: /etc/apt/keyrings/docker.gpg
+
+- name: Agregar repositorio de Docker
+  shell: |
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+  args:
+    creates: /etc/apt/sources.list.d/docker.list
+
+- name: Actualizar apt después de agregar Docker
+  apt:
+    update_cache: yes
+
+- name: Instalar Docker CE y plugins
+  apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    state: present
+
+- name: Agregar usuario estudiante al grupo docker
+  user:
+    name: estudiante
+    groups: docker
+    append: yes
+
+- name: Habilitar y arrancar Docker
+  systemd:
+    name: docker
+    enabled: yes
+    state: started

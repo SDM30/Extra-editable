@@ -1,0 +1,17 @@
+[Unit]
+Description=Extra-editable Frontend (Angular)
+After=network.target
+
+[Service]
+Type=simple
+User=estudiante
+Group=estudiante
+WorkingDirectory={{ project_dir }}/frontend
+ExecStart=/usr/bin/npx ng serve --host 0.0.0.0 --port {{ frontend_port }} --disable-host-check
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

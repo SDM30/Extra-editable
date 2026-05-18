@@ -1,0 +1,18 @@
+[Unit]
+Description=Extra-editable Code Execution Service
+After=network.target docker.service
+Wants=docker.service
+
+[Service]
+Type=simple
+User=estudiante
+Group=estudiante
+WorkingDirectory={{ project_dir }}/code-execution-service
+ExecStart=/usr/bin/npx ts-node-dev --respawn --transpile-only src/server.ts
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

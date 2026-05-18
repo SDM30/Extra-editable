@@ -1,0 +1,11 @@
+---
+- name: restart collab lb
+  shell: |
+    docker rm -f collab-lb 2>/dev/null || true
+    docker run -d \
+      --name collab-lb \
+      --restart unless-stopped \
+      -p {{ collab_lb_port }}:8083 \
+      --add-host host.docker.internal:host-gateway \
+      -v {{ project_dir }}/collab-lb-nginx.conf:/etc/nginx/nginx.conf:ro \
+      nginx

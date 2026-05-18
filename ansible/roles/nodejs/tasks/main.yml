@@ -1,0 +1,37 @@
+---
+# Role: nodejs — Node.js 22 desde NodeSource
+
+- name: Instalar dependencias para NodeSource
+  apt:
+    name:
+      - ca-certificates
+      - curl
+      - gnupg
+    state: present
+
+- name: Descargar e instalar script de NodeSource 22
+  shell: |
+    curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+  args:
+    creates: /etc/apt/sources.list.d/nodesource.list
+
+- name: Instalar Node.js
+  apt:
+    name: nodejs
+    state: present
+    update_cache: yes
+
+- name: Verificar versión de Node.js
+  command: node --version
+  register: node_version
+  changed_when: false
+
+- name: Mostrar versión de Node.js
+  debug:
+    msg: "Node.js {{ node_version.stdout }} instalado"
+
+- name: Instalar Angular CLI globalmente (solo en nodo principal)
+  npm:
+    name: "@angular/cli"
+    global: yes
+  when: inventory_hostname in groups.get('main_node', [])

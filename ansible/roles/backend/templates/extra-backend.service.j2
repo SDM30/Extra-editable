@@ -1,0 +1,18 @@
+[Unit]
+Description=Extra-editable Backend (Django)
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=estudiante
+Group=estudiante
+WorkingDirectory={{ project_dir }}/backend
+ExecStart={{ project_dir }}/backend/venv/bin/python manage.py runserver 0.0.0.0:{{ backend_port }}
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

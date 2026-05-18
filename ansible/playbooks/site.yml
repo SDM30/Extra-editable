@@ -1,0 +1,78 @@
+---
+# ═══════════════════════════════════════════════════════════════
+#  PLAYBOOK MAESTRO — Extra-editable
+#  Ejecutar desde Samuel (Control Node):
+#    ansible-playbook playbooks/site.yml --ask-vault-pass
+# ═══════════════════════════════════════════════════════════════
+
+# ── 1. Base en todas las VMs ──
+- name: Preparar todas las VMs (paquetes base + clonar repo)
+  hosts: all
+  roles:
+    - common
+
+# ── 2. Docker donde sea necesario ──
+- name: Instalar Docker CE
+  hosts: main_node,code_execution_servers,lsp_servers
+  roles:
+    - docker
+
+# ── 3. Node.js donde sea necesario ──
+- name: Instalar Node.js 22
+  hosts: main_node,collab_servers,code_execution_servers
+  roles:
+    - nodejs
+
+# ── 4. Python donde sea necesario ──
+- name: Instalar Python 3 + dependencias
+  hosts: main_node,lsp_balancer_servers
+  roles:
+    - python
+
+# ── 5. Backend (David) ──
+- name: Deploy Backend Django
+  hosts: main_node
+  roles:
+    - backend
+
+# ── 6. Collab Service ×3 (Melissa) ──
+- name: Deploy Collab Service
+  hosts: collab_servers
+  roles:
+    - collab
+
+# ── 7. Collab Load Balancer (David) ──
+- name: Deploy Collab Load Balancer
+  hosts: main_node
+  roles:
+    - collab_lb
+
+# ── 8. Code Execution (Chitiva) ──
+- name: Deploy Code Execution Service
+  hosts: code_execution_servers
+  roles:
+    - code_execution
+
+# ── 9. LSP Service (Gabriel + Simon) ──
+- name: Deploy LSP Service
+  hosts: lsp_servers
+  roles:
+    - lsp_service
+
+# ── 10. LSP Load Balancer (Campos) ──
+- name: Deploy LSP Load Balancer
+  hosts: lsp_balancer_servers
+  roles:
+    - lsp_balancer
+
+# ── 11. API Gateway (David — último, después de que los servicios estén arriba) ──
+- name: Deploy API Gateway
+  hosts: main_node
+  roles:
+    - gateway
+
+# ── 12. Frontend (David — último) ──
+- name: Deploy Frontend Angular
+  hosts: main_node
+  roles:
+    - frontend

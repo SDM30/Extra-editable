@@ -1,0 +1,33 @@
+---
+# Role: collab — Hocuspocus ×3 (Melissa)
+
+- name: Abrir puertos de collab en UFW
+  ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop: "{{ collab_ports }}"
+
+- name: Instalar dependencias npm del collab service
+  command: npm install
+  args:
+    chdir: "{{ project_dir }}/collab-service"
+    creates: "{{ project_dir }}/collab-service/node_modules"
+  become_user: estudiante
+
+- name: Instalar servicio systemd template para collab
+  template:
+    src: extra-collab@.service.j2
+    dest: /etc/systemd/system/extra-collab@.service
+    mode: '0644'
+
+- name: Recargar systemd
+  systemd:
+    daemon_reload: yes
+
+- name: Habilitar y arrancar instancias de collab
+  systemd:
+    name: "extra-collab@{{ item }}"
+    enabled: yes
+    state: started
+  loop: "{{ collab_ports }}"

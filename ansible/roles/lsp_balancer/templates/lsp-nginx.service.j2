@@ -1,0 +1,14 @@
+[Unit]
+Description=LSP Load Balancer Nginx
+After=network.target
+
+[Service]
+Type=forking
+ExecStart=/usr/sbin/nginx -c {{ project_dir }}/lsp-load-balancer/nginx.conf
+ExecReload=/usr/sbin/nginx -c {{ project_dir }}/lsp-load-balancer/nginx.conf -s reload
+ExecStop=/usr/sbin/nginx -c {{ project_dir }}/lsp-load-balancer/nginx.conf -s quit
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,58 @@
+---
+# Role: backend — Django REST Framework (David)
+
+- name: Abrir puerto del backend en UFW
+  ufw:
+    rule: allow
+    port: "{{ backend_port }}"
+    proto: tcp
+
+- name: Instalar dependencias del sistema para psycopg
+  apt:
+    name:
+      - python3-dev
+      - libpq-dev
+    state: present
+
+- name: Crear virtualenv del backend
+  command: python3 -m venv {{ project_dir }}/backend/venv
+  args:
+    creates: "{{ project_dir }}/backend/venv/bin/python3"
+  become_user: estudiante
+
+- name: Instalar dependencias Python del backend
+  pip:
+    requirements: "{{ project_dir }}/backend/requirements.txt"
+    virtualenv: "{{ project_dir }}/backend/venv"
+  become_user: estudiante
+
+- name: Generar archivo .env del backend
+  template:
+    src: backend.env.j2
+    dest: "{{ project_dir }}/backend/.env"
+    owner: estudiante
+    group: estudiante
+    mode: '0600'
+  notify: restart backend
+
+- name: Ejecutar migraciones de Django
+  command: "{{ project_dir }}/backend/venv/bin/python manage.py migrate --noinput"
+  args:
+    chdir: "{{ project_dir }}/backend"
+  become_user: estudiante
+  environment:
+    DJANGO_SETTINGS_MODULE: config.settings
+
+- name: Instalar servicio systemd del backend
+  template:
+    src: extra-backend.service.j2
+    dest: /etc/systemd/system/extra-backend.service
+    mode: '0644'
+  notify: restart backend
+
+- name: Habilitar y arrancar backend
+  systemd:
+    name: extra-backend
+    enabled: yes
+    state: started
+    daemon_reload: yes

@@ -1,0 +1,67 @@
+---
+# Role: lsp_balancer — LSP Load Balancer Nginx nativo (Campos)
+
+- name: Abrir puerto del LSP balancer en UFW
+  ufw:
+    rule: allow
+    port: "{{ lsp_balancer_port }}"
+    proto: tcp
+
+- name: Instalar Nginx y redis-tools
+  apt:
+    name:
+      - nginx
+      - redis-tools
+    state: present
+
+- name: Crear directorio de configuración del balanceador
+  file:
+    path: "{{ project_dir }}/lsp-load-balancer"
+    state: directory
+    owner: estudiante
+    group: estudiante
+    mode: '0755'
+
+- name: Generar nginx config del LSP balancer
+  template:
+    src: nginx_lb.conf.j2
+    dest: "{{ project_dir }}/lsp-load-balancer/nginx.conf"
+    owner: estudiante
+    group: estudiante
+    mode: '0644'
+  notify: reload lsp nginx
+
+- name: Detener nginx del sistema (usamos nuestra propia config)
+  systemd:
+    name: nginx
+    state: stopped
+    enabled: no
+  ignore_errors: yes
+
+- name: Instalar servicio systemd del LSP nginx
+  template:
+    src: lsp-nginx.service.j2
+    dest: /etc/systemd/system/lsp-nginx.service
+    mode: '0644'
+
+- name: Instalar servicio systemd del watcher
+  template:
+    src: lsp-watcher.service.j2
+    dest: /etc/systemd/system/lsp-watcher.service
+    mode: '0644'
+
+- name: Recargar systemd
+  systemd:
+    daemon_reload: yes
+
+- name: Habilitar y arrancar LSP Nginx
+  systemd:
+    name: lsp-nginx
+    enabled: yes
+    state: started
+
+- name: Habilitar y arrancar LSP watcher
+  systemd:
+    name: lsp-watcher
+    enabled: yes
+    state: started

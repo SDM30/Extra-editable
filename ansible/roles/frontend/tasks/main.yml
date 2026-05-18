@@ -1,0 +1,47 @@
+---
+# Role: frontend — Angular con build de producción (David)
+
+- name: Abrir puerto del frontend en UFW
+  ufw:
+    rule: allow
+    port: "{{ frontend_port }}"
+    proto: tcp
+
+- name: Instalar dependencias npm del frontend
+  command: npm install
+  args:
+    chdir: "{{ project_dir }}/frontend"
+    creates: "{{ project_dir }}/frontend/node_modules"
+  become_user: estudiante
+
+- name: Generar environment.prod.ts con IPs reales
+  template:
+    src: enviroment.prod.ts.j2
+    dest: "{{ project_dir }}/frontend/src/app/environments/enviroment.prod.ts"
+    owner: estudiante
+    group: estudiante
+    mode: '0644'
+
+- name: Copiar environment de producción como environment principal
+  copy:
+    src: "{{ project_dir }}/frontend/src/app/environments/enviroment.prod.ts"
+    dest: "{{ project_dir }}/frontend/src/app/environments/enviroment.ts"
+    remote_src: yes
+    owner: estudiante
+    group: estudiante
+    mode: '0644'
+  notify: restart frontend
+
+- name: Instalar servicio systemd del frontend
+  template:
+    src: extra-frontend.service.j2
+    dest: /etc/systemd/system/extra-frontend.service
+    mode: '0644'
+  notify: restart frontend
+
+- name: Habilitar y arrancar frontend
+  systemd:
+    name: extra-frontend
+    enabled: yes
+    state: started
+    daemon_reload: yes

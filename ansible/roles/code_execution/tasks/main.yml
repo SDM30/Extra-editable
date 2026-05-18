@@ -1,0 +1,35 @@
+---
+# Role: code_execution — Code Execution Service (Chitiva)
+
+- name: Abrir puerto de ejecución en UFW
+  ufw:
+    rule: allow
+    port: "{{ code_exec_port }}"
+    proto: tcp
+
+- name: Instalar dependencias npm del code execution service
+  command: npm install
+  args:
+    chdir: "{{ project_dir }}/code-execution-service"
+    creates: "{{ project_dir }}/code-execution-service/node_modules"
+  become_user: estudiante
+
+- name: Compilar TypeScript del code execution service
+  command: npm run build
+  args:
+    chdir: "{{ project_dir }}/code-execution-service"
+  become_user: estudiante
+
+- name: Instalar servicio systemd de code execution
+  template:
+    src: extra-code-exec.service.j2
+    dest: /etc/systemd/system/extra-code-exec.service
+    mode: '0644'
+  notify: restart code execution
+
+- name: Habilitar y arrancar code execution
+  systemd:
+    name: extra-code-exec
+    enabled: yes
+    state: started
+    daemon_reload: yes

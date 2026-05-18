@@ -1,0 +1,6 @@
+---
+- name: restart code execution
+  systemd:
+    name: extra-code-exec
+    state: restarted
+    daemon_reload: yes
