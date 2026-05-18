@@ -25,7 +25,7 @@ frontend/*.launch
 frontend/.settings/
 frontend/*.sublime-workspace
 
-# Visual Studio Code (solo frontend)
+# Visual Studio Code (solo front)
 frontend/.vscode/*
 !frontend/.vscode/settings.json
 !frontend/.vscode/tasks.json
