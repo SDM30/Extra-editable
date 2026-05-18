@@ -34,4 +34,5 @@
   npm:
     name: "@angular/cli"
     global: yes
+    state: latest
   when: inventory_hostname in groups.get('main_node', [])
