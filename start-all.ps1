@@ -100,6 +100,26 @@ function Invoke-Python([string]$pythonExe, [string[]]$pythonArgs, [string]$worki
     }
 }
 
+function Test-BackendDependenciesInstalled([string]$pythonExe) {
+    $checkCode = @'
+import importlib.util
+required_modules = [
+    'django',
+    'rest_framework',
+    'corsheaders',
+    'decouple',
+    'jwt',
+    'psycopg',
+    'psycopg2',
+]
+missing = [name for name in required_modules if importlib.util.find_spec(name) is None]
+raise SystemExit(0 if not missing else 1)
+'@
+
+    & $pythonExe '-c' $checkCode
+    return ($LASTEXITCODE -eq 0)
+}
+
 function Ensure-PostgresContainer() {
     & docker volume create $postgresVolume | Out-Null
 
@@ -153,7 +173,13 @@ if (-not (Get-Command npm -ErrorAction SilentlyContinue)) { throw 'npm is not av
 $backendPython = Ensure-BackendPython
 Install-NpmDeps $frontendDir
 Install-NpmDeps $collabDir
-Invoke-Python $backendPython @('-m', 'pip', 'install', '-r', 'requirements.txt') $backendDir
+
+if (-not (Test-BackendDependenciesInstalled $backendPython)) {
+    Write-Host 'Installing backend Python dependencies...'
+    Invoke-Python $backendPython @('-m', 'pip', 'install', '--disable-pip-version-check', '--no-input', '-r', 'requirements.txt') $backendDir
+} else {
+    Write-Host 'Backend Python dependencies already installed.'
+}
 
 Ensure-PostgresContainer
 
