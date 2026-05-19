@@ -4,7 +4,7 @@
 
 | Área | Ajuste aplicado |
 |------|-----------------|
-| Disponibilidad | Ventana de 2-6 horas (no 24h), carga simulada con Playwright para Python |
+| Disponibilidad | Ventana de 2-6 horas (no 24h), carga simulada con Playwright para Python, resiliencia con auto-recovery ante caída total de instancias |
 | Sandboxing | Simplificado a funcionalidad básica de ejecución (Python, C++, TypeScript) |
 | Autenticación | Simplificada: solo login y verificación de identidad de usuario, sin control de acceso estricto |
 | Colaboración | 100% automatizada con clientes WebSocket programáticos (Yjs + Hocuspocus) |
@@ -49,6 +49,7 @@ Proyecto_ARQ/tests/
 ├── test_lsp_ws.py              # Protocolo LSP vía WebSocket (pytest)
 ├── test_lsp_lifecycle.py       # Idle timeout (30s), max_clients, multiplexing
 ├── test_lb.py                  # Balanceadores: round-robin LSP, sticky collab, failover
+├── test_resilience.py          # Resiliencia: caída total de instancias + auto-recovery
 ├── test_collab_ws.py           # Colaboración multiusuario automatizada (Yjs/Hocuspocus)
 ├── test_collab_filesync.py     # Propagación de archivos vía Y.Array('files')
 └── utils/
@@ -80,16 +81,17 @@ Proyecto_ARQ/tests/
 
 ---
 
-## 2. NF-001: Disponibilidad de escritura y edición colaborativa
+## 2. ASR-001 / NF-001: Limitaciones de disponibilidad de escritura y ejecución en línea
 
-**Métrica:** Tasa de éxito de health checks y operaciones sobre ventana de 2-6 horas. Objetivo ≥90% de respuestas exitosas bajo carga simulada con navegador real.
+**Métrica:** Tasa de éxito de health checks y operaciones sobre ventana de 2-6 horas. Objetivo ≥90% de respuestas exitosas bajo carga simulada con navegador real. Incluye pruebas de resiliencia ante caída total de instancias con recuperación automática.
 
 ### 2.1 Health polling (capa API)
+
+**Health polling:** sondeo periódico de salud. Consiste en consultar los endpoints `/health` de cada servicio cada N segundos (ej. 30s) durante una ventana larga (2-6h), registrando éxitos, fallos y latencia. Al final se calcula: `% disponible = (peticiones_exitosas / total_peticiones) × 100`.
 
 **Flujo:**
 1. Iniciar todos los servicios vía `start-all.sh`.
 2. Ejecutar script `availability.py` que cada 30 segundos consulte los health checks:
-   - `GET http://localhost:8081/health` (code-execution)
    - `GET http://localhost:8083/health` (collab LB)
    - `GET http://localhost:8085/health` (LSP LB)
    - `POST http://localhost:8000/api/auth/login/` con credenciales válidas (backend)
@@ -119,6 +121,30 @@ Proyecto_ARQ/tests/
 **Uso:** `python3 tests/availability.py --duration 4h --interval 30 --playwright-workers 3`
 
 **Referencia:** NF-001. Fuente: `server.ts` (health endpoint), `start-all.sh`, `frontend/src/app/editor/`, `frontend/src/app/services/lsp-service.ts` (autocompletado), `frontend/src/app/services/codemirror-lsp-service.ts`, `monitor.py` (patrones reutilizables).
+
+### 2.3 Resiliencia ante caída total de instancias (auto-recovery)
+
+**Propósito:** Verificar que el sistema es capaz de detectar la caída total de todas las instancias de un servicio y recuperarse automáticamente levantando nuevas instancias, sin intervención manual.
+
+**Contexto:** Si todas las réplicas de un servicio (LSP, collab) fallan simultáneamente, el balanceador de carga u otro componente de orquestación debe detectar la ausencia total de backends sanos y disparar el reinicio o reemplazo de las instancias caídas.
+
+**Precondición:** El sistema debe contar con un mecanismo de auto-recovery (health check del balanceador + script de reinicio, Docker Compose con `restart: always` + healthcheck, o supervisor de procesos). Si el entorno de pruebas no dispone de orquestación automática, se debe implementar un script `recovery-watchdog.sh` que monitoree los upstreams del balanceador y reinicie las instancias caídas.
+
+#### Escenarios
+
+| # | Escenario | Procedimiento | Resultado esperado |
+|---|-----------|--------------|--------------------|
+| **R1** | **Caída total de instancias LSP** | 1. Verificar que las 3 instancias LSP están sanas (`GET /health` a cada upstream). 2. Detener simultáneamente las 3 instancias (`docker stop lsp-<puerto>` para todas). 3. Monitorear el balanceador LSP (`GET http://localhost:8085/health`) cada 5s durante 60s. 4. Verificar que el mecanismo de auto-recovery detecta la caída y levanta nuevas instancias. | El balanceador responde inicialmente con error 502/503 (sin backends). En ≤30s, el mecanismo de recovery levanta al menos 1 nueva instancia. El health del LB vuelve a 200. Las nuevas instancias aceptan requests LSP (`POST /lsp/{id}` → 200). |
+| **R2** | **Caída total de instancias Collab** | 1. Verificar que las 3 instancias collab están sanas. 2. Detener simultáneamente las 3 instancias (`docker stop collab-<puerto>`). 3. Monitorear `GET http://localhost:8083/health` cada 5s. 4. Esperar auto-recovery. | Similar a R1: 502/503 inicial, recovery en ≤30s, health vuelve a 200, nuevas instancias aceptan WebSocket con token válido. |
+| **R3** | **Recuperación con estado** | 1. Crear un contenedor LSP para `project:test-recovery` (lenguaje Python). 2. Conectar cliente WS y hacer `didOpen` de `main.py`. 3. Detener las 3 instancias LSP. 4. Esperar auto-recovery. 5. Intentar crear nuevamente el contenedor y conectar otro cliente. | Tras recovery, el sistema está limpio y funcional. El nuevo contenedor se crea exitosamente y acepta sesiones LSP. Los clientes previamente conectados deben reconectarse (failover vía balanceador). |
+| **R4** | **Disponibilidad ≥90% durante recuperación** | 1. Ejecutar health polling (§2.1) durante 1 hora con intervalos de 10s. 2. A los 20 min, provocar caída total de LSP (R1). 3. A los 40 min, provocar caída total de Collab (R2). 4. Calcular tasa de disponibilidad global. | La tasa de disponibilidad combinada (API + UI) se mantiene ≥90% a pesar de los incidentes de caída total, gracias a la recuperación automática en ≤30s. |
+| **R5** | **Balanceador de carga como health-check watchdog** | 1. Verificar que el balanceador LSP (`nginx.conf`) tiene `fail_timeout=30s` y `max_fails`. 2. Detener 1 instancia. 3. Verificar que el balanceador la marca como `down` tras `max_fails` intentos fallidos. 4. Reactivar la instancia. 5. Verificar que el balanceador la reincorpora al pool tras `fail_timeout`. | El balanceador excluye automáticamente instancias no saludables y las reincorpora cuando se recuperan, sin necesidad de recarga manual de configuración. |
+
+**Herramienta:** `tests/test_resilience.py` — pytest + `subprocess` para `docker stop`/`docker start`, `httpx` para health polling, `time` para medir tiempos de recuperación. Alternativamente, script bash `tests/resilience.sh` si la orquestación es vía shell scripts.
+
+**Uso:** `python3 tests/test_resilience.py --services lsp,collab --watchdog-script ./recovery-watchdog.sh`
+
+**Referencia:** ASR-001, NF-001. Fuente: `lsp-load-balancer/nginx.conf` (fail_timeout), `collab-load-balancer/nginx.config` (max_fails), `update_nginx.py` (actualización dinámica de upstreams), `start-all.sh` (orquestación de servicios).
 
 ---
 
@@ -298,7 +324,7 @@ Encapsula la conexión Hocuspocus/Yjs:
 
 | ID | Descripción | Prueba asociada | Archivos fuente |
 |---|---|---|---|
-| **NF-001** | Disponibilidad ≥90% para edición y colaboración en línea | §2 — Health polling 2-6h + carga Playwright | `server.ts`, `start-all.sh`, `app/editor/` |
+| **ASR-001 / NF-001** | Disponibilidad ≥90% para edición y colaboración en línea, con resiliencia ante caída total de instancias y recuperación automática | §2 — Health polling 2-6h + carga Playwright + resiliencia auto-recovery | `server.ts`, `start-all.sh`, `app/editor/`, `nginx.conf`, `update_nginx.py` |
 | **ADR-004** | Autenticación basada en tokens (JWT) para identificar usuarios | §3 — Login, perfil, tokens inválidos | `settings.py`, `views.py` |
 | **ADR-005** | Balanceadores de carga para disponibilidad y desempeño | §7 — Distribución + failover LSP y Collab | `nginx.config`, `nginx.conf` |
 | **ADR-006** | Manejo colaborativo multiusuario restringido (≤4) | §6.2 — Conexión, edición concurrente, awareness, límites | `server.js`, `collab.service.ts` |
@@ -332,15 +358,16 @@ npm install yjs @hocuspocus/provider ws
 | # | Criterio | Umbral |
 |---|----------|--------|
 | 1 | Smoke test | 10/10 checks pasan en <60s |
-| 2 | Disponibilidad (health + Playwright) | ≥90% en ventana 2-6h |
-| 3 | LSP REST CRUD | 9/9 tests pasan |
-| 4 | LSP WebSocket protocolo | 8/8 tests pasan |
-| 5 | LSP ciclo de vida | 5/5 tests pasan (idle=30s) |
-| 6 | Colaboración WebSocket | 7/7 tests pasan |
-| 7 | Propagación de archivos | 3/3 tests pasan |
-| 8 | Balanceadores carga + failover | Distribución <20% desviación, failover <30s |
-| 9 | Ejecución de código | 6/6 tests pasan |
-| 10 | Autenticación JWT | 3/3 tests pasan |
+| 2 | Disponibilidad (health + Playwright + resiliencia) | ≥90% en ventana 2-6h |
+| 3 | Resiliencia auto-recovery | Recuperación en ≤30s tras caída total |
+| 4 | LSP REST CRUD | 9/9 tests pasan |
+| 5 | LSP WebSocket protocolo | 8/8 tests pasan |
+| 6 | LSP ciclo de vida | 5/5 tests pasan (idle=30s) |
+| 7 | Colaboración WebSocket | 7/7 tests pasan |
+| 8 | Propagación de archivos | 3/3 tests pasan |
+| 9 | Balanceadores carga + failover | Distribución <20% desviación, failover <30s |
+| 10 | Ejecución de código | 6/6 tests pasan |
+| 11 | Autenticación JWT | 3/3 tests pasan |
 
 ---
 
@@ -371,8 +398,9 @@ npm install yjs @hocuspocus/provider ws
 | 8 | `test_collab_ws.py` (conexión, edición concurrente, awareness, límite 4) |
 | 9 | `test_collab_filesync.py` (Y.Array propagación de archivos) |
 | 10 | `test_lb.py` (balanceadores LSP + collab, failover) |
-| 11 | `availability.py` (health polling + carga Playwright, reporte JSON) |
-| 12-13 | Integración, CI/CD, documentación de resultados |
+| 11 | `test_resilience.py` (caída total + auto-recovery) |
+| 12 | `availability.py` (health polling + carga Playwright, reporte JSON) |
+| 13 | Integración, CI/CD, documentación de resultados |
 
 ---
 
