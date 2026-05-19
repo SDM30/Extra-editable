@@ -29,15 +29,15 @@ docker ps
 
 Usar los scripts provistos para construir, instalar y desplegar:
 
-- `./setup.sh [num_instancias]` — instalación completa: construye la imagen `lsp-server`, crea el entorno Python (venv), instala dependencias, crea `.env` y levanta los servicios con Docker Compose.
-- `./deploy.sh [num_instancias]` — despliegue rápido: `up -d --build --scale language-service=<n>`.
-- `./create-lsp-containers.sh <puertos...>` — crear contenedores LSP en las instancias del API (p. ej. `./create-lsp-containers.sh 32771 32772`).
+- `./setup-dev.sh [num_instancias]` — instalación completa: construye la imagen `lsp-server`, crea el entorno Python (venv), instala dependencias, crea `.env` y levanta los servicios con Docker Compose.
+- `./deploy-dev.sh [num_instancias]` — despliegue rápido: `up -d --build --scale language-service=<n>`.
+- `./create-lsp-dev.sh <puertos...>` — crear contenedores LSP en las instancias del API (p. ej. `./create-lsp-dev.sh 32771 32772`).
 
 Ejemplo:
 ```
-./setup.sh 1
+./setup-dev.sh 1
 # o para arrancar rápidamente:
-./deploy.sh 1
+./deploy-dev.sh 1
 ```
 
 Si `docker images` muestra la imagen pero el API dice que no existe, revisa que estés usando el mismo Docker daemon/context:
@@ -48,7 +48,7 @@ docker context show
 
 ## 2) Instalar dependencias del API
 
-El script `./setup.sh` se encarga de crear un entorno virtual en `language-service/venv` e instalar dependencias desde `require.txt`. Si se prefiere hacerlo manualmente:
+El script `./setup-dev.sh` se encarga de crear un entorno virtual en `language-service/venv` e instalar dependencias desde `require.txt`. Si se prefiere hacerlo manualmente:
 
 ```
 cd language-service
@@ -73,15 +73,15 @@ MAX_CLIENTS_PER_CONTAINER=4
 
 Para desarrollo y despliegue automatizado, usar los scripts:
 
-- `./setup.sh [num_instancias]` — instalación y arranque completo.
-- `./deploy.sh [num_instancias]` — despliegue rápido con Docker Compose.
+- `./setup-dev.sh [num_instancias]` — instalación y arranque completo.
+- `./deploy-dev.sh [num_instancias]` — despliegue rápido con Docker Compose.
 
 Ejecutar ejemplo:
 
 ```
-./deploy.sh 1
+./deploy-dev.sh 1
 # o para instalar y arrancar:
-./setup.sh 1
+./setup-dev.sh 1
 ```
 
 ### Linux
@@ -182,11 +182,12 @@ docker exec <ID_CONTENEDOR> bash -lc "ps aux | grep -E '[t]ypescript-language-se
 ```
 LSP-Service/
 ├── Makefile                   # Atajos para tareas y scripts
-├── setup.sh                   # Instalación completa y arranque (construye imagen, venv, .env, up)
-├── deploy.sh                  # Despliegue rápido (docker compose up -d --build --scale)
-├── create-lsp-containers.sh   # Crear contenedores LSP apuntando a instancias del API
-├── discover-and-create.sh     # Descubrir instancias del API y crear LSPs automáticamente
-├── cleanup-containers.sh      # Eliminar contenedores de prueba creados por los scripts
+├── setup-dev.sh               # Instalación completa y arranque (construye imagen, venv, .env, up)
+├── deploy-dev.sh              # Despliegue rápido (docker compose up -d --build --scale)
+├── create-lsp-dev.sh          # Crear contenedores LSP apuntando a instancias del API
+├── discover-dev.sh            # Descubrir instancias del API y crear LSPs automáticamente
+├── cleanup-dev.sh             # Eliminar contenedores de prueba creados por los scripts
+├── deploy-multi.sh            # Despliegue multi-máquina
 ├── docker-compose.yml         # Definición de servicios (API, redis, etc.)
 ├── lsp-container/             # Imagen Docker del multiplexor LSP
 │   ├── Dockerfile
@@ -215,43 +216,43 @@ LSP-Service/
 
 A continuación se detallan cómo usar los scripts principales y las reglas del Makefile.
 
-- setup.sh [num_instancias]
+- setup-dev.sh [num_instancias]
   - Qué hace: construcción de imagen `lsp-server`, creación de `language-service/venv`, instalación de dependencias, creación de `language-service/.env` si falta y levantado con Docker Compose.
-  - Uso: `./setup.sh 1` (o `make setup 1`)
+  - Uso: `./setup-dev.sh 1` (o `make setup 1`)
 
-- deploy.sh [num_instancias]
+- deploy-dev.sh [num_instancias]
   - Qué hace: despliegue rápido con Docker Compose (build + up -d + escala).
-  - Uso: `./deploy.sh 1` (o `make deploy 1`)
+  - Uso: `./deploy-dev.sh 1` (o `make deploy 1`)
 
-- create-lsp-containers.sh [opciones] <puerto1> [puerto2...]
+- create-lsp-dev.sh [opciones] <puerto1> [puerto2...]
   - Qué hace: realiza POST al endpoint /lsp/ de instancias del API para crear contenedores LSP.
   - Opciones: `-l/--language`, `-c/--clients`, `-p/--project`, `-d/--dry-run`, `-v/--verbose`.
-  - Ejemplo: `./create-lsp-containers.sh -l python -c 4 32771 32772`
+  - Ejemplo: `./create-lsp-dev.sh -l python -c 4 32771 32772`
 
-- discover-and-create.sh
+- discover-dev.sh
   - Qué hace: detecta instancias del API (docker ps / compose) y ejecuta la creación automática de LSPs en ellas.
-  - Uso: `./discover-and-create.sh` (use `-d` para modo dry-run/descubrimiento)
+  - Uso: `./discover-dev.sh` (use `-d` para modo dry-run/descubrimiento)
 
-- cleanup-containers.sh
+- cleanup-dev.sh
   - Qué hace: elimina contenedores de prueba creados por los scripts (filtra por nombre base).
-  - Uso: `./cleanup-containers.sh` (o `make cleanup-lsp`)
+  - Uso: `./cleanup-dev.sh` (o `make cleanup-lsp`)
 
 Makefile (resumen de targets útiles)
 
 - `make help`        — Muestra ayuda y ejemplos.
-- `make setup [n]`   — Ejecuta `./setup.sh n`.
-- `make deploy [n]`  — Ejecuta `./deploy.sh n`.
+- `make setup [n]`   — Ejecuta `./setup-dev.sh n`.
+- `make deploy [n]`  — Ejecuta `./deploy-dev.sh n`.
 - `make build`       — Construye imágenes (lsp-container + compose build).
 - `make up [n]`      — Levanta servicios con Compose (escala language-service).
 - `make down`        — Detiene servicios.
-- `make create` / `make create-containers` — Ejecuta `discover-and-create.sh` o `create-lsp-containers.sh`.
-- `make cleanup-lsp` — Ejecuta `cleanup-containers.sh`.
+- `make create` / `make create-containers` — Ejecuta `discover-dev.sh` o `create-lsp-dev.sh`.
+- `make cleanup-lsp` — Ejecuta `cleanup-dev.sh`.
 - `make logs`, `make ps`, `make shell`, `make redis-cli` — Monitorización y debugging.
 
 Ejemplos rápidos:
 
 - Instalación + pruebas: `make setup 1 && make test-full`
-- Despliegue rápido: `make deploy 1` o `./deploy.sh 1`
+- Despliegue rápido: `make deploy 1` o `./deploy-dev.sh 1`
 
 
 

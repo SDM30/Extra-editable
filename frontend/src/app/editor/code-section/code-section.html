@@ -5,7 +5,13 @@
     [ngModel]="value"
     (ngModelChange)="onValueChange($event)"
     [extensions]="resolvedEditorExtensions"
-    [theme]="theme">
+    [theme]="theme"
+    [indentWithTab]="indentWithTab"
+    [indentUnit]="indentUnit"
+    [lineWrapping]="lineWrapping"
+    [highlightWhitespace]="highlightWhitespace"
+    [placeholder]="placeholder"
+    [autoFocus]="autoFocus">
   </code-editor>
 
   <div

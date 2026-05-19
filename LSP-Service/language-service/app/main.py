@@ -11,8 +11,6 @@ from app.routers import lsp
 from fastapi.responses import JSONResponse
 from app.services import health as health_service
 
-from app.routers import lsp
-
 # ──────────────────────────────────────────────────────────────────────────────
 # Variables de entorno
 # ──────────────────────────────────────────────────────────────────────────────

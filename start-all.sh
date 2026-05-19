@@ -88,6 +88,28 @@ ensure_npm_deps "$ROOT_DIR/collab-service"
 ensure_python_deps
 ensure_postgres
 
+wait_for_postgres() {
+  local max_attempts=10
+  local attempt=1
+  while [ $attempt -le $max_attempts ]; do
+    if docker exec extra-editable-postgres pg_isready -U postgres 2>/dev/null | grep -q "accepting connections"; then
+      echo "PostgreSQL listo"
+      return 0
+    fi
+    if docker logs extra-editable-postgres --tail 5 2>/dev/null | grep -qi "recovery"; then
+      echo "PostgreSQL en recovery mode, reiniciando contenedor..."
+      docker restart extra-editable-postgres >/dev/null
+      sleep 5
+    fi
+    echo "Esperando PostgreSQL... (intento $attempt/$max_attempts)"
+    sleep 3
+    attempt=$((attempt + 1))
+  done
+  echo "WARNING: PostgreSQL podria no estar listo tras $max_attempts intentos"
+}
+
+wait_for_postgres
+
 echo "Running Django migrations"
 (cd "$ROOT_DIR/backend" && "$PYTHON" manage.py migrate --noinput) \
   &> "$ROOT_DIR/logs/backend-migrate.log"
@@ -98,6 +120,7 @@ echo "Seeding initial users"
 
 start_docker_nginx extra-editable-gateway "$ROOT_DIR/nginx.conf" 8080
 start_docker_nginx collab-lb "$ROOT_DIR/collab-load-balancer/nginx.config" 8083
+start_docker_nginx lsp-lb "$ROOT_DIR/lsp-load-balancer/nginx.conf" 8085
 
 echo "Starting backend"
 (cd "$ROOT_DIR/backend" && "$PYTHON" manage.py runserver 0.0.0.0:8000) \

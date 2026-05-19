@@ -193,8 +193,7 @@ export class Editor implements OnInit, OnDestroy {
       // Si existe el array compartido 'files', observar cambios y refrescar desde backend
       const filesArr = this.collab.getProjectFilesArray(project.id);
       if (filesArr) {
-        // Observador que recarga la lista de archivos desde el backend
-        filesArr.observe(async () => {
+        const refreshFiles = async () => {
           try {
             const fresh = await this.workspace.getProject(project.id);
             const idx = this.projects.findIndex((p) => p.id === project.id);
@@ -216,7 +215,15 @@ export class Editor implements OnInit, OnDestroy {
           } catch (e) {
             console.warn('[Editor] Could not refresh project files on project-array change', e);
           }
-        });
+        };
+
+        filesArr.observe(() => { refreshFiles(); });
+
+        // Si el array ya tiene entradas (colaborador se une a proyecto con archivos
+        // existentes), disparar carga inicial. Yjs solo notifica cambios futuros.
+        if (filesArr.length > 0) {
+          refreshFiles();
+        }
       }
 
     } catch (e) {
@@ -410,7 +417,10 @@ export class Editor implements OnInit, OnDestroy {
       await this.connectCollab(token, username, userId);
 
       try {
-        this.collab.pushProjectFile(project.id, { id: archivo.id, nombre: archivo.nombre });
+        const pushed = this.collab.pushProjectFile(project.id, { id: archivo.id, nombre: archivo.nombre });
+        if (!pushed) {
+          console.warn('[Editor] No se pudo propagar archivo via Y.Array (proveedor de proyecto no conectado)');
+        }
       } catch (e) {
         // ignore if push fails
       }

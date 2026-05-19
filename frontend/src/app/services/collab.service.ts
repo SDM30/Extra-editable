@@ -241,13 +241,15 @@ export class CollabService implements OnDestroy {
   }
 
   // Empuja metadata de archivo al Y.Array del proyecto para notificar a otros clientes
-  pushProjectFile(projectId: number | string, fileMeta: any): void {
+  pushProjectFile(projectId: number | string, fileMeta: any): boolean {
     const arr = this.getProjectFilesArray(projectId);
-    if (!arr) return;
+    if (!arr) return false;
     try {
       arr.push([fileMeta]);
+      return true;
     } catch (e) {
       console.warn('[collab] Could not push project file to Y.Array', e);
+      return false;
     }
   }
 

@@ -9,8 +9,8 @@ help:
 	@echo "║   LSP SERVICE - Comandos disponibles              ║"
 	@echo "╠════════════════════════════════════════════════════╣"
 	@echo "║ INSTALACIÓN Y DESPLIEGUE                          ║"
-	@echo "║  make setup [n]   - Instalación completa (n instancias)"
-	@echo "║  make deploy [n]  - Despliegue rápido (n instancias)"
+	@echo "║  make setup [n]   - Instalación completa (n instancias) (setup-dev.sh)"
+	@echo "║  make deploy [n]  - Despliegue rápido (n instancias) (deploy-dev.sh)"
 	@echo "║  make build       - Construir todas las imágenes"
 	@echo "║  make up [n]      - Levantar servicios (n instancias)"
 	@echo "║  make down        - Detener servicios"
@@ -40,12 +40,12 @@ help:
 # ─── Instalación y despliegue ───
 
 setup:
-	@chmod +x setup.sh 2>/dev/null || true
-	@./setup.sh $(filter-out $@,$(MAKECMDGOALS))
+	@chmod +x setup-dev.sh 2>/dev/null || true
+	@./setup-dev.sh $(filter-out $@,$(MAKECMDGOALS))
 
 deploy:
-	@chmod +x deploy.sh 2>/dev/null || true
-	@./deploy.sh $(filter-out $@,$(MAKECMDGOALS))
+	@chmod +x deploy-dev.sh 2>/dev/null || true
+	@./deploy-dev.sh $(filter-out $@,$(MAKECMDGOALS))
 
 build:
 	@echo "Construyendo imagen lsp-server..."
@@ -102,24 +102,24 @@ redis-cli:
 # ─── Pruebas ───
 
 discover:
-	@chmod +x discover-and-create.sh 2>/dev/null || true
-	@./discover-and-create.sh -d
+	@chmod +x discover-dev.sh 2>/dev/null || true
+	@./discover-dev.sh -d
 
 create:
-	@chmod +x discover-and-create.sh create-lsp-containers.sh 2>/dev/null || true
-	@./discover-and-create.sh
+	@chmod +x discover-dev.sh create-lsp-dev.sh 2>/dev/null || true
+	@./discover-dev.sh
 
 create-containers:
-	@chmod +x create-lsp-containers.sh 2>/dev/null || true
-	@./create-lsp-containers.sh $(filter-out $@,$(MAKECMDGOALS))
+	@chmod +x create-lsp-dev.sh 2>/dev/null || true
+	@./create-lsp-dev.sh $(filter-out $@,$(MAKECMDGOALS))
 
 cleanup-lsp:
-	@chmod +x cleanup-containers.sh 2>/dev/null || true
-	@./cleanup-containers.sh $(filter-out $@,$(MAKECMDGOALS))
+	@chmod +x cleanup-dev.sh 2>/dev/null || true
+	@./cleanup-dev.sh $(filter-out $@,$(MAKECMDGOALS))
 
 test:
-	@chmod +x cleanup-containers.sh 2>/dev/null || true
-	@./discover-and-create.sh $(filter-out $@,$(MAKECMDGOALS))
+	@chmod +x cleanup-dev.sh 2>/dev/null || true
+	@./discover-dev.sh $(filter-out $@,$(MAKECMDGOALS))
 
 test-full:
 	@echo "=== FLUJO COMPLETO DE PRUEBA ==="
@@ -128,8 +128,8 @@ test-full:
 	@docker ps --filter "name=lsp-service-language-service" --format "  {{.Names}}: {{.Ports}}" || echo "  ❌ No hay instancias"
 	@echo ""
 	@echo "2. Creando contenedores LSP..."
-	@chmod +x discover-and-create.sh 2>/dev/null || true
-	@./discover-and-create.sh
+	@chmod +x discover-dev.sh 2>/dev/null || true
+	@./discover-dev.sh
 	@echo ""
 	@echo "3. Verificando contenedores LSP..."
 	@docker ps --filter "name=auto-project" --format "  {{.Names}}: {{.Ports}}" || echo "  ❌ No se crearon"

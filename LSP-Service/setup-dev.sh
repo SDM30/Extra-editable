@@ -1,6 +1,9 @@
 #!/bin/bash
-# setup.sh - Script de instalación y despliegue completo
-# Uso: ./setup.sh [num_instancias]
+# setup-dev.sh - Instalacion completa single-machine (desarrollo)
+# Uso: ./setup-dev.sh [num_instancias]
+#
+# Construye la imagen lsp-server, crea venv, genera .env y levanta con Docker Compose.
+# Redis se inicia automaticamente como contenedor independiente.
 
 set -e
 
@@ -91,7 +94,7 @@ PROJECTS_DIR=/home/projects
 WS_PUBLIC_HOST=0.0.0.0
 CONTAINER_IDLE_TIMEOUT=300000
 MAX_CLIENTS_PER_CONTAINER=4
-REDIS_HOST=redis-lsp
+REDIS_HOST=127.0.0.1
 REDIS_PORT=6379
 REDIS_DB=0
 EOF
@@ -100,7 +103,7 @@ else
     # Agregar variables de Redis si no existen
     if ! grep -q "REDIS_HOST" language-service/.env; then
         cat >> language-service/.env << EOF
-REDIS_HOST=redis-lsp
+REDIS_HOST=127.0.0.1
 REDIS_PORT=6379
 REDIS_DB=0
 EOF
@@ -117,6 +120,15 @@ echo "✓ Limpieza completada"
 
 # 7. Construir y levantar contenedores
 echo "[7/7] Construyendo y levantando servicios con ${INSTANCES} instancia(s)..."
+
+# Iniciar Redis si no esta corriendo (ya no esta en docker-compose)
+if ! docker ps --format '{{.Names}}' | grep -qx 'redis-lsp'; then
+    docker rm -f redis-lsp 2>/dev/null || true
+    docker run -d --name redis-lsp --restart unless-stopped \
+        -p 6379:6379 redis:7-alpine \
+        redis-server --save "" --appendonly no --stop-writes-on-bgsave-error no
+    echo "✓ Redis iniciado (redis-lsp)"
+fi
 
 # Verificar si docker-compose.yml usa 'version' (obsoleto en nuevas versiones)
 if grep -q "^version:" docker-compose.yml 2>/dev/null; then
@@ -159,11 +171,11 @@ echo "  # Ver instancias del API"
 echo "  docker ps --filter 'name=language-service'"
 echo ""
 echo "  # Scripts de prueba"
-echo "  ./discover-and-create.sh          # Crear contenedores LSP en cada instancia"
-echo "  ./cleanup-containers.sh           # Limpiar contenedores LSP"
+echo "  ./discover-dev.sh               # Crear contenedores LSP en cada instancia"
+echo "  ./cleanup-dev.sh                # Limpiar contenedores LSP"
 echo ""
-echo "Prueba rápida:"
-echo "  ./discover-and-create.sh -l python"
+echo "Prueba rapida:"
+echo "  ./discover-dev.sh -l python"
 echo ""
 echo "Redis:"
 echo "  docker exec redis-lsp redis-cli PING"

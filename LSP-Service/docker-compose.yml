@@ -1,12 +1,7 @@
 # docker-compose.yml — Servicio de Lenguaje (LSP Management)
-# Soporta despliegue single-machine y multi-machine.
 #
-# Single-machine (local, con Redis incluido):
-#   docker compose up -d
-#
-# Multi-machine (Redis externo, NFS compartido):
-#   cp .env.multi .env  →  editar WS_PUBLIC_HOST y REDIS_HOST por máquina
-#   ./deploy-multi.sh
+# Redis se ejecuta como contenedor independiente en la máquina del balanceador
+# de carga (ver lsp-load-balancer/install.sh). No se incluye en este compose.
 services:
   language-service:
     build: ./language-service
@@ -23,9 +18,8 @@ services:
       - PROJECTS_DIR=/home/projects
       - CONTAINER_IDLE_TIMEOUT=${CONTAINER_IDLE_TIMEOUT:-300000}
       - MAX_CLIENTS_PER_CONTAINER=4
-      # Redis: en single-machine usa el servicio redis-lsp; en multi-machine
-      # se configura como host externo (IP de la máquina que corre Redis).
-      - REDIS_HOST=${REDIS_HOST:-redis-lsp}
+      # Redis: host externo (IP de la máquina que corre Redis, configurado en .env)
+      - REDIS_HOST=${REDIS_HOST:-127.0.0.1}
       - REDIS_PORT=${REDIS_PORT:-6379}
       - REDIS_DB=${REDIS_DB:-0}
       # Secreto para comunicación interna entre instancias (cross-machine).
@@ -42,40 +36,7 @@ services:
       - ./language-service:/app
     networks:
       - lsp-network
-    # depends_on solo aplica en single-machine (Redis como servicio interno).
-    # En multi-machine se omite porque Redis es externo y se asume disponible.
     restart: unless-stopped
-
-  # Redis (solo para despliegue single-machine / testing local).
-  # En multi-machine, Redis se ejecuta como servicio standalone externo.
-  # Ver docs/multi-machine-setup.md para instrucciones.
-  redis-lsp:
-    image: redis:7-alpine
-    container_name: redis-lsp
-    # En multi-machine: exponer a la red para que otras máquinas accedan.
-    # Descomentar la línea de abajo y comentar la de arriba.
-    # ports:
-    #   - "0.0.0.0:6379:6379"
-    ports:
-      - "6379:6379"
-    command: >
-      redis-server
-      --save ""
-      --appendonly no
-      --stop-writes-on-bgsave-error no
-    volumes:
-      - redis_data:/data
-    networks:
-      - lsp-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-
-volumes:
-  redis_data:
 
 networks:
   lsp-network:

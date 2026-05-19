@@ -25,7 +25,9 @@ set -euo pipefail
 # ─── Configuración (modificable) ──────────────────────────────────────────────
 NFS_EXPORT_DIR="/srv/nfs/projects"       # Directorio a exportar en el servidor
 NFS_MOUNT_POINT="/home/projects"         # Punto de montaje en los clientes
-NFS_NETWORK="10.0.0.0/24"                # Red autorizada a acceder al export
+# Red autorizada a acceder al export. Se puede sobrescribir con variable de entorno:
+#   NFS_ALLOWED_NETWORK=192.168.20.0/24 sudo -E ./scripts/setup-nfs.sh server
+NFS_ALLOWED_NETWORK="${NFS_ALLOWED_NETWORK:-10.0.0.0/24}"
 
 # Colores
 RED='\033[0;31m'
@@ -79,7 +81,7 @@ setup_server() {
     chmod 755 "$NFS_EXPORT_DIR"
 
     # 3. Configurar export (idempotente)
-    local export_line="$NFS_EXPORT_DIR ${NFS_NETWORK}(rw,sync,no_subtree_check,no_root_squash)"
+    local export_line="$NFS_EXPORT_DIR ${NFS_ALLOWED_NETWORK}(rw,sync,no_subtree_check,no_root_squash)"
     if grep -qF "$export_line" /etc/exports 2>/dev/null; then
         log_info "Export ya configurado en /etc/exports"
     else
@@ -106,8 +108,8 @@ setup_server() {
 
     echo ""
     log_info "Si falla, abre el firewall para NFS:"
-    echo "       sudo ufw allow from ${NFS_NETWORK} to any port nfs"
-    echo "       sudo ufw allow from ${NFS_NETWORK} to any port 111  # portmapper"
+    echo "       sudo ufw allow from ${NFS_ALLOWED_NETWORK} to any port nfs"
+    echo "       sudo ufw allow from ${NFS_ALLOWED_NETWORK} to any port 111  # portmapper"
 }
 
 # ─── Cliente ──────────────────────────────────────────────────────────────────
@@ -125,7 +127,7 @@ setup_client() {
         log_error "Verifica:"
         log_error "  1. El servidor NFS está corriendo en ${nfs_server}"
         log_error "  2. El firewall permite puerto 2049 (nfs) y 111 (portmapper)"
-        log_error "  3. La red ${NFS_NETWORK} está autorizada en /etc/exports del servidor"
+        log_error "  3. La red ${NFS_ALLOWED_NETWORK} está autorizada en /etc/exports del servidor"
         log_error ""
         log_error "  Prueba manual: showmount -e ${nfs_server}"
         exit 1

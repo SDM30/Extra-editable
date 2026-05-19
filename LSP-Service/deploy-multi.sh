@@ -106,7 +106,7 @@ if [ "${1:-}" = "--build" ]; then
 fi
 
 echo -e "${YELLOW}Levantando servicio...${NC}"
-$COMPOSE_CMD up -d $BUILD_FLAG
+$COMPOSE_CMD up -d language-service $BUILD_FLAG
 
 sleep 3
 
