@@ -5,56 +5,17 @@
 ❯ Building...
 ✔ Building...
 Initial chunk files | Names               |  Raw size
-main.js             | main                | 213.07 kB | 
+main.js             | main                | 214.21 kB | 
 chunk-FXRS5FTJ.js   | -                   |   7.19 kB | 
 styles.css          | styles              | 236 bytes | 
 
-                    | Initial total       | 220.50 kB
+                    | Initial total       | 221.64 kB
 
 Lazy chunk files    | Names               |  Raw size
 chunk-42KEDNSK.js   | auth-wrap-component |  47.29 kB | 
 
-Application bundle generation complete. [6.382 seconds] - 2026-05-18T23:49:02.903Z
+Application bundle generation complete. [7.273 seconds] - 2026-05-19T14:43:14.178Z
 
 Watch mode enabled. Watching for file changes...
 NOTE: Raw file sizes do not reflect development server per-request transformations.
   ➜  Local:   http://localhost:4200/
-❯ Changes detected. Rebuilding...
-✔ Changes detected. Rebuilding...
-
-No output file changes.
-
-Application bundle generation complete. [1.775 seconds] - 2026-05-19T00:11:37.889Z
-
-❯ Changes detected. Rebuilding...
-✔ Changes detected. Rebuilding...
-Initial chunk files | Names |  Raw size
-main.js             | main  | 213.48 kB | 
-
-Application bundle generation complete. [0.854 seconds] - 2026-05-19T00:11:46.260Z
-
-Page reload sent to client(s).
-❯ Changes detected. Rebuilding...
-✔ Changes detected. Rebuilding...
-Initial chunk files | Names |  Raw size
-main.js             | main  | 213.82 kB | 
-
-Application bundle generation complete. [1.029 seconds] - 2026-05-19T00:12:26.184Z
-
-Page reload sent to client(s).
-❯ Changes detected. Rebuilding...
-✔ Changes detected. Rebuilding...
-Initial chunk files | Names |  Raw size
-main.js             | main  | 214.15 kB | 
-
-Application bundle generation complete. [0.935 seconds] - 2026-05-19T00:12:39.889Z
-
-Page reload sent to client(s).
-❯ Changes detected. Rebuilding...
-✔ Changes detected. Rebuilding...
-Initial chunk files | Names |  Raw size
-main.js             | main  | 214.21 kB | 
-
-Application bundle generation complete. [0.902 seconds] - 2026-05-19T00:12:49.488Z
-
-Component update sent to client(s).
