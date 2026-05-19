@@ -1,8 +1,9 @@
-import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
-import { Router } from '@angular/router';
+import { ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { finalize, timeout } from 'rxjs';
 import { Extension } from '@codemirror/state';
+import { FormsModule } from '@angular/forms';
 
 import { Header } from './headerIDE/headerIDE';
 import { CodeSection } from './code-section/code-section';
@@ -22,7 +23,7 @@ export type Theme = 'light' | 'dark' | Extension;
 @Component({
   selector: 'app-editor',
   standalone: true,
-  imports: [Header, CodeSection],
+  imports: [Header, CodeSection, FormsModule],
   templateUrl: './editor.html',
   styleUrls: ['./editor.css'],
 })
@@ -45,7 +46,7 @@ export class Editor implements OnInit, OnDestroy {
 
   languageOptions = [
     { label: 'C++', value: 'cpp' },
-    { label: 'JavaScript', value: 'javascript' },
+    { label: 'TypeScript', value: 'typescript' },
     { label: 'Python', value: 'python' },
   ];
 
@@ -59,7 +60,12 @@ export class Editor implements OnInit, OnDestroy {
   selectedRoom = '';
   currentFilePathBase = 'main';
   lspEnabled: boolean = false;
+  languageDisabled = false;
+  fallbackMode = false;
+  renamingArchivoId: number | null = null;
+  renamingName = '';
   terminalHeight: number = 220;
+  @ViewChild('renameInput') renameInputRef?: ElementRef<HTMLInputElement>;
   collaborators: Array<{ userId: string; username: string; color: string }> = [];
   private collaboratorsSub?: Subscription;
   private selectionRequestId = 0;
@@ -72,6 +78,7 @@ export class Editor implements OnInit, OnDestroy {
     private auth: AuthService,
     private workspace: WorkspaceService,
     private router: Router,
+    private route: ActivatedRoute,
   ) {}
 
   async ngOnInit() {
@@ -82,9 +89,31 @@ export class Editor implements OnInit, OnDestroy {
       await this.router.navigate(['/auth']);
       return;
     }
-    console.log('[Editor] Loading workspace...');
-    // Obtiene (o genera) la identidad del usuario y pide el token al servidor collab
-    await this.loadWorkspace();
+
+    const projectIdParam = this.route.snapshot.paramMap.get('projectId');
+    if (!projectIdParam) {
+      console.log('[Editor] No projectId in route, redirecting to /projects');
+      await this.router.navigate(['/projects']);
+      return;
+    }
+
+    const targetProjectId = Number(projectIdParam);
+    if (isNaN(targetProjectId) || targetProjectId <= 0) {
+      console.log('[Editor] Invalid projectId, redirecting to /projects');
+      await this.router.navigate(['/projects']);
+      return;
+    }
+
+    console.log('[Editor] Loading project:', targetProjectId);
+    try {
+      const project = await this.workspace.getProject(targetProjectId);
+      this.projects = [project];
+      console.log('[Editor] Project loaded:', project.nombre);
+      await this.selectProject(project.id);
+    } catch (error) {
+      console.error('[Editor] Failed to load project:', error);
+      this.useLocalFallbackProject();
+    }
 
     this.collaboratorsSub?.unsubscribe();
     this.collaboratorsSub = this.collab.collaborators$.subscribe((list) => {
@@ -127,6 +156,8 @@ export class Editor implements OnInit, OnDestroy {
       this.projectId = '';
       this.selectedRoom = '';
       this.lspEnabled = false;
+      this.languageDisabled = false;
+      this.fallbackMode = true;
       if (project.archivos?.[0]) {
         this.value = project.archivos[0].contenido ?? this.value;
         this.currentFilePathBase = this.stripFileExtension(project.archivos[0].nombre);
@@ -139,12 +170,17 @@ export class Editor implements OnInit, OnDestroy {
     this.projectId = String(project.id);
     this.language = this.mapProjectLanguage(project.lenguaje);
     this.lspEnabled = true;
+    this.languageDisabled = true;
+    this.fallbackMode = false;
     this.cdr.detectChanges();
 
     if (!project.archivos || project.archivos.length === 0) {
-      const created = await this.ensureDefaultArchivo(project);
-      if (requestId !== this.selectionRequestId) return;
-      project.archivos = [created];
+      this.selectedArchivoId = null;
+      this.selectedRoom = '';
+      this.value = '';
+      this.lspEnabled = false;
+      this.cdr.detectChanges();
+      return;
     }
 
     if (requestId !== this.selectionRequestId) return;
@@ -157,24 +193,37 @@ export class Editor implements OnInit, OnDestroy {
       // Si existe el array compartido 'files', observar cambios y refrescar desde backend
       const filesArr = this.collab.getProjectFilesArray(project.id);
       if (filesArr) {
-        // Observador que recarga la lista de archivos desde el backend
-        filesArr.observe(async () => {
+        const refreshFiles = async () => {
           try {
             const fresh = await this.workspace.getProject(project.id);
             const idx = this.projects.findIndex((p) => p.id === project.id);
             if (idx >= 0) {
               const freshArch = fresh.archivos ?? [];
               this.projects[idx].archivos = freshArch;
-              // Si el archivo actualmente seleccionado fue borrado, ajustar selección
               if (this.selectedArchivoId && !freshArch.find((a) => a.id === this.selectedArchivoId)) {
-                this.selectedArchivoId = freshArch[0]?.id ?? null;
+                if (freshArch.length > 0) {
+                  this.selectedArchivoId = freshArch[0].id;
+                } else {
+                  this.selectedArchivoId = null;
+                  this.selectedRoom = '';
+                  this.value = '';
+                  this.lspEnabled = false;
+                }
               }
               this.cdr.detectChanges();
             }
           } catch (e) {
             console.warn('[Editor] Could not refresh project files on project-array change', e);
           }
-        });
+        };
+
+        filesArr.observe(() => { refreshFiles(); });
+
+        // Si el array ya tiene entradas (colaborador se une a proyecto con archivos
+        // existentes), disparar carga inicial. Yjs solo notifica cambios futuros.
+        if (filesArr.length > 0) {
+          refreshFiles();
+        }
       }
 
     } catch (e) {
@@ -289,6 +338,8 @@ export class Editor implements OnInit, OnDestroy {
     this.currentFilePathBase = this.stripFileExtension(fallbackArchivo.nombre);
     this.projectId = '';
     this.lspEnabled = false;
+    this.languageDisabled = false;
+    this.fallbackMode = true;
     this.cdr.detectChanges();
   }
 
@@ -316,52 +367,169 @@ export class Editor implements OnInit, OnDestroy {
   }
   async createFileInSelectedProject(): Promise<void> {
     const project = this.projects.find((item) => item.id === this.selectedProjectId);
-    if (!project || project.id < 0) return;
+    if (!project || project.id < 0) {
+      console.warn('[Editor] No se puede crear archivo: proyecto local o no seleccionado');
+      return;
+    }
+
+    const defaultName = this.defaultFileNameForLanguage(this.language);
+    const nombre = window.prompt('Nombre del archivo:', defaultName);
+    if (!nombre || !nombre.trim()) return;
+
+    const ext = nombre.substring(nombre.lastIndexOf('.'));
+    const validExts: Record<string, string[]> = {
+      cpp: ['.cpp', '.hpp', '.h', '.c', '.cc', '.cxx'],
+      python: ['.py', '.pyw'],
+      typescript: ['.ts', '.tsx'],
+    };
+    const valid = validExts[this.language] || validExts['cpp'];
+    if (ext && !valid.includes(ext.toLowerCase())) {
+      alert(`Extensión "${ext}" no válida para ${this.language}. Permitidas: ${valid.join(', ')}`);
+      return;
+    }
+
+    const existingNames = new Set((project.archivos ?? []).map((archivo) => archivo.nombre));
+    if (existingNames.has(nombre.trim())) {
+      alert(`Ya existe un archivo llamado "${nombre.trim()}" en este proyecto.`);
+      return;
+    }
 
     this.cacheCurrentRoomContent();
     await this.saveCurrentArchivo();
 
-    const existingNames = new Set((project.archivos ?? []).map((archivo) => archivo.nombre));
-    const baseName = this.defaultFileNameForLanguage(this.language);
-    const candidateNames = [
-      baseName,
-      `main-2${this.fileExtensionForLanguage(this.language)}`,
-      `main-3${this.fileExtensionForLanguage(this.language)}`,
-      `file-${Date.now()}${this.fileExtensionForLanguage(this.language)}`,
-    ];
-    const nombre = candidateNames.find((name) => !existingNames.has(name)) ?? `file-${Date.now()}${this.fileExtensionForLanguage(this.language)}`;
-
-    const archivo = await this.workspace.createArchivo(project.id, {
-      nombre,
-      contenido: this.defaultCodeForLanguage(this.language),
-    });
-
-    project.archivos = [...(project.archivos ?? []), archivo];
-    this.selectedArchivoId = archivo.id;
-    this.value = archivo.contenido;
-    this.currentFilePathBase = this.stripFileExtension(archivo.nombre);
-    this.projectId = String(project.id);
-    this.selectedRoom = `${project.id}:${archivo.id}`;
-    this.roomContentCache.set(this.selectedRoom, this.value);
-    this.lspEnabled = true;
-    this.cdr.detectChanges();
-
-    const { token, username, userId } = await this.auth.getCollabToken(project.id, archivo.id);
-    await this.connectCollab(token, username, userId);
-
-    // Notify other clients via project-level Y.Array if available
     try {
-      this.collab.pushProjectFile(project.id, { id: archivo.id, nombre: archivo.nombre });
-    } catch (e) {
-      // ignore if push fails
+      const archivo = await this.workspace.createArchivo(project.id, {
+        nombre: nombre.trim(),
+        contenido: this.defaultCodeForLanguage(this.language),
+      });
+
+      project.archivos = [...(project.archivos ?? []), archivo];
+      this.selectedArchivoId = archivo.id;
+      this.value = archivo.contenido;
+      this.currentFilePathBase = this.stripFileExtension(archivo.nombre);
+      this.projectId = String(project.id);
+      this.selectedRoom = `${project.id}:${archivo.id}`;
+      this.roomContentCache.set(this.selectedRoom, this.value);
+      this.lspEnabled = true;
+      this.cdr.detectChanges();
+
+      const { token, username, userId } = await this.auth.getCollabToken(project.id, archivo.id);
+      await this.connectCollab(token, username, userId);
+
+      try {
+        const pushed = this.collab.pushProjectFile(project.id, { id: archivo.id, nombre: archivo.nombre });
+        if (!pushed) {
+          console.warn('[Editor] No se pudo propagar archivo via Y.Array (proveedor de proyecto no conectado)');
+        }
+      } catch (e) {
+        // ignore if push fails
+      }
+    } catch (error: any) {
+      const message = error?.error?.detail
+        || error?.error?.nombre?.[0]
+        || error?.message
+        || 'No se pudo crear el archivo. Revise los logs del backend.';
+      console.error('[Editor] Error al crear archivo:', error);
+      alert(`Error al crear archivo:\n${message}`);
     }
   }
 
-  private async ensureDefaultArchivo(project: WorkspaceProyecto): Promise<WorkspaceArchivo> {
-    return this.workspace.createArchivo(project.id, {
-      nombre: this.defaultFileNameForLanguage(this.language),
-      contenido: this.defaultCodeForLanguage(this.language),
+  /** Activa el modo de edición inline para renombrar un archivo. */
+  startRename(archivo: WorkspaceArchivo): void {
+    this.renamingArchivoId = archivo.id;
+    this.renamingName = archivo.nombre;
+    setTimeout(() => {
+      const input = this.renameInputRef?.nativeElement;
+      if (input) {
+        const dotIndex = this.renamingName.lastIndexOf('.');
+        const cursorPos = dotIndex > 0 ? dotIndex : this.renamingName.length;
+        input.focus();
+        input.setSelectionRange(cursorPos, cursorPos);
+      }
     });
+  }
+
+  /** Cancela la edición inline sin guardar cambios. */
+  cancelRename(): void {
+    this.renamingArchivoId = null;
+    this.renamingName = '';
+  }
+
+  /** Guarda el nuevo nombre vía PATCH, actualiza estado local y notifica peers. */
+  async commitRename(archivoId: number): Promise<void> {
+    const project = this.projects.find((item) => item.id === this.selectedProjectId);
+    if (!project || project.id < 0) return;
+
+    const archivo = project.archivos?.find((a) => a.id === archivoId);
+    if (!archivo) return;
+
+    const newName = this.renamingName.trim();
+    if (!newName || newName === archivo.nombre) {
+      this.cancelRename();
+      return;
+    }
+
+    try {
+      const updated = await this.workspace.updateArchivo(project.id, archivoId, { nombre: newName });
+      archivo.nombre = updated.nombre;
+      if (this.selectedArchivoId === archivoId) {
+        this.currentFilePathBase = this.stripFileExtension(updated.nombre);
+        const oldRoom = this.selectedRoom;
+        this.selectedRoom = `${project.id}:${archivoId}`;
+        this.roomContentCache.delete(oldRoom);
+        this.roomContentCache.set(this.selectedRoom, this.value);
+        this.cdr.detectChanges();
+      }
+      this.collab.renameProjectFile(project.id, archivoId, newName);
+      this.cancelRename();
+    } catch (error: any) {
+      const message = error?.error?.nombre?.[0]
+        || error?.error?.detail
+        || error?.message
+        || 'No se pudo renombrar el archivo.';
+      alert(`Error al renombrar:\n${message}`);
+    }
+  }
+
+  /** Elimina un archivo con confirmación, ajusta selección y notifica peers.
+   * Si es el último archivo, el proyecto queda vacío (sin archivo seleccionado). */
+  async deleteArchivo(archivoId: number): Promise<void> {
+    const project = this.projects.find((item) => item.id === this.selectedProjectId);
+    if (!project || project.id < 0) return;
+    const archivo = project.archivos?.find((a) => a.id === archivoId);
+    if (!archivo) return;
+
+    if (!confirm(`¿Eliminar el archivo "${archivo.nombre}"?`)) return;
+
+    this.cacheCurrentRoomContent();
+    await this.saveCurrentArchivo();
+
+    try {
+      await this.workspace.deleteArchivo(project.id, archivoId);
+      project.archivos = (project.archivos ?? []).filter((a) => a.id !== archivoId);
+
+      if (this.selectedArchivoId === archivoId) {
+        this.collab.disconnect();
+        const remaining = project.archivos;
+        if (remaining.length > 0) {
+          await this.selectArchivo(remaining[0].id);
+        } else {
+          this.selectedArchivoId = null;
+          this.selectedRoom = '';
+          this.value = '';
+          this.lspEnabled = false;
+          this.roomContentCache.delete(`${project.id}:${archivoId}`);
+          this.cdr.detectChanges();
+        }
+      }
+
+      this.collab.deleteProjectFile(project.id, archivoId);
+    } catch (error: any) {
+      const message = error?.error?.detail
+        || error?.message
+        || 'No se pudo eliminar el archivo.';
+      alert(`Error al eliminar:\n${message}`);
+    }
   }
 
   private async connectCollab(token: string, username: string, userId: string): Promise<void> {
@@ -401,7 +569,7 @@ export class Editor implements OnInit, OnDestroy {
 
   private mapLanguageToProject(language: string): WorkspaceProyecto['lenguaje'] {
     if (language === 'python') return 'PYTHON';
-    if (language === 'typescript' || language === 'javascript') return 'TYPESCRIPT';
+    if (language === 'typescript') return 'TYPESCRIPT';
     return 'CPP';
   }
 
@@ -445,6 +613,14 @@ export class Editor implements OnInit, OnDestroy {
     }
 
     this.roomContentCache.set(this.selectedRoom, this.value);
+  }
+
+  /** Cierra sesión: guarda archivo actual, desconecta collab y redirige a /auth. */
+  onLogout(): void {
+    this.cacheCurrentRoomContent();
+    this.saveCurrentArchivo();
+    this.collab.disconnect();
+    this.auth.logout();
   }
 
   enviarEntrada(input: string): void {

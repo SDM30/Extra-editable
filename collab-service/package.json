@@ -9,7 +9,7 @@
     "dev": "node --watch src/server.js"
   },
   "dependencies": {
-    "@hocuspocus/server": "^2.13.4",
+    "@hocuspocus/server": "^2.14.6",
     "jsonwebtoken": "^9.0.2",
     "pg": "^8.20.0"
   }

@@ -68,9 +68,18 @@ echo -e "${YELLOW}[2/5] Verificando conexión a Redis...${NC}"
 if redis-cli ping >/dev/null 2>&1; then
     echo -e "${GREEN}✓ Redis responde PONG${NC}"
 else
-    echo -e "${RED}❌ Redis no responde en localhost:6379${NC}"
-    echo "   Levantar Redis: cd $PROJECT_DIR && docker compose up -d redis-lsp"
-    exit 1
+    echo -e "${YELLOW}⚠ Redis no responde en localhost:6379. Iniciando contenedor...${NC}"
+    docker rm -f redis-lsp 2>/dev/null || true
+    docker run -d --name redis-lsp --restart unless-stopped \
+        -p 6379:6379 redis:7-alpine \
+        redis-server --save "" --appendonly no --stop-writes-on-bgsave-error no
+    sleep 2
+    if redis-cli ping >/dev/null 2>&1; then
+        echo -e "${GREEN}✓ Redis iniciado y responde PONG${NC}"
+    else
+        echo -e "${RED}❌ No se pudo iniciar Redis${NC}"
+        exit 1
+    fi
 fi
 
 # ─── 3. Detener instancias previas si se fuerza ───

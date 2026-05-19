@@ -10,6 +10,7 @@
         id="language-selector"
         [ngModel]="language"
         (ngModelChange)="languageChange.emit($event)"
+        [disabled]="languageDisabled"
       >
         @for (lang of languageOptions; track lang.value) {
           <option [ngValue]="lang.value">{{ lang.label }}</option>
@@ -33,7 +34,8 @@
 
   <div class="header-right">
     <div class="status idle">● Idle</div>
-    <button class="run-button" (click)="onRunClick()">Run</button>
+    <button class="btn run" (click)="onRunClick()">Run</button>
     <button class="btn submit" type="button">Submit</button>
+    <button class="btn logout" type="button" (click)="onLogoutClick()">Salir</button>
   </div>
 </header>

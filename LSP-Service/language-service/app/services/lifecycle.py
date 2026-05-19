@@ -1,9 +1,12 @@
 # lifecycle.py
 # Se comunica con Docker para crear, iniciar y destruir contenedores LSP.
+# Soporta despliegue multi-máquina: los contenedores son "sticky" a la máquina
+# que los creó. Operaciones sobre contenedores remotos se forwardean via HTTP.
 import logging
 import os
 import time
 import docker
+import httpx
 from docker.errors import DockerException, ImageNotFound, APIError
 from app.services import registry
 
@@ -12,6 +15,34 @@ _client = None
 
 LANGUAGES = ["python", "cpp", "typescript"]
 LSPMUX_INTERNAL_PORT = 3000  # Puerto interno del contenedor
+
+
+def _get_local_host() -> str:
+    """Retorna el identificador de esta máquina (WS_PUBLIC_HOST)."""
+    return os.environ.get("WS_PUBLIC_HOST", "127.0.0.1")
+
+
+def _is_local(entry: dict) -> bool:
+    """True si el contenedor vive en el Docker daemon de esta máquina."""
+    if not entry:
+        return False
+    return entry.get("host", _get_local_host()) == _get_local_host()
+
+
+def _forward_destroy_to_host(host: str, project_id: str, language: str) -> bool:
+    """Reenvía la orden de destrucción a la máquina dueña del contenedor."""
+    port = os.environ.get("INTERNAL_API_PORT", "8135")
+    secret = os.environ.get("LSP_INTERNAL_SECRET", "")
+    url = f"http://{host}:{port}/lsp/{project_id}/_internal/destroy?language={language}"
+    headers = {}
+    if secret:
+        headers["X-LSP-Internal"] = secret
+    try:
+        resp = httpx.delete(url, headers=headers, timeout=10.0)
+        return resp.status_code == 200
+    except httpx.RequestError as e:
+        logger.error("Error forwardeando destroy a %s: %s", host, e)
+        return False
 
 def _get_client():
     global _client
@@ -25,17 +56,20 @@ def _get_client():
         raise RuntimeError(f"Docker no disponible: {e}")
 
 def create_container(project_id: str, language: str, max_clients: int = 4):
-    """Crea un contenedor LSP multiplexor para el proyecto."""
+    """Crea un contenedor LSP multiplexor para el proyecto.
+
+    Si el proyecto+lenguaje ya existe en otra máquina, retorna la entrada del
+    registry sin crear duplicados.  Si existe localmente pero el contenedor
+    Docker murió, lo recrea."""
     if language not in LANGUAGES:
         raise ValueError(f"Lenguaje no soportado: {language}. Usa: {LANGUAGES}")
 
-    ws_public_host = os.environ.get("WS_PUBLIC_HOST", "127.0.0.1")
+    ws_public_host = _get_local_host()
     idle_timeout = os.environ.get("CONTAINER_IDLE_TIMEOUT", "300000")
-
     client = _get_client()
 
-    # Recuperación: si el servicio reinició, el registry (en memoria) se pierde,
-    # pero el contenedor puede seguir existiendo. Detectarlo por labels.
+    # Recuperación: si el servicio reinició, el registry se perdió (caso
+    # anterior a Redis) pero el contenedor puede seguir existiendo localmente.
     try:
         found = client.containers.list(
             all=True,
@@ -61,7 +95,8 @@ def create_container(project_id: str, language: str, max_clients: int = 4):
                         container_id=container.id,
                         ws_port=host_port,
                         ws_url=ws_url,
-                        max_clients=int(container.labels.get("max_clients", max_clients))
+                        max_clients=int(container.labels.get("max_clients", max_clients)),
+                        host=ws_public_host,
                     )
                     logger.info(f"Contenedor existente detectado por labels: {container.id[:12]} - WS: {ws_url}")
                     return registry.get(project_id, language)
@@ -71,8 +106,15 @@ def create_container(project_id: str, language: str, max_clients: int = 4):
     except Exception as e:
         logger.warning(f"No se pudo recuperar contenedor por labels: {e}")
 
+    # Si ya existe entrada en registry, verificar si es local o remoto
     if registry.exists(project_id, language):
         existing = registry.get(project_id, language)
+        # Contenedor remoto: retornar tal cual (no podemos gestionarlo localmente)
+        if not _is_local(existing):
+            logger.info("Contenedor remoto existente para %s (%s) en %s",
+                        project_id, language, existing.get("host"))
+            return existing
+        # Contenedor local: verificar que el contenedor Docker siga vivo
         try:
             container = client.containers.get(existing["container_id"])
             if container.status == "running":
@@ -80,7 +122,7 @@ def create_container(project_id: str, language: str, max_clients: int = 4):
                 return existing
             else:
                 logger.warning(f"Contenedor existente para {project_id} ({language}) no está corriendo, recreando...")
-                destroy_container(project_id, language)
+                destroy_container_local(project_id, language)
         except Exception as e:
             logger.error(f"Error verificando contenedor existente: {e}")
             registry.remove(project_id, language)
@@ -95,7 +137,6 @@ def create_container(project_id: str, language: str, max_clients: int = 4):
     try:
         client.images.get(image)
     except ImageNotFound:
-        # Si no existe lsp-multiplexor, intentar con lsp-server
         try:
             image = "lsp-server:latest"
             client.images.get(image)
@@ -154,7 +195,8 @@ def create_container(project_id: str, language: str, max_clients: int = 4):
             container_id=container.id,
             ws_port=host_port,
             ws_url=ws_url,
-            max_clients=max_clients
+            max_clients=max_clients,
+            host=ws_public_host,
         )
         
         return registry.get(project_id, language)
@@ -165,7 +207,27 @@ def create_container(project_id: str, language: str, max_clients: int = 4):
 
 
 def destroy_container(project_id: str, language: str) -> bool:
-    """Destruye el contenedor LSP de un proyecto+lenguaje."""
+    """Destruye el contenedor LSP de un proyecto+lenguaje.
+
+    Si el contenedor pertenece a otra máquina, forwardea la operación a la
+    máquina dueña via HTTP.  Si es local, lo elimina directamente."""
+    entry = registry.get(project_id, language)
+    if not entry:
+        return False
+
+    if not _is_local(entry):
+        logger.info("Forwardeando destroy de %s/%s a %s",
+                    project_id, language, entry["host"])
+        return _forward_destroy_to_host(entry["host"], project_id, language)
+
+    return destroy_container_local(project_id, language)
+
+
+def destroy_container_local(project_id: str, language: str) -> bool:
+    """Destruye localmente un contenedor LSP (sin validación cross-machine).
+
+    Usado internamente por `destroy_container` y por el endpoint
+    `/_internal/destroy` que recibe requests forwardeados de otras máquinas."""
     entry = registry.get(project_id, language)
     if not entry:
         return False
@@ -182,10 +244,25 @@ def destroy_container(project_id: str, language: str) -> bool:
 
 
 def get_status(project_id: str, language: str) -> dict:
-    """Retorna el estado del contenedor LSP de un proyecto+lenguaje."""
+    """Retorna el estado del contenedor LSP de un proyecto+lenguaje.
+
+    Para contenedores remotos retorna la info del registry con status='remote'
+    ya que no puede consultar el Docker daemon de otra máquina."""
     entry = registry.get(project_id, language)
     if not entry:
         return {"status": "not_found"}
+
+    if not _is_local(entry):
+        return {
+            "project_id": project_id,
+            "container_id": entry.get("container_id", "")[:12],
+            "language": entry.get("language"),
+            "status": "remote",
+            "host": entry.get("host"),
+            "ws_url": entry.get("ws_url"),
+            "ws_port": entry.get("ws_port"),
+            "max_clients": entry.get("max_clients", 4)
+        }
 
     client = _get_client()
     try:
@@ -197,7 +274,8 @@ def get_status(project_id: str, language: str) -> dict:
             "status": container.status,
             "ws_url": entry.get("ws_url"),
             "ws_port": entry.get("ws_port"),
-            "max_clients": entry.get("max_clients", 4)
+            "max_clients": entry.get("max_clients", 4),
+            "host": entry.get("host"),
         }
     except Exception as e:
         return {
@@ -205,16 +283,22 @@ def get_status(project_id: str, language: str) -> dict:
             "container_id": entry["container_id"][:12],
             "language": entry["language"],
             "status": "error",
-            "error": str(e)
+            "error": str(e),
+            "host": entry.get("host"),
         }
 
 
 def get_container_logs(project_id: str, language: str, tail: int = 100) -> str:
-    """Obtiene los logs del contenedor para debugging."""
+    """Obtiene los logs del contenedor para debugging.
+
+    Para contenedores remotos forwardea la petición a la máquina dueña."""
     entry = registry.get(project_id, language)
     if not entry:
         return "Contenedor no encontrado"
-    
+
+    if not _is_local(entry):
+        return _forward_get_logs(entry["host"], project_id, language, tail)
+
     client = _get_client()
     try:
         container = client.containers.get(entry["container_id"])
@@ -222,3 +306,20 @@ def get_container_logs(project_id: str, language: str, tail: int = 100) -> str:
         return logs
     except Exception as e:
         return f"Error obteniendo logs: {e}"
+
+
+def _forward_get_logs(host: str, project_id: str, language: str, tail: int) -> str:
+    """Forwardea la petición de logs al host dueño del contenedor."""
+    port = os.environ.get("INTERNAL_API_PORT", "8135")
+    secret = os.environ.get("LSP_INTERNAL_SECRET", "")
+    url = f"http://{host}:{port}/lsp/{project_id}/logs?language={language}&tail={tail}"
+    headers = {}
+    if secret:
+        headers["X-LSP-Internal"] = secret
+    try:
+        resp = httpx.get(url, headers=headers, timeout=10.0)
+        if resp.status_code == 200:
+            return resp.json().get("logs", str(resp.content))
+        return f"Error forwardeando logs: HTTP {resp.status_code}"
+    except httpx.RequestError as e:
+        return f"Error forwardeando logs a {host}: {e}"

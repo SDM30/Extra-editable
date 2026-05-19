@@ -10,7 +10,7 @@ class Proyecto(models.Model):
 
     nombre = models.CharField(max_length=255)
     descripcion = models.TextField(blank=True)
-    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_creacion = models.DateTimeField(auto_now_add=True, db_column='fechaCreacion')
     lenguaje = models.CharField(max_length=10, choices=Lenguaje.choices)
     usuario = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -20,7 +20,7 @@ class Proyecto(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'proyectos'
+        db_table = 'projects_proyecto'
         ordering = ['-fecha_creacion']
         verbose_name = 'proyecto'
 
@@ -31,18 +31,17 @@ class Proyecto(models.Model):
 class Archivo(models.Model):
     nombre = models.CharField(max_length=255)
     contenido = models.TextField(blank=True)
-    ydoc = models.BinaryField(blank=True, null=True)  # estado binario Yjs (HocusPocus)
     proyecto = models.ForeignKey(
         Proyecto,
         on_delete=models.CASCADE,
         related_name='archivos'
     )
-    fecha_creacion = models.DateTimeField(auto_now_add=True)
-    fecha_actualizacion = models.DateTimeField(auto_now=True)
+    fecha_creacion = models.DateTimeField(auto_now_add=True, db_column='fechaCreacion')
+    fecha_actualizacion = models.DateTimeField(auto_now=True, db_column='fechaActualizacion')
 
     class Meta:
         managed = False
-        db_table = 'archivos'
+        db_table = 'projects_archivo'
         unique_together = ('proyecto', 'nombre')
         ordering = ['nombre']
         verbose_name = 'archivo'
@@ -72,3 +71,29 @@ class CollabSession(models.Model):
 
     def __str__(self):
         return f'CollabSession(project={self.proyecto_id}, user={self.usuario_id})'
+
+
+class ProyectoColaborador(models.Model):
+    """Registra qué usuarios pueden colaborar en un proyecto.
+    Creado al enviar `colaboradores: [id, ...]` en POST /api/projects/.
+    Usado por IsProjectOwner y collab_join para verificar acceso de escritura."""
+    proyecto = models.ForeignKey(
+        Proyecto,
+        on_delete=models.CASCADE,
+        related_name='colaboraciones'
+    )
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='colaboraciones'
+    )
+    fecha_agregado = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        managed = False
+        db_table = 'proyecto_colaboradores'
+        unique_together = ('proyecto', 'usuario')
+        ordering = ['fecha_agregado']
+
+    def __str__(self):
+        return f'{self.proyecto.nombre} <- {self.usuario.username}'

@@ -1,55 +1,42 @@
+# docker-compose.yml — Servicio de Lenguaje (LSP Management)
+#
+# Redis se ejecuta como contenedor independiente en la máquina del balanceador
+# de carga (ver lsp-load-balancer/install.sh). No se incluye en este compose.
 services:
   language-service:
     build: ./language-service
     labels:
       - "lsp.service=api"
       - "lsp.component=language-service"
+    # Puerto fijo por máquina: cada instancia escucha en su propio puerto.
+    # En single-machine con --scale se usan puertos dinámicos; en multi-machine
+    # cada máquina expone exactamente un puerto fijo (default 8135).
     ports:
-      - "8135"
+      - "${PORT:-8135}:8135"
     environment:
-      - HOST_IP=${HOST_IP:-127.0.0.1}
-      - WS_PUBLIC_HOST=${HOST_IP:-127.0.0.1}
+      - WS_PUBLIC_HOST=${WS_PUBLIC_HOST:-127.0.0.1}
       - PROJECTS_DIR=/home/projects
-      - CONTAINER_IDLE_TIMEOUT=300000
+      - CONTAINER_IDLE_TIMEOUT=${CONTAINER_IDLE_TIMEOUT:-300000}
       - MAX_CLIENTS_PER_CONTAINER=4
-      - REDIS_HOST=redis-lsp
-      - REDIS_PORT=6379
-      - REDIS_DB=0
+      # Redis: host externo (IP de la máquina que corre Redis, configurado en .env)
+      - REDIS_HOST=${REDIS_HOST:-127.0.0.1}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_DB=${REDIS_DB:-0}
+      # Secreto para comunicación interna entre instancias (cross-machine).
+      # En redes privadas puede dejarse vacío. En producción, configurar.
+      - LSP_INTERNAL_SECRET=${LSP_INTERNAL_SECRET:-}
+      - PORT=${PORT:-8135}
     volumes:
+      # Docker socket: necesario para crear/destruir contenedores LSP.
       - /var/run/docker.sock:/var/run/docker.sock
-      - projects_data:/home/projects
+      # Proyectos: bind mount directo al host. En multi-machine este path
+      # debe ser un montaje NFS compartido entre todas las máquinas.
+      - /home/projects:/home/projects
+      # Hot-reload del código fuente (solo desarrollo).
       - ./language-service:/app
     networks:
       - lsp-network
-    depends_on:
-      redis-lsp:
-        condition: service_healthy
     restart: unless-stopped
-
-  redis-lsp:
-    image: redis:7-alpine
-    container_name: redis-lsp
-    ports:
-      - "6379:6379"
-    command: >
-      redis-server
-      --save ""
-      --appendonly no
-      --stop-writes-on-bgsave-error no
-    volumes:
-      - redis_data:/data
-    networks:
-      - lsp-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-
-volumes:
-  projects_data:
-  redis_data:
 
 networks:
   lsp-network:

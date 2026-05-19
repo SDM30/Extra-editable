@@ -4,14 +4,21 @@
     [themeOptions]="themeOptions"
     [language]="language"
     [languageOptions]="languageOptions"
+    [languageDisabled]="languageDisabled"
     (themeChange)="theme = $event"
     (languageChange)="onLanguageChange($event)"
     (runCode)="ejecutarCodigo()"
+    (logout)="onLogout()"
   >
   </app-header>
 
   <div class="editor-workspace">
     <aside class="workspace-sidebar">
+      @if (fallbackMode) {
+        <div class="fallback-banner">
+          <span>Modo sin conexión — la creación y sincronización de archivos no está disponible</span>
+        </div>
+      }
       <div class="sidebar-section">
         <div class="sidebar-title">Proyectos</div>
         <div class="project-list">
@@ -39,14 +46,37 @@
             @for (project of projects; track project.id) {
               @if (project.id === selectedProjectId) {
                 @for (archivo of project.archivos; track archivo.id) {
-                  <button
-                    type="button"
-                    class="file-item"
-                    [class.active]="archivo.id === selectedArchivoId"
-                    (click)="selectArchivo(archivo.id)"
-                  >
-                    {{ archivo.nombre }}
-                  </button>
+                  <div class="file-item-row" [class.active]="archivo.id === selectedArchivoId">
+                    @if (renamingArchivoId === archivo.id) {
+                      <input
+                        #renameInput
+                        class="file-rename-input"
+                        [ngModel]="renamingName"
+                        (ngModelChange)="renamingName = $event"
+                        (keydown.enter)="commitRename(archivo.id)"
+                        (keydown.escape)="cancelRename()"
+                        (blur)="commitRename(archivo.id)"
+                        (click)="$event.stopPropagation()"
+                      />
+                      <button class="action-btn confirm-btn" title="Guardar" (click)="commitRename(archivo.id); $event.stopPropagation()">&#10003;</button>
+                      <button class="action-btn cancel-btn" title="Cancelar" (click)="cancelRename(); $event.stopPropagation()">&#10007;</button>
+                    } @else {
+                      <button
+                        type="button"
+                        class="file-item"
+                        [class.active]="archivo.id === selectedArchivoId"
+                        (click)="selectArchivo(archivo.id)"
+                      >
+                        {{ archivo.nombre }}
+                      </button>
+                      @if (selectedProjectId && selectedProjectId > 0) {
+                        <div class="file-actions">
+                          <button class="action-btn edit-btn" title="Renombrar" (click)="startRename(archivo); $event.stopPropagation()">&#9998;</button>
+                          <button class="action-btn delete-btn" title="Eliminar" (click)="deleteArchivo(archivo.id); $event.stopPropagation()">&times;</button>
+                        </div>
+                      }
+                    }
+                  </div>
                 }
               }
             }
@@ -68,23 +98,29 @@
         </div>
       }
 
-      <app-code-section
-        [value]="value"
-        (valueChange)="onEditorValueChange($event)"
-        [theme]="theme"
-        [language]="language"
-        [projectId]="projectId"
-        [room]="selectedRoom"
-        [filePath]="currentFilePathBase"
-        [lspEnabled]="lspEnabled"
-        [resultado]="resultado"
-        [resultadoOk]="resultadoOk"
-        [cargando]="cargando"
-        [terminalHeight]="terminalHeight"
-        (resizeStart)="startResize($event)"
-        (inputSend)="enviarEntrada($event)"
-      >
-      </app-code-section>
+      @if (selectedArchivoId === null && selectedProjectId !== null && selectedProjectId > 0) {
+        <div class="empty-project-message">
+          No hay archivos en este proyecto. Use "+ Nuevo" para crear uno.
+        </div>
+      } @else {
+        <app-code-section
+          [value]="value"
+          (valueChange)="onEditorValueChange($event)"
+          [theme]="theme"
+          [language]="language"
+          [projectId]="projectId"
+          [room]="selectedRoom"
+          [filePath]="currentFilePathBase"
+          [lspEnabled]="lspEnabled"
+          [resultado]="resultado"
+          [resultadoOk]="resultadoOk"
+          [cargando]="cargando"
+          [terminalHeight]="terminalHeight"
+          (resizeStart)="startResize($event)"
+          (inputSend)="enviarEntrada($event)"
+        >
+        </app-code-section>
+      }
     </section>
   </div>
 </div>

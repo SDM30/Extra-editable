@@ -1,8 +1,8 @@
 #!/bin/bash
-# discover-and-create.sh
-# Descubre las instancias del API y crea contenedores en cada una
+# discover-dev.sh
+# Descubre las instancias del API (via docker compose) y crea contenedores LSP en cada una
 # 
-# Uso: ./discover-and-create.sh [opciones]
+# Uso: ./discover-dev.sh [opciones]
 
 set -e
 
@@ -22,7 +22,7 @@ discover_ports() {
 # Si no hay docker, usar puertos por defecto
 if ! command -v docker &>/dev/null; then
     echo "Docker no disponible. Especifica puertos manualmente."
-    echo "Uso: ./create-lsp-containers.sh <puerto1> <puerto2> ..."
+    echo "Uso: ./create-lsp-dev.sh <puerto1> <puerto2> ..."
     exit 1
 fi
 
@@ -40,7 +40,7 @@ echo ""
 
 # Llamar al script principal con los puertos descubiertos
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-"${SCRIPT_DIR}/create-lsp-containers.sh" \
+"${SCRIPT_DIR}/create-lsp-dev.sh" \
     -l "$LANGUAGE" \
     -c "$MAX_CLIENTS" \
     -p "$BASE_PROJECT_NAME" \
