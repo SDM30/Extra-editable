@@ -31,13 +31,11 @@ const pool: Record<Language, LanguagePool> = {
 function getImage(language: Language): string {
 	switch (language) {
 		case 'cpp':
-			return 'gcc:13';
+			return 'secure-cpp-runner:latest';
 		case 'python':
-			return 'python:3.12-slim';
+			return 'secure-python-runner:latest';
 		case 'typescript':
-			return 'node-ts-runner';
-		default:
-			throw new Error('Lenguaje no soportado');
+			return 'secure-typescript-runner:latest';
 	}
 }
 
