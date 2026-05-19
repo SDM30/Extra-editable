@@ -384,24 +384,5 @@ npm install yjs @hocuspocus/provider ws
 
 ---
 
-## Cronograma de implementación sugerido (2 semanas)
-
-| Día | Tarea |
-|-----|-------|
-| 1 | `smoke.sh` + `test_auth.py` (simples, validan que el entorno funciona) |
-| 2 | `utils/lsp_ws_client.py` (cliente LSP reutilizable) |
-| 3 | `test_lsp_rest.py` (CRUD de contenedores vía balanceador) |
-| 4 | `test_lsp_ws.py` (protocolo LSP: initialize, completion, hover, diagnostics) |
-| 5 | `test_lsp_lifecycle.py` (idle timeout 30s, max_clients, multiplexing) |
-| 6 | `test_execution.py` (ejecución básica Python/C++/TS) |
-| 7 | `utils/collab_ws_client.py` (cliente Hocuspocus/Yjs reutilizable) |
-| 8 | `test_collab_ws.py` (conexión, edición concurrente, awareness, límite 4) |
-| 9 | `test_collab_filesync.py` (Y.Array propagación de archivos) |
-| 10 | `test_lb.py` (balanceadores LSP + collab, failover) |
-| 11 | `test_resilience.py` (caída total + auto-recovery) |
-| 12 | `availability.py` (health polling + carga Playwright, reporte JSON) |
-| 13 | Integración, CI/CD, documentación de resultados |
-
----
 
 *Documento generado a partir del análisis del código fuente del repositorio — Plan de Pruebas v3.0*
