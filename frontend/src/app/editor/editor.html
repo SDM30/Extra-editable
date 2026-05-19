@@ -49,6 +49,7 @@
                   <div class="file-item-row" [class.active]="archivo.id === selectedArchivoId">
                     @if (renamingArchivoId === archivo.id) {
                       <input
+                        #renameInput
                         class="file-rename-input"
                         [ngModel]="renamingName"
                         (ngModelChange)="renamingName = $event"

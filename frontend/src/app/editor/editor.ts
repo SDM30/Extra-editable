@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { finalize, timeout } from 'rxjs';
@@ -65,6 +65,7 @@ export class Editor implements OnInit, OnDestroy {
   renamingArchivoId: number | null = null;
   renamingName = '';
   terminalHeight: number = 220;
+  @ViewChild('renameInput') renameInputRef?: ElementRef<HTMLInputElement>;
   collaborators: Array<{ userId: string; username: string; color: string }> = [];
   private collaboratorsSub?: Subscription;
   private selectionRequestId = 0;
@@ -364,22 +365,34 @@ export class Editor implements OnInit, OnDestroy {
       return;
     }
 
+    const defaultName = this.defaultFileNameForLanguage(this.language);
+    const nombre = window.prompt('Nombre del archivo:', defaultName);
+    if (!nombre || !nombre.trim()) return;
+
+    const ext = nombre.substring(nombre.lastIndexOf('.'));
+    const validExts: Record<string, string[]> = {
+      cpp: ['.cpp', '.hpp', '.h', '.c', '.cc', '.cxx'],
+      python: ['.py', '.pyw'],
+      typescript: ['.ts', '.tsx'],
+    };
+    const valid = validExts[this.language] || validExts['cpp'];
+    if (ext && !valid.includes(ext.toLowerCase())) {
+      alert(`Extensión "${ext}" no válida para ${this.language}. Permitidas: ${valid.join(', ')}`);
+      return;
+    }
+
+    const existingNames = new Set((project.archivos ?? []).map((archivo) => archivo.nombre));
+    if (existingNames.has(nombre.trim())) {
+      alert(`Ya existe un archivo llamado "${nombre.trim()}" en este proyecto.`);
+      return;
+    }
+
     this.cacheCurrentRoomContent();
     await this.saveCurrentArchivo();
 
-    const existingNames = new Set((project.archivos ?? []).map((archivo) => archivo.nombre));
-    const baseName = this.defaultFileNameForLanguage(this.language);
-    const candidateNames = [
-      baseName,
-      `main-2${this.fileExtensionForLanguage(this.language)}`,
-      `main-3${this.fileExtensionForLanguage(this.language)}`,
-      `file-${Date.now()}${this.fileExtensionForLanguage(this.language)}`,
-    ];
-    const nombre = candidateNames.find((name) => !existingNames.has(name)) ?? `file-${Date.now()}${this.fileExtensionForLanguage(this.language)}`;
-
     try {
       const archivo = await this.workspace.createArchivo(project.id, {
-        nombre,
+        nombre: nombre.trim(),
         contenido: this.defaultCodeForLanguage(this.language),
       });
 
@@ -396,7 +409,6 @@ export class Editor implements OnInit, OnDestroy {
       const { token, username, userId } = await this.auth.getCollabToken(project.id, archivo.id);
       await this.connectCollab(token, username, userId);
 
-      // Notify other clients via project-level Y.Array if available
       try {
         this.collab.pushProjectFile(project.id, { id: archivo.id, nombre: archivo.nombre });
       } catch (e) {
@@ -416,6 +428,15 @@ export class Editor implements OnInit, OnDestroy {
   startRename(archivo: WorkspaceArchivo): void {
     this.renamingArchivoId = archivo.id;
     this.renamingName = archivo.nombre;
+    setTimeout(() => {
+      const input = this.renameInputRef?.nativeElement;
+      if (input) {
+        const dotIndex = this.renamingName.lastIndexOf('.');
+        const cursorPos = dotIndex > 0 ? dotIndex : this.renamingName.length;
+        input.focus();
+        input.setSelectionRange(cursorPos, cursorPos);
+      }
+    });
   }
 
   /** Cancela la edición inline sin guardar cambios. */

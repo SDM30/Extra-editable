@@ -100,3 +100,154 @@ Not Found: /lsp/8
 [18/May/2026 18:52:08] "GET /api/projects/8/ HTTP/1.1" 200 896
 [18/May/2026 18:52:08] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
 [18/May/2026 18:52:08] "GET /api/projects/8/ HTTP/1.1" 200 896
+[18/May/2026 18:55:50] "PATCH /api/projects/8/archivos/14/ HTTP/1.1" 200 260
+[18/May/2026 18:55:50] "GET /api/projects/8/ HTTP/1.1" 200 895
+[18/May/2026 18:55:50] "GET /api/projects/8/ HTTP/1.1" 200 895
+[18/May/2026 19:11:46] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[18/May/2026 19:11:47] "GET /api/projects/8/ HTTP/1.1" 200 895
+[18/May/2026 19:11:47] "OPTIONS /api/auth/me/ HTTP/1.1" 200 0
+[18/May/2026 19:11:47] "GET /api/auth/me/ HTTP/1.1" 200 154
+[18/May/2026 19:11:47] "OPTIONS /api/projects/8/collab/join/ HTTP/1.1" 200 0
+[18/May/2026 19:11:47] "POST /api/projects/8/collab/join/ HTTP/1.1" 200 184
+[18/May/2026 19:11:47] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[18/May/2026 19:11:47,314] - Broken pipe from ('172.17.0.2', 36298)
+[18/May/2026 19:11:47] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[18/May/2026 19:11:47] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[18/May/2026 19:11:47] "GET /api/auth/me/ HTTP/1.1" 200 154
+[18/May/2026 19:11:47] "POST /api/projects/8/collab/join/ HTTP/1.1" 200 191
+[18/May/2026 19:11:47] "OPTIONS /lsp/8 HTTP/1.1" 200 0
+Not Found: /lsp/8
+[18/May/2026 19:11:47] "POST /lsp/8 HTTP/1.1" 404 2306
+[18/May/2026 19:11:47] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[18/May/2026 19:11:47,580] - Broken pipe from ('172.17.0.2', 36332)
+[18/May/2026 19:11:48] "GET /api/projects/8/ HTTP/1.1" 200 895
+[18/May/2026 19:11:48] "GET /api/auth/me/ HTTP/1.1" 200 148
+[18/May/2026 19:11:48] "POST /api/projects/8/collab/join/ HTTP/1.1" 200 182
+[18/May/2026 19:11:48] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[18/May/2026 19:11:48] "GET /api/auth/me/ HTTP/1.1" 200 148
+[18/May/2026 19:11:48] "POST /api/projects/8/collab/join/ HTTP/1.1" 200 189
+[18/May/2026 19:11:48] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+Not Found: /lsp/8
+[18/May/2026 19:11:49] "POST /lsp/8 HTTP/1.1" 404 2306
+[18/May/2026 19:12:26] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[18/May/2026 19:12:26] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[18/May/2026 19:12:26,278] - Broken pipe from ('172.17.0.2', 46396)
+[18/May/2026 19:12:26] "GET /api/projects/8/ HTTP/1.1" 200 895
+[18/May/2026 19:12:26] "GET /api/auth/me/ HTTP/1.1" 200 154
+[18/May/2026 19:12:26] "POST /api/projects/8/collab/join/ HTTP/1.1" 200 184
+[18/May/2026 19:12:27] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[18/May/2026 19:12:27,030] - Broken pipe from ('172.17.0.2', 46406)
+[18/May/2026 19:12:27] "GET /api/auth/me/ HTTP/1.1" 200 154
+[18/May/2026 19:12:27] "POST /api/projects/8/collab/join/ HTTP/1.1" 200 191
+[18/May/2026 19:12:27] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[18/May/2026 19:12:27,161] - Broken pipe from ('172.17.0.2', 46410)
+Not Found: /lsp/8
+[18/May/2026 19:12:27] "POST /lsp/8 HTTP/1.1" 404 2306
+[18/May/2026 19:12:27] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[18/May/2026 19:12:27,206] - Broken pipe from ('172.17.0.2', 46424)
+[18/May/2026 19:12:27] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[18/May/2026 19:12:28] "GET /api/projects/8/ HTTP/1.1" 200 895
+[18/May/2026 19:12:28] "GET /api/auth/me/ HTTP/1.1" 200 148
+[18/May/2026 19:12:28] "POST /api/projects/8/collab/join/ HTTP/1.1" 200 182
+[18/May/2026 19:12:28] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[18/May/2026 19:12:28] "GET /api/auth/me/ HTTP/1.1" 200 148
+[18/May/2026 19:12:28] "POST /api/projects/8/collab/join/ HTTP/1.1" 200 189
+[18/May/2026 19:12:28] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[18/May/2026 19:12:28,441] - Broken pipe from ('172.17.0.2', 46460)
+Not Found: /lsp/8
+[18/May/2026 19:12:29] "POST /lsp/8 HTTP/1.1" 404 2306
+[18/May/2026 19:12:39] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[18/May/2026 19:12:40] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[18/May/2026 19:12:40] "GET /api/projects/8/ HTTP/1.1" 200 895
+[18/May/2026 19:12:40] "GET /api/auth/me/ HTTP/1.1" 200 154
+[18/May/2026 19:12:40] "POST /api/projects/8/collab/join/ HTTP/1.1" 200 184
+[18/May/2026 19:12:40] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[18/May/2026 19:12:40] "GET /api/auth/me/ HTTP/1.1" 200 154
+[18/May/2026 19:12:40] "POST /api/projects/8/collab/join/ HTTP/1.1" 200 191
+[18/May/2026 19:12:40] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[18/May/2026 19:12:40,840] - Broken pipe from ('172.17.0.2', 47782)
+[18/May/2026 19:12:40] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+Not Found: /lsp/8
+[18/May/2026 19:12:40] "POST /lsp/8 HTTP/1.1" 404 2306
+[18/May/2026 19:12:40] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[18/May/2026 19:12:40,939] - Broken pipe from ('172.17.0.2', 47808)
+[18/May/2026 19:12:42] "GET /api/projects/8/ HTTP/1.1" 200 895
+[18/May/2026 19:12:42] "GET /api/auth/me/ HTTP/1.1" 200 148
+[18/May/2026 19:12:42] "POST /api/projects/8/collab/join/ HTTP/1.1" 200 182
+[18/May/2026 19:12:42] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[18/May/2026 19:12:42,073] - Broken pipe from ('172.17.0.2', 47810)
+[18/May/2026 19:12:42] "GET /api/auth/me/ HTTP/1.1" 200 148
+[18/May/2026 19:12:42] "POST /api/projects/8/collab/join/ HTTP/1.1" 200 189
+[18/May/2026 19:12:42] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[18/May/2026 19:12:42,132] - Broken pipe from ('172.17.0.2', 47816)
+Not Found: /lsp/8
+[18/May/2026 19:12:44] "POST /lsp/8 HTTP/1.1" 404 2306
+Not Found: /lsp/8
+[18/May/2026 19:12:49] "POST /lsp/8 HTTP/1.1" 404 2306
+Not Found: /lsp/8
+[18/May/2026 19:12:50] "POST /lsp/8 HTTP/1.1" 404 2306
+[18/May/2026 19:53:37] "OPTIONS /api/projects/8/archivos/ HTTP/1.1" 200 0
+Unauthorized: /api/projects/8/archivos/
+[18/May/2026 19:53:37] "POST /api/projects/8/archivos/ HTTP/1.1" 401 203
+[18/May/2026 19:53:42] "OPTIONS /api/auth/me/ HTTP/1.1" 200 0
+Unauthorized: /api/auth/me/
+[18/May/2026 19:53:42] "GET /api/auth/me/ HTTP/1.1" 401 203
+[18/May/2026 19:53:42] "OPTIONS /api/projects/8/collab/join/ HTTP/1.1" 200 0
+Unauthorized: /api/projects/8/collab/join/
+[18/May/2026 19:53:42] "POST /api/projects/8/collab/join/ HTTP/1.1" 401 203
+Unauthorized: /api/auth/me/
+[18/May/2026 19:53:42] "GET /api/auth/me/ HTTP/1.1" 401 203
+Unauthorized: /api/projects/8/collab/join/
+[18/May/2026 19:53:42] "POST /api/projects/8/collab/join/ HTTP/1.1" 401 203
+Unauthorized: /api/projects/8/archivos/
+[18/May/2026 19:53:48] "POST /api/projects/8/archivos/ HTTP/1.1" 401 203
+[18/May/2026 19:53:53] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[18/May/2026 19:53:53] "OPTIONS /api/projects/8/ HTTP/1.1" 200 0
+Unauthorized: /api/projects/8/
+[18/May/2026 19:53:53] "GET /api/projects/8/ HTTP/1.1" 401 203
+[18/May/2026 19:54:09] "OPTIONS /api/auth/login/ HTTP/1.1" 200 0
+Unauthorized: /api/auth/login/
+[18/May/2026 19:54:09] "POST /api/auth/login/ HTTP/1.1" 401 71
+[18/May/2026 19:54:18] "POST /api/auth/login/ HTTP/1.1" 200 483
+[18/May/2026 19:54:18] "OPTIONS /api/projects/ HTTP/1.1" 200 0
+[18/May/2026 19:54:18] "GET /api/projects/ HTTP/1.1" 200 276
+[18/May/2026 19:54:20] "GET /api/projects/8/ HTTP/1.1" 200 895
+[18/May/2026 19:54:20] "GET /api/auth/me/ HTTP/1.1" 200 154
+[18/May/2026 19:54:20] "POST /api/projects/8/collab/join/ HTTP/1.1" 200 184
+[18/May/2026 19:54:20] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[18/May/2026 19:54:20,720] - Broken pipe from ('172.17.0.2', 60378)
+[18/May/2026 19:54:20] "GET /api/auth/me/ HTTP/1.1" 200 154
+[18/May/2026 19:54:20] "POST /api/projects/8/collab/join/ HTTP/1.1" 200 191
+[18/May/2026 19:54:20] "OPTIONS /lsp/8 HTTP/1.1" 200 0
+[18/May/2026 19:54:20] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+Not Found: /lsp/8
+[18/May/2026 19:54:20] "POST /lsp/8 HTTP/1.1" 404 2306
+[18/May/2026 19:54:27] "POST /api/projects/8/archivos/ HTTP/1.1" 201 251
+[18/May/2026 19:54:27] "GET /api/auth/me/ HTTP/1.1" 200 154
+[18/May/2026 19:54:27] "POST /api/projects/8/collab/join/ HTTP/1.1" 200 191
+[18/May/2026 19:54:27] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[18/May/2026 19:54:27] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+Unauthorized: /api/projects/8/
+[18/May/2026 19:54:27] "GET /api/projects/8/ HTTP/1.1" 200 1147
+[18/May/2026 19:54:27] "GET /api/projects/8/ HTTP/1.1" 401 203
+[18/May/2026 19:54:30] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+Unauthorized: /api/projects/8/
+[18/May/2026 19:54:30] "GET /api/projects/8/ HTTP/1.1" 401 203
+[18/May/2026 19:54:53] "POST /api/auth/login/ HTTP/1.1" 200 483
+[18/May/2026 19:54:53] "GET /api/projects/ HTTP/1.1" 200 276
+[18/May/2026 19:54:55] "GET /api/projects/8/ HTTP/1.1" 200 1147
+[18/May/2026 19:54:55] "GET /api/auth/me/ HTTP/1.1" 200 148
+[18/May/2026 19:54:55] "POST /api/projects/8/collab/join/ HTTP/1.1" 200 182
+[18/May/2026 19:54:55] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[18/May/2026 19:54:55] "GET /api/auth/me/ HTTP/1.1" 200 148
+[18/May/2026 19:54:55] "POST /api/projects/8/collab/join/ HTTP/1.1" 200 189
+Not Found: /lsp/8
+[18/May/2026 19:54:55] "POST /lsp/8 HTTP/1.1" 404 2306
+[18/May/2026 19:54:55] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[18/May/2026 19:54:55,521] - Broken pipe from ('172.17.0.2', 56234)
+[18/May/2026 19:54:56] "GET /api/auth/me/ HTTP/1.1" 200 148
+[18/May/2026 19:54:56] "POST /api/projects/8/collab/join/ HTTP/1.1" 200 189
+[18/May/2026 19:54:56] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[18/May/2026 19:54:56,707] - Broken pipe from ('172.17.0.2', 56244)
+[18/May/2026 19:54:56] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[18/May/2026 19:54:56,723] - Broken pipe from ('172.17.0.2', 56252)
