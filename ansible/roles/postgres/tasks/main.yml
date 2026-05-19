@@ -1,0 +1,56 @@
+---
+# Role: postgres — Instalar y configurar PostgreSQL en David (main_node)
+
+- name: Instalar PostgreSQL y python3-psycopg2
+  apt:
+    name:
+      - postgresql
+      - postgresql-contrib
+      - python3-psycopg2
+    state: present
+    update_cache: yes
+
+- name: Habilitar y arrancar PostgreSQL
+  systemd:
+    name: postgresql
+    enabled: yes
+    state: started
+
+- name: Abrir puerto PostgreSQL en UFW (solo loopback)
+  ufw:
+    rule: allow
+    port: "{{ db_port }}"
+    proto: tcp
+    from_ip: "127.0.0.1"
+
+- name: Eliminar base de datos si existe
+  postgresql_db:
+    name: "{{ db_name }}"
+    state: absent
+  become_user: postgres
+
+- name: Eliminar usuario si existe
+  postgresql_user:
+    name: "{{ db_user }}"
+    state: absent
+  become_user: postgres
+
+- name: Crear usuario de base de datos
+  postgresql_user:
+    name: "{{ db_user }}"
+    password: "{{ db_password }}"
+    state: present
+  become_user: postgres
+
+- name: Crear base de datos
+  postgresql_db:
+    name: "{{ db_name }}"
+    owner: "{{ db_user }}"
+    state: present
+  become_user: postgres
+
+- name: Aplicar esquema SQL inicial
+  command: >
+    psql -U postgres -d {{ db_name }}
+    -f {{ project_dir }}/backend/db/esquema.sql
+  become_user: postgres

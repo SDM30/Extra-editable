@@ -29,49 +29,55 @@
   roles:
     - python
 
-# ── 5. Backend (David) ──
+# ── 5. PostgreSQL (David) ──
+- name: Instalar y configurar PostgreSQL
+  hosts: main_node
+  roles:
+    - postgres
+
+# ── 6. Backend (David) ──
 - name: Deploy Backend Django
   hosts: main_node
   roles:
     - backend
 
-# ── 6. Collab Service ×3 (Melissa) ──
+# ── 7. Collab Service ×3 (Melissa) ──
 - name: Deploy Collab Service
   hosts: collab_servers
   roles:
     - collab
 
-# ── 7. Collab Load Balancer (David) ──
+# ── 8. Collab Load Balancer (David) ──
 - name: Deploy Collab Load Balancer
   hosts: main_node
   roles:
     - collab_lb
 
-# ── 8. Code Execution (Chitiva) ──
+# ── 9. Code Execution (Chitiva) ──
 - name: Deploy Code Execution Service
   hosts: code_execution_servers
   roles:
     - code_execution
 
-# ── 9. LSP Service (Gabriel + Simon) ──
+# ── 10. LSP Service (Gabriel + Simon) ──
 - name: Deploy LSP Service
   hosts: lsp_servers
   roles:
     - lsp_service
 
-# ── 10. LSP Load Balancer (Campos) ──
+# ── 11. LSP Load Balancer (Campos) ──
 - name: Deploy LSP Load Balancer
   hosts: lsp_balancer_servers
   roles:
     - lsp_balancer
 
-# ── 11. API Gateway (David — último, después de que los servicios estén arriba) ──
+# ── 12. API Gateway (David — último, después de que los servicios estén arriba) ──
 - name: Deploy API Gateway
   hosts: main_node
   roles:
     - gateway
 
-# ── 12. Frontend (David — último) ──
+# ── 13. Frontend (David — último) ──
 - name: Deploy Frontend Angular
   hosts: main_node
   roles:
