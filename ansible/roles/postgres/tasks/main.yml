@@ -37,10 +37,15 @@
     state: absent
   become_user: postgres
 
+- name: Revocar privilegios del usuario antes de eliminarlo
+  command: >
+    psql -U postgres -c "DROP OWNED BY \"{{ db_user }}\";"
+  become_user: postgres
+  ignore_errors: true
+
 - name: Eliminar usuario si existe
-  postgresql_user:
-    name: "{{ db_user }}"
-    state: absent
+  command: >
+    psql -U postgres -c "DROP USER IF EXISTS \"{{ db_user }}\";"
   become_user: postgres
 
 - name: Crear usuario de base de datos
