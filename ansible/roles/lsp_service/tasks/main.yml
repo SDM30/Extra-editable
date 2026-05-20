@@ -22,6 +22,14 @@
     chdir: "{{ project_dir }}/LSP-Service"
   become_user: estudiante
 
+- name: Iniciar contenedor Redis para LSP
+  shell: |
+    docker start redis-lsp 2>/dev/null || \
+    docker run -d --name redis-lsp --restart unless-stopped \
+      -p 6379:6379 redis:7-alpine \
+      redis-server --save "" --appendonly no --stop-writes-on-bgsave-error no
+  changed_when: false
+
 - name: Esperar a que Redis esté saludable
   command: docker exec redis-lsp redis-cli ping
   register: redis_ping
@@ -31,7 +39,7 @@
   changed_when: false
 
 - name: Ejecutar discover-and-create para contenedores LSP
-  command: bash discover-and-create.sh
+  command: bash discover-dev.sh
   args:
     chdir: "{{ project_dir }}/LSP-Service"
   become_user: estudiante

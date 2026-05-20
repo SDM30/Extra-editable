@@ -17,8 +17,10 @@
   notify: restart gateway
 
 - name: Detener contenedor gateway previo
-  command: docker rm -f api-gateway
-  ignore_errors: yes
+  shell: |
+    docker rm -f api-gateway 2>/dev/null || true
+    old=$(docker ps -q --filter "publish={{ gateway_port }}")
+    [ -n "$old" ] && docker stop $old && docker rm $old || true
   changed_when: false
 
 - name: Levantar contenedor API Gateway
