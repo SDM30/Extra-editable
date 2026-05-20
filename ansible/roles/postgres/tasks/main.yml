@@ -42,11 +42,13 @@
     psql -U postgres -c "DROP OWNED BY \"{{ db_user }}\";"
   become_user: postgres
   ignore_errors: true
+  when: db_user != 'postgres'
 
 - name: Eliminar usuario si existe
   command: >
     psql -U postgres -c "DROP USER IF EXISTS \"{{ db_user }}\";"
   become_user: postgres
+  when: db_user != 'postgres'
 
 - name: Crear usuario de base de datos
   postgresql_user:
