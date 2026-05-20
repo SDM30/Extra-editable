@@ -22,7 +22,7 @@ styles.css          | styles              | 236 bytes |
 Lazy chunk files    | Names               |  Raw size
 chunk-3TXSLBCY.js   | auth-wrap-component |  47.29 kB | 
 
-Application bundle generation complete. [4.137 seconds] - 2026-05-20T19:04:56.314Z
+Application bundle generation complete. [4.967 seconds] - 2026-05-20T20:48:19.094Z
 
 Watch mode enabled. Watching for file changes...
 NOTE: Raw file sizes do not reflect development server per-request transformations.

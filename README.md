@@ -265,3 +265,14 @@ Frontend → POST /auth/login/ → access_token
 - **Watcher recarga nginx del contenedor**: usa `docker exec lsp-lb nginx -s reload` en lugar de requerir nginx instalado en el host.
 - **Build automático de `lsp-multiplexor`**: si la imagen no existe, `start-all.sh` la construye desde `LSP-Service/lsp-container/` antes de levantar el watcher.
 - **API gateway corrige proxy_pass**: `/api/` ahora apunta a `host.docker.internal:8000` (Django) en vez de `:8080`.
+
+# Distribuición VM
+| Name | Username | Password | IP_Address | Servicios |
+|------|----------|----------|------------|-----------|
+| S. Osorio | estudiante | | 10.43.99.252 | Control Node (solo Ansible) |
+| Simón | estudiante | F0c4-16M4p4c | 10.43.99.67 | LSP Service (réplica) |
+| David | estudiante | arquiDavid911 | 10.43.98.3 | Backend + Frontend + Gateway + Collab LB |
+| S. Campos | estudiante | C4m4l30n+26C | 10.43.99.20 | LSP Load Balancer |
+| Gabriel | estudiante | Gorila/32Ard | 10.43.100.88 | LSP Service (primario) |
+| Chitiva | estudiante | Ll4m4/47M0n0 | 10.43.99.41 | Code Execution Service |
+| Melissa | estudiante | Pulp0/373l3f | 10.43.100.126 | Collab Service (3 instancias) |
