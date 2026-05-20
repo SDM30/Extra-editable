@@ -5,20 +5,17 @@
   > WebSocket: ws://0.0.0.0:1235
 [collab] Servidor en http/ws://localhost:1235
 [collab] Endpoint de token de prueba: POST http://localhost:1235/dev-token
-[collab] simon autenticado
+[collab] gabriel autenticado
 [collab] Conexión iniciada a "1"
-[collab] simon autenticado
-[collab] Conexión iniciada a "1:1"
 [collab] ? salió de "1"
-[collab] ? salió de "1:1"
-[collab] simon autenticado
-[collab] Conexión iniciada a "1:1"
-[collab] ? salió de "1:1"
-[collab] simon autenticado
-[collab] Conexión iniciada a "1"
-[collab] simon autenticado
-[collab] Conexión iniciada a "1:1"
 [collab] gabriel autenticado
 [collab] Conexión iniciada a "1"
+[collab] ? salió de "1"
 [collab] gabriel autenticado
+[collab] Conexión iniciada a "1"
+[collab] simon autenticado
+[collab] Conexión iniciada a "1"
+[collab] gabriel autenticado
+[collab] Conexión iniciada a "1:1"
+[collab] simon autenticado
 [collab] Conexión iniciada a "1:1"

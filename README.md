@@ -36,6 +36,24 @@ Ese arranque levanta:
 ./start-all.sh
 ```
 
+## Detener y limpiar
+
+### Detener todos los servicios
+
+```bash
+./stop-all.sh
+```
+
+Mata los procesos del host (backend, frontend, collab, watcher LSP), detiene y elimina los contenedores Docker del proyecto y cierra túneles SSH en puertos 8080/8050.
+
+### Reiniciar desde cero (Docker)
+
+```bash
+./reset-docker.sh
+```
+
+Elimina **todos** los contenedores, imágenes, redes y volúmenes Docker del proyecto. Útil para pruebas limpias antes de un nuevo `start-all.sh`. Las imágenes base (`nginx:alpine`, `redis:7-alpine`, `postgres:15-alpine`) no se eliminan porque pueden ser compartidas con otros proyectos.
+
 ## Requisitos
 
 - Python 3.10+

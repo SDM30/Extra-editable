@@ -36,6 +36,10 @@ stop_previous() {
   sudo pkill -f "node src/server.js" 2>/dev/null || true
   sudo pkill -f "ng serve" 2>/dev/null || true
   sudo pkill -f "Angular CLI" 2>/dev/null || true
+  # Cerrar túneles SSH que ocupen puertos del stack (collab-lb, LSP)
+  sudo pkill -f "ssh -L 8080" 2>/dev/null || true
+  sudo pkill -f "ssh -L 8083" 2>/dev/null || true
+  sudo pkill -f "ssh -L 8050" 2>/dev/null || true
   sleep 2
   echo "Previous services stopped."
 }
@@ -126,16 +130,6 @@ echo "Seeding initial users"
 
 start_docker_nginx extra-editable-gateway "$ROOT_DIR/nginx.conf" 8080
 start_docker_nginx collab-lb "$ROOT_DIR/collab-load-balancer/nginx.config" 8083
-# LSP LB necesita alcanzar los contenedores LSP en lsp-service_lsp-network
-docker rm -f lsp-lb >/dev/null 2>&1 || true
-docker run -d --name lsp-lb \
-  --network lsp-service_lsp-network \
-  -p 8085:8085 \
-  -v "$ROOT_DIR/lsp-load-balancer/nginx.conf:/etc/nginx/nginx.conf:ro" \
-  nginx:alpine >/dev/null
-# Conectar también a la red bridge para que el gateway (extra-editable-gateway) lo alcance
-docker network connect bridge lsp-lb 2>/dev/null || true
-
 # ── LSP Service + agente sidecar ────────────────────────────────────────────────
 LSP_DIR="$ROOT_DIR/LSP-Service"
 if [ -f "$LSP_DIR/deploy-dev.sh" ]; then
@@ -152,6 +146,22 @@ if [ -f "$LSP_DIR/deploy-dev.sh" ]; then
   else
     echo "  Building lsp-multiplexor image..."
     (cd "$LSP_DIR/lsp-container" && docker build -t lsp-multiplexor:latest -t lsp-server:latest .)
+  fi
+  # LSP LB necesita alcanzar los contenedores LSP en lsp-service_lsp-network
+  # Se crea después de deploy-dev.sh para que la red ya exista
+  docker rm -f lsp-lb >/dev/null 2>&1 || true
+  docker run -d --name lsp-lb \
+    --network lsp-service_lsp-network \
+    -p 8085:8085 \
+    -v "$ROOT_DIR/lsp-load-balancer/nginx.conf:/etc/nginx/nginx.conf:ro" \
+    nginx:alpine >/dev/null
+  # Conectar también a la red bridge para que el gateway (extra-editable-gateway) lo alcance
+  docker network connect bridge lsp-lb 2>/dev/null || true
+  # Crear venv del watcher si no existe (requiere el paquete redis)
+  if [ ! -f "$ROOT_DIR/lsp-load-balancer/venv/bin/python3" ]; then
+    echo "  Creating LSP watcher venv..."
+    python3 -m venv "$ROOT_DIR/lsp-load-balancer/venv"
+    "$ROOT_DIR/lsp-load-balancer/venv/bin/pip" install redis
   fi
   echo "Starting LSP Load Balancer watcher"
   (cd "$ROOT_DIR/lsp-load-balancer" && ./venv/bin/python3 update_nginx.py) \

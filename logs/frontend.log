@@ -13,20 +13,21 @@ websocket connection issues.
 ❯ Building...
 ✔ Building...
 Initial chunk files | Names               |  Raw size
-main.js             | main                | 216.50 kB | 
+main.js             | main                | 217.01 kB | 
 chunk-APEK4AIU.js   | -                   |   7.19 kB | 
 styles.css          | styles              | 236 bytes | 
 
-                    | Initial total       | 223.93 kB
+                    | Initial total       | 224.44 kB
 
 Lazy chunk files    | Names               |  Raw size
 chunk-3TXSLBCY.js   | auth-wrap-component |  47.29 kB | 
 
-Application bundle generation complete. [8.264 seconds] - 2026-05-20T17:16:04.320Z
+Application bundle generation complete. [4.137 seconds] - 2026-05-20T19:04:56.314Z
 
 Watch mode enabled. Watching for file changes...
 NOTE: Raw file sizes do not reflect development server per-request transformations.
   ➜  Local:   http://localhost:4200/
-  ➜  Network: http://10.43.99.67:4200/
+  ➜  Network: http://192.168.20.217:4200/
   ➜  Network: http://172.17.0.1:4200/
+  ➜  Network: http://10.101.138.110:4200/
   ➜  Network: http://172.18.0.1:4200/
