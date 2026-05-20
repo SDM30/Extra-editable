@@ -122,6 +122,23 @@ start_docker_nginx extra-editable-gateway "$ROOT_DIR/nginx.conf" 8080
 start_docker_nginx collab-lb "$ROOT_DIR/collab-load-balancer/nginx.config" 8083
 start_docker_nginx lsp-lb "$ROOT_DIR/lsp-load-balancer/nginx.conf" 8085
 
+# ── LSP Service + agente sidecar ────────────────────────────────────────────────
+LSP_DIR="$ROOT_DIR/LSP-Service"
+if [ -f "$LSP_DIR/deploy-dev.sh" ]; then
+  echo "Starting LSP Service (3 instances + agent)"
+  if docker image inspect lsp-service-language-service:latest &>/dev/null 2>&1; then
+    (cd "$LSP_DIR" && bash deploy-dev.sh 3)
+  else
+    echo "  Building LSP image first..."
+    (cd "$LSP_DIR" && bash setup-dev.sh 3)
+  fi
+  echo "Starting LSP Load Balancer watcher"
+  (cd "$ROOT_DIR/lsp-load-balancer" && python3 update_nginx.py) \
+    &> "$ROOT_DIR/logs/lsp-watcher.log" &
+else
+  echo "LSP-Service not found, skipping"
+fi
+
 echo "Starting backend"
 (cd "$ROOT_DIR/backend" && "$PYTHON" manage.py runserver 0.0.0.0:8000) \
   &> "$ROOT_DIR/logs/backend.log" &
@@ -145,4 +162,4 @@ for port in 1234 1235 1236; do
   ) &> "$ROOT_DIR/logs/collab-$port.log" &
 done
 
-echo "Started backend, frontend, Postgres, gateway, collab LB, and collab instances. Logs: $ROOT_DIR/logs"
+echo "Started backend, frontend, Postgres, gateway, collab LB, collab instances, LSP service, LSP agent, and LSP watcher. Logs: $ROOT_DIR/logs"

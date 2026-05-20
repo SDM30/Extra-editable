@@ -137,7 +137,7 @@ if grep -q "^version:" docker-compose.yml 2>/dev/null; then
 fi
 
 $COMPOSE_CMD build
-$COMPOSE_CMD up -d --scale language-service=${INSTANCES}
+$COMPOSE_CMD up -d --scale language-service=${INSTANCES} --scale agent=1
 
 # ─── Resumen final ───
 
@@ -165,7 +165,7 @@ echo "Comandos útiles:"
 echo "  $COMPOSE_CMD logs -f              # Ver logs en tiempo real"
 echo "  $COMPOSE_CMD ps                   # Ver estado de servicios"
 echo "  $COMPOSE_CMD down                 # Detener y eliminar servicios"
-echo "  $COMPOSE_CMD up -d --scale language-service=${INSTANCES}  # Reescalar"
+echo "  $COMPOSE_CMD up -d --scale language-service=${INSTANCES} --scale agent=1  # Reescalar"
 echo ""
 echo "  # Ver instancias del API"
 echo "  docker ps --filter 'name=language-service'"

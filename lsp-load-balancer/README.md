@@ -6,6 +6,9 @@ del servicio gestiona internamente el ciclo de vida de los contenedores LSP asoc
 proyecto, garantizando que el multiplexor de cada contenedor sea usado exclusivamente por
 el proyecto que le corresponde.
 
+> ℹ️ La documentación de diseño de la arquitectura de recuperación automática está en la
+> [wiki del Servicio de Lenguaje](../Extra-editable.wiki/Servicio-de-lenguaje.md#-arquitectura-de-recuperación-automática).
+
 ## 🏗️ Arquitectura
 
 ```
@@ -13,13 +16,19 @@ Frontend (http://localhost:4200)
     ↓
 Nginx Principal (puerto 8080)
     ↓ /lsp/
-LSP Load Balancer (puerto 8082) ← Balanceador Nginx
-    ↓↓↓ Least Conn
+LSP Load Balancer (puerto 8085) ← Nginx + update_nginx.py
+    ↓↓↓ Round-robin dinámico
 [LSP Service :8135] [LSP Service :8136] [LSP Service :8137]
     ↓                    ↓                    ↓
 [Contenedor        [Contenedor          [Contenedor
  LSP proyecto-A]    LSP proyecto-B]      LSP proyecto-C]
 ```
+
+**Descubrimiento dinámico:** `update_nginx.py` lee instancias vivas desde Redis
+(`SMEMBERS lsp:instances` + heartbeat TTL) y regenera `nginx.conf` automáticamente.
+Si detecta **cero instancias** por 3 polls consecutivos, publica un comando `SPAWN`
+en el canal Redis Pub/Sub `lb:lsp:commands`. Los agentes sidecar en cada nodo
+reciben `SPAWN` y re-levantan sus contenedores LSP.
 
 > **¿Por qué balancear el Servicio de Lenguaje y no los contenedores LSP?**
 > Cada contenedor LSP es efímero y específico de un proyecto: el multiplexor interno está
@@ -30,9 +39,10 @@ LSP Load Balancer (puerto 8082) ← Balanceador Nginx
 ## 📋 Prerequisitos
 
 1. **Nginx instalado** en la máquina host
-2. **Redis corriendo** en `localhost:6379` — requerido para el registro compartido de contenedores entre instancias
-3. **2-3 instancias del Servicio de Lenguaje** ejecutándose en puertos distintos
+2. **Redis corriendo** con keys `lsp:instances` (Set) y `lsp:heartbeat:*` (String con TTL 30s)
+3. **2-3 instancias del Servicio de Lenguaje** ejecutándose en puertos distintos (ver `LSP-Service/`)
 4. El **Nginx principal** (puerto 8080) debe reenviar requests de `/lsp/` a este balanceador
+5. **JWT_SECRET** compartido entre backend, LSP Service y multiplexor
 
 ## 📦 Instalación
 
@@ -75,21 +85,27 @@ nginx -t -c $(pwd)/nginx.conf
 nginx -c $(pwd)/nginx.conf
 
 # Verificar que está corriendo
-curl http://localhost:8082/health
+curl http://localhost:8085/health
 # {"status":"ok","service":"lsp-load-balancer"}
 ```
 
 ### 2. Levantar el watcher de descubrimiento dinámico
 
-`update_nginx.py` observa Redis y regenera `nginx.conf` cada vez que una instancia
-entra o sale. Debe correr en paralelo con Nginx.
+`update_nginx.py` lee instancias vivas desde Redis (`SMEMBERS lsp:instances` + heartbeat TTL)
+y regenera `nginx.conf` cada vez que una instancia entra o sale. Si detecta cero instancias,
+publica un comando `SPAWN` en el canal Redis Pub/Sub `lb:lsp:commands`.
 
 ```bash
 cd lsp-load-balancer
 python3 update_nginx.py
-# En lugar de sudo python3, usar la ruta completa al python del venv
-# TODO: HACERLO BIEN
-sudo /home/simondm/Development/ARQ/Proyecto_ARQ/.venv_lsp/bin/python3 update_nginx.py
+# O con el venv del proyecto:
+# /home/simondm/Development/ARQ/Proyecto_ARQ/.venv/bin/python3 update_nginx.py
+```
+
+Para producción, usar el servicio systemd que instala `install.sh`:
+```bash
+sudo systemctl start lsp-watcher
+sudo journalctl -u lsp-watcher -f
 ```
 
 ### 3. Levantar las instancias del Servicio de Lenguaje
@@ -97,69 +113,25 @@ sudo /home/simondm/Development/ARQ/Proyecto_ARQ/.venv_lsp/bin/python3 update_ngi
 Desde el directorio `LSP-Service/`:
 
 ```bash
-# Desplegar con Docker Compose (recomendado)
-make deploy 3          # 3 instancias con hot-reload
-./deploy.sh 3          # equivalente directo
+# Desplegar con Docker Compose (3 instancias + agente sidecar)
+./deploy-dev.sh 3
 
 # O si aún no están construidas las imágenes
-make setup 3           # build + deploy
-./setup.sh 3           # equivalente directo
+./setup-dev.sh 3
+```
 
-## 🔄 Verificar que el balanceador funciona
+### 4. Verificar registro en Redis
 
 ```bash
-# 1. Health check del balanceador
-curl -i http://localhost:8082/health
-# Debe responder: {"status":"ok","service":"lsp-load-balancer"}
+# Instancias registradas
+redis-cli SMEMBERS lsp:instances
 
-# 2. Verificar round-robin — observar a qué instancia llega cada petición
-#    (requiere el middleware de identificación de instancia, ver sección de pruebas)
-for i in {1..6}; do
-    echo "Petición $i → $(curl -s -o /dev/null -D - http://localhost:8082/lsp/ | grep X-Instance-Port)"
-done
-```
+# Heartbeats activos (TTL 30s, refrescados cada 10s)
+redis-cli KEYS lsp:heartbeat:*
+redis-cli TTL lsp:heartbeat:<id>
 
-## 🧪 Probar la distribución entre instancias
-
-Para confirmar visualmente que el balanceador distribuye en round-robin, agrega
-temporalmente este middleware en `language-service/app/main.py`:
-
-```python
-import os
-from fastapi import Request
-
-@app.middleware("http")
-async def add_instance_header(request: Request, call_next):
-    response = await call_next(request)
-    response.headers["X-Instance-Port"] = str(os.getenv("PORT", "unknown"))
-    return response
-```
-
-La salida esperada con round-robin:
-
-```
-Petición 1 → X-Instance-Port: 8135
-Petición 2 → X-Instance-Port: 8136
-Petición 3 → X-Instance-Port: 8135
-Petición 4 → X-Instance-Port: 8136
-```
-
-### Verificar el registro compartido en Redis
-
-```bash
-# Observar en tiempo real las claves que se crean al gestionar contenedores
-redis-cli monitor
-
-# En otra terminal, crear un contenedor LSP
-curl -X POST http://localhost:8082/lsp/proyecto-1 \
-  -H "Content-Type: application/json" \
-  -d '{"language": "python"}'
-
-# Listar contenedores activos registrados en Redis
-redis-cli keys "lsp:container:*"
-
-# Ver el detalle de un contenedor específico
-redis-cli get "lsp:container:proyecto-1:python"
+# Contenedores LSP creados
+redis-cli KEYS lsp:container:*
 ```
 
 ## 🔗 Integración con Nginx Principal
@@ -169,7 +141,7 @@ apuntando a este balanceador:
 
 ```nginx
 location /lsp/ {
-    proxy_pass http://host.docker.internal:8082;
+    proxy_pass http://host.docker.internal:8085;
     # ... resto de configuración CORS y headers
 }
 ```
@@ -177,7 +149,7 @@ location /lsp/ {
 Flujo completo:
 ```
 Cliente → localhost:8080/lsp/ → Nginx Principal
-        → host.docker.internal:8082 → Este balanceador
+        → host.docker.internal:8085 → Este balanceador
         → Servicio de Lenguaje (8135 | 8136 | 8137)
         → Contenedor LSP del proyecto correspondiente
 ```
@@ -185,24 +157,30 @@ Cliente → localhost:8080/lsp/ → Nginx Principal
 ## 📊 Algoritmo de balanceo
 
 - **Tipo:** Round-robin (predeterminado en Nginx)
-- **Comportamiento:** Cada nueva petición va a la siguiente instancia del Servicio de Lenguaje en orden
+- **Descubrimiento:** Redis (`SMEMBERS lsp:instances` + heartbeat TTL). `update_nginx.py` regenera el upstream dinámicamente cada 2s.
+- **Auto-recovery:** Si 0 instancias por 3 polls (6s), el watcher publica `SPAWN` vía Redis Pub/Sub (`lb:lsp:commands`). Los agentes sidecar en cada nodo re-levantan los contenedores.
 - **Registro compartido:** Redis garantiza que todas las instancias conozcan los contenedores activos, evitando duplicados por proyecto+lenguaje
 
 ## 🧯 Troubleshooting
 
 | Problema | Solución |
 |----------|----------|
-| `502 Bad Gateway` desde el API Gateway | Nginx del balanceador no está corriendo — levantarlo **antes** que las instancias: `nginx -c $(pwd)/nginx.conf` |
-| `502 Bad Gateway` con Nginx corriendo | Las instancias del Servicio de Lenguaje no están corriendo: `./start_instances.sh status` |
-| `Connection refused` en puerto 8082 | Nginx no está corriendo: `ps aux \| grep nginx` |
+| `502 Bad Gateway` desde el API Gateway | Nginx del balanceador no está corriendo — levantarlo: `nginx -c $(pwd)/nginx.conf` |
+| `502 Bad Gateway` con Nginx corriendo | Las instancias del Servicio de Lenguaje no están corriendo o el upstream está vacío. Verificar: `redis-cli SMEMBERS lsp:instances` |
+| `Connection refused` en puerto 8085 | Nginx no está corriendo: `ps aux \| grep nginx` |
 | `Redis error on get: Connection refused` | Redis no está corriendo: `redis-cli ping` |
-| Nginx corre pero upstream vacío | `update_nginx.py` no está corriendo o no detectó instancias: verificar `redis-cli smembers lsp:instances` |
+| Nginx corre pero upstream vacío | `update_nginx.py` no está corriendo o no detectó instancias. Verificar: `redis-cli SMEMBERS lsp:instances` y `redis-cli KEYS lsp:heartbeat:*` |
+| Heartbeats expirados (TTL ausente) | La instancia del LSP Service murió. Verificar con `docker ps --filter label=lsp.service=api`. El agente sidecar debería re-levantarla en ≤10s |
+| `SMEMBERS` vacío o sin heartbeats | El LSP Service no se registró en Redis. Revisar logs: `docker compose logs language-service` |
 | Requests no se distribuyen | Verificar que hay 2+ instancias levantadas y que `update_nginx.py` regeneró el `nginx.conf` |
 | Contenedores duplicados por proyecto | Verificar que Redis está corriendo y que `REDIS_HOST` está configurado en `.env` |
+| Watcher no puede reloadear nginx | El watcher debe correr como `User=root` (systemd) para enviar señales a nginx. Ver `install.sh` |
 
 ## 📝 Notas operacionales
 
 - Este balanceador es **stateless** — puede levantarse y bajarse sin afectar las instancias del servicio ni los contenedores LSP activos
-- El estado compartido vive en **Redis**: si Redis cae, cada instancia opera con su registro local vacío hasta que Redis se recupere
+- El estado compartido vive en **Redis**: si Redis cae, el watcher deja de detectar instancias (nginx se queda con la última config conocida)
 - Cada instancia del Servicio de Lenguaje debe tener acceso al **Docker socket** para gestionar los contenedores LSP
-- Las instancias deben ser idénticas (misma versión, mismo `.env`, mismo acceso a Docker)
+- Las instancias deben ser idénticas (misma versión, mismo `JWT_SECRET`, mismo acceso a Redis)
+- El watcher (`update_nginx.py`) corre como servicio systemd con `User=root` para poder hacer `nginx -s reload`
+- El canal Pub/Sub `lb:lsp:commands` es independiente de las keys de Redis — no interfiere con `lsp:instances` ni `lsp:container:*`

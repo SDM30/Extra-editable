@@ -1,54 +1,51 @@
 Watching for file changes with StatReloader
-[19/May/2026 22:10:07] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
-[19/May/2026 22:10:07] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
-[19/May/2026 22:10:07,235] - Broken pipe from ('172.17.0.6', 47332)
-[19/May/2026 22:10:07] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
-Unauthorized: /api/projects/8/
-[19/May/2026 22:10:08] "GET /api/projects/8/ HTTP/1.1" 401 203
-Unauthorized: /api/projects/2/lsp/token/
-[19/May/2026 22:10:19] "POST /api/projects/2/lsp/token/ HTTP/1.1" 401 123
-Unauthorized: /api/projects/1/lsp/token/
-[19/May/2026 22:10:30] "POST /api/projects/1/lsp/token/ HTTP/1.1" 401 123
-Unauthorized: /api/projects/
-[19/May/2026 22:10:44] "GET /api/projects/ HTTP/1.1" 401 123
-Unauthorized: /api/projects/
-[19/May/2026 22:10:51] "GET /api/projects/ HTTP/1.1" 401 123
-Unauthorized: /api/projects/
-[19/May/2026 22:10:54] "GET /api/projects/ HTTP/1.1" 401 123
-[19/May/2026 22:11:20] "POST /api/auth/login/ HTTP/1.1" 200 483
-[19/May/2026 22:11:35] "POST /api/projects/2/lsp/token/ HTTP/1.1" 200 183
-Not Found: /ap2/projects/1/lsp/token/
-[19/May/2026 22:13:14] "POST /ap2/projects/1/lsp/token/ HTTP/1.1" 404 2366
-[19/May/2026 22:13:50] "POST /api/auth/login/ HTTP/1.1" 200 483
-[19/May/2026 22:13:50] "POST /api/projects/2/lsp/token/ HTTP/1.1" 200 183
-[19/May/2026 22:41:47] "POST /api/projects/2/lsp/token/ HTTP/1.1" 200 183
-Unauthorized: /api/projects/validate-collab-token/
-[19/May/2026 23:18:27] "GET /api/projects/validate-collab-token/ HTTP/1.1" 401 26
-Unauthorized: /api/projects/8/
-[19/May/2026 23:18:27] "GET /api/projects/8/ HTTP/1.1" 401 203
-Unauthorized: /api/projects/8/
-[19/May/2026 23:18:29] "GET /api/projects/8/ HTTP/1.1" 401 203
-[19/May/2026 23:18:34] "POST /api/auth/login/ HTTP/1.1" 200 483
-/home/simondm/Development/ARQ/Proyecto_ARQ/backend/.venv/lib/python3.13/site-packages/rest_framework/pagination.py:200: UnorderedObjectListWarning: Pagination may yield inconsistent results with an unordered object_list: <class 'projects.models.Proyecto'> QuerySet.
-  paginator = self.django_paginator_class(queryset, page_size)
-[19/May/2026 23:18:34] "GET /api/projects/ HTTP/1.1" 200 496
-[19/May/2026 23:18:35] "GET /api/projects/8/ HTTP/1.1" 200 926
-[19/May/2026 23:18:35] "GET /api/auth/me/ HTTP/1.1" 200 148
-[19/May/2026 23:18:36] "POST /api/projects/8/collab/join/ HTTP/1.1" 200 182
-[19/May/2026 23:18:36] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
-[19/May/2026 23:18:36,096] - Broken pipe from ('172.17.0.6', 46512)
-[19/May/2026 23:18:36] "GET /api/auth/me/ HTTP/1.1" 200 148
-[19/May/2026 23:18:36] "POST /api/projects/8/collab/join/ HTTP/1.1" 200 189
-[19/May/2026 23:18:36] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
-[19/May/2026 23:18:36] "POST /api/projects/8/lsp/token/ HTTP/1.1" 200 182
-[19/May/2026 23:18:58] "POST /api/auth/login/ HTTP/1.1" 200 483
-[19/May/2026 23:18:58] "GET /api/projects/ HTTP/1.1" 200 276
-[19/May/2026 23:18:59] "GET /api/projects/8/ HTTP/1.1" 200 926
-[19/May/2026 23:18:59] "GET /api/auth/me/ HTTP/1.1" 200 154
-[19/May/2026 23:18:59] "POST /api/projects/8/collab/join/ HTTP/1.1" 200 184
-[19/May/2026 23:18:59] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
-[19/May/2026 23:18:59,756] - Broken pipe from ('172.17.0.6', 35754)
-[19/May/2026 23:18:59] "GET /api/auth/me/ HTTP/1.1" 200 154
-[19/May/2026 23:18:59] "POST /api/projects/8/collab/join/ HTTP/1.1" 200 191
-[19/May/2026 23:18:59] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
-[19/May/2026 23:18:59] "POST /api/projects/8/lsp/token/ HTTP/1.1" 200 184
+[19/May/2026 23:31:29] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[19/May/2026 23:31:29,204] - Broken pipe from ('172.17.0.4', 45246)
+[19/May/2026 23:31:29] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[19/May/2026 23:31:29,219] - Broken pipe from ('172.17.0.4', 45248)
+[19/May/2026 23:31:29] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[19/May/2026 23:31:29,624] - Broken pipe from ('172.17.0.4', 45262)
+[19/May/2026 23:31:29] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[19/May/2026 23:31:29,861] - Broken pipe from ('172.17.0.4', 45270)
+[19/May/2026 23:31:30] "GET /api/projects/8/ HTTP/1.1" 200 926
+[19/May/2026 23:31:30] "GET /api/auth/me/ HTTP/1.1" 200 154
+[19/May/2026 23:31:31] "GET /api/projects/8/ HTTP/1.1" 200 926
+[19/May/2026 23:31:31] "POST /api/projects/8/collab/join/ HTTP/1.1" 200 184
+[19/May/2026 23:31:31] "GET /api/auth/me/ HTTP/1.1" 200 148
+[19/May/2026 23:31:31] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[19/May/2026 23:31:31] "POST /api/projects/8/collab/join/ HTTP/1.1" 200 182
+[19/May/2026 23:31:31] "GET /api/auth/me/ HTTP/1.1" 200 154
+[19/May/2026 23:31:31] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[19/May/2026 23:31:31,355] - Broken pipe from ('172.17.0.4', 45288)
+[19/May/2026 23:31:31] "POST /api/projects/8/collab/join/ HTTP/1.1" 200 191
+[19/May/2026 23:31:31] "GET /api/auth/me/ HTTP/1.1" 200 148
+[19/May/2026 23:31:31] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[19/May/2026 23:31:31] "POST /api/projects/8/collab/join/ HTTP/1.1" 200 189
+[19/May/2026 23:31:31] "POST /api/projects/8/lsp/token/ HTTP/1.1" 200 184
+[19/May/2026 23:31:31] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[19/May/2026 23:31:32] "POST /api/projects/8/lsp/token/ HTTP/1.1" 200 182
+[19/May/2026 23:31:54] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[19/May/2026 23:31:54] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[19/May/2026 23:31:54,329] - Broken pipe from ('172.17.0.4', 33256)
+[19/May/2026 23:31:54] "GET /api/projects/8/ HTTP/1.1" 200 926
+[19/May/2026 23:31:54] "GET /api/auth/me/ HTTP/1.1" 200 148
+[19/May/2026 23:31:54] "POST /api/projects/8/collab/join/ HTTP/1.1" 200 182
+[19/May/2026 23:31:54] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[19/May/2026 23:31:54,816] - Broken pipe from ('172.17.0.4', 33260)
+[19/May/2026 23:31:54] "GET /api/auth/me/ HTTP/1.1" 200 148
+[19/May/2026 23:31:54] "POST /api/projects/8/collab/join/ HTTP/1.1" 200 189
+[19/May/2026 23:31:54] "POST /api/projects/8/lsp/token/ HTTP/1.1" 200 182
+[19/May/2026 23:31:54] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[19/May/2026 23:31:54,951] - Broken pipe from ('172.17.0.4', 33276)
+[19/May/2026 23:31:56] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[19/May/2026 23:31:56] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[19/May/2026 23:31:57] "GET /api/projects/8/ HTTP/1.1" 200 926
+[19/May/2026 23:31:57] "GET /api/auth/me/ HTTP/1.1" 200 154
+[19/May/2026 23:31:57] "POST /api/projects/8/collab/join/ HTTP/1.1" 200 184
+[19/May/2026 23:31:57] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[19/May/2026 23:31:57,436] - Broken pipe from ('172.17.0.4', 33298)
+[19/May/2026 23:31:57] "GET /api/auth/me/ HTTP/1.1" 200 154
+[19/May/2026 23:31:57] "POST /api/projects/8/collab/join/ HTTP/1.1" 200 191
+[19/May/2026 23:31:57] "POST /api/projects/8/lsp/token/ HTTP/1.1" 200 184
+[19/May/2026 23:31:57] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[19/May/2026 23:31:57,567] - Broken pipe from ('172.17.0.4', 33300)
