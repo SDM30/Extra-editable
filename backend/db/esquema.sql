@@ -17,6 +17,9 @@ CREATE TABLE usuarios (
     bio         VARCHAR(500) NOT NULL DEFAULT '',
     rol         rol_usuario  NOT NULL DEFAULT 'USUARIO',
 
+    first_name  VARCHAR(150) NOT NULL DEFAULT '',
+    last_name   VARCHAR(150) NOT NULL DEFAULT '',
+
     -- campos requeridos por Django Auth
     is_active      BOOLEAN     NOT NULL DEFAULT TRUE,
     is_staff       BOOLEAN     NOT NULL DEFAULT FALSE,
@@ -82,3 +85,16 @@ CREATE TABLE proyecto_colaboradores (
 
 CREATE INDEX idx_colaboradores_proyecto ON proyecto_colaboradores(proyecto_id);
 CREATE INDEX idx_colaboradores_usuario ON proyecto_colaboradores(usuario_id);
+
+-- ============================================================
+-- SESIONES COLABORATIVAS
+-- ============================================================
+CREATE TABLE collab_sessions (
+    id          BIGSERIAL PRIMARY KEY,
+    token       VARCHAR(512) NOT NULL DEFAULT '',
+    last_seen   TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    proyecto_id BIGINT NOT NULL REFERENCES proyectos(id)  ON DELETE CASCADE,
+    usuario_id  BIGINT        REFERENCES usuarios(id)     ON DELETE SET NULL
+);
+
+CREATE INDEX idx_collab_sessions_proyecto ON collab_sessions(proyecto_id);

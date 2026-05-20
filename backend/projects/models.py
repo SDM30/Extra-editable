@@ -20,7 +20,7 @@ class Proyecto(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'projects_proyecto'
+        db_table = 'proyectos'
         ordering = ['-fecha_creacion']
         verbose_name = 'proyecto'
 
@@ -41,7 +41,7 @@ class Archivo(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'projects_archivo'
+        db_table = 'archivos'
         unique_together = ('proyecto', 'nombre')
         ordering = ['nombre']
         verbose_name = 'archivo'
@@ -67,6 +67,8 @@ class CollabSession(models.Model):
     last_seen = models.DateTimeField(auto_now=True)
 
     class Meta:
+        managed = False
+        db_table = 'collab_sessions'
         ordering = ['-last_seen']
 
     def __str__(self):
