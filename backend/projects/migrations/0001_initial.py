@@ -15,22 +15,6 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.CreateModel(
-            name='Archivo',
-            fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('nombre', models.CharField(max_length=255)),
-                ('contenido', models.TextField(blank=True)),
-                ('fecha_creacion', models.DateTimeField(auto_now_add=True, db_column='fechaCreacion')),
-                ('fecha_actualizacion', models.DateTimeField(auto_now=True, db_column='fechaActualizacion')),
-            ],
-            options={
-                'verbose_name': 'archivo',
-                'db_table': 'projects_archivo',
-                'ordering': ['nombre'],
-                'managed': False,
-            },
-        ),
-        migrations.CreateModel(
             name='Proyecto',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
@@ -38,12 +22,30 @@ class Migration(migrations.Migration):
                 ('descripcion', models.TextField(blank=True)),
                 ('fecha_creacion', models.DateTimeField(auto_now_add=True, db_column='fechaCreacion')),
                 ('lenguaje', models.CharField(choices=[('CPP', 'C++'), ('PYTHON', 'Python'), ('TYPESCRIPT', 'TypeScript')], max_length=10)),
+                ('usuario', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='proyectos', to=settings.AUTH_USER_MODEL)),
             ],
             options={
                 'verbose_name': 'proyecto',
                 'db_table': 'projects_proyecto',
                 'ordering': ['-fecha_creacion'],
-                'managed': False,
+                'managed': True,
+            },
+        ),
+        migrations.CreateModel(
+            name='Archivo',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('nombre', models.CharField(max_length=255)),
+                ('contenido', models.TextField(blank=True)),
+                ('fecha_creacion', models.DateTimeField(auto_now_add=True, db_column='fechaCreacion')),
+                ('fecha_actualizacion', models.DateTimeField(auto_now=True, db_column='fechaActualizacion')),
+                ('proyecto', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='archivos', to='projects.proyecto')),
+            ],
+            options={
+                'verbose_name': 'archivo',
+                'db_table': 'projects_archivo',
+                'ordering': ['nombre'],
+                'managed': True,
             },
         ),
         migrations.CreateModel(

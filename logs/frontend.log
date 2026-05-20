@@ -2,6 +2,14 @@
 > frontend@0.0.0 start
 > ng serve
 
+
+Warning: This is a simple server for use in testing or debugging Angular applications
+locally. It hasn't been reviewed for security issues.
+
+Binding this server to an open connection can result in compromising your application or
+computer. Using a different host than the one passed to the "--host" flag might result in
+websocket connection issues.
+    
 ❯ Building...
 ✔ Building...
 Initial chunk files | Names               |  Raw size
@@ -14,8 +22,11 @@ styles.css          | styles              | 236 bytes |
 Lazy chunk files    | Names               |  Raw size
 chunk-3TXSLBCY.js   | auth-wrap-component |  47.29 kB | 
 
-Application bundle generation complete. [6.144 seconds] - 2026-05-20T04:31:15.696Z
+Application bundle generation complete. [7.817 seconds] - 2026-05-20T15:50:25.058Z
 
 Watch mode enabled. Watching for file changes...
 NOTE: Raw file sizes do not reflect development server per-request transformations.
   ➜  Local:   http://localhost:4200/
+  ➜  Network: http://10.43.99.67:4200/
+  ➜  Network: http://172.17.0.1:4200/
+  ➜  Network: http://172.18.0.1:4200/

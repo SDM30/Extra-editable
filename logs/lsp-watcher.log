@@ -1,4 +1,4 @@
 Traceback (most recent call last):
-  File "/home/simondm/Development/ARQ/Proyecto_ARQ/lsp-load-balancer/update_nginx.py", line 13, in <module>
+  File "/home/estudiante/Extra-editable/lsp-load-balancer/update_nginx.py", line 13, in <module>
     import redis
 ModuleNotFoundError: No module named 'redis'
