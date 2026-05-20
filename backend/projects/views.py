@@ -195,6 +195,32 @@ class ProyectoViewSet(viewsets.ModelViewSet):
 
         return Response({'token': token, 'room': room})
 
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated], url_path='collab/heartbeat')
+    def collab_heartbeat(self, request, pk=None):
+        """Mantiene viva la sesión colaborativa sin generar un nuevo token.
+
+        El frontend llama este endpoint periódicamente mientras el editor sigue
+        abierto, de modo que `last_seen` no quede obsoleto por inactividad.
+        """
+        proyecto = self.get_object()
+
+        if proyecto.usuario != request.user:
+            if not ProyectoColaborador.objects.filter(
+                proyecto=proyecto, usuario=request.user
+            ).exists():
+                return Response(
+                    {'detail': 'No tienes acceso a este proyecto.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+        session, _ = CollabSession.objects.get_or_create(
+            proyecto=proyecto,
+            usuario=request.user if request.user.is_authenticated else None,
+        )
+        session.save()
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
     @action(detail=True, methods=['get'], permission_classes=[IsAuthenticated], url_path='collaborators')
     def collaborators(self, request, pk=None):
         """Endpoint: GET /api/projects/{pk}/collaborators/

@@ -122,6 +122,14 @@ start_docker_nginx extra-editable-gateway "$ROOT_DIR/nginx.conf" 8080
 start_docker_nginx collab-lb "$ROOT_DIR/collab-load-balancer/nginx.config" 8083
 start_docker_nginx lsp-lb "$ROOT_DIR/lsp-load-balancer/nginx.conf" 8085
 
+echo "Starting collab load balancer discovery watcher"
+(
+  cd "$ROOT_DIR/collab-load-balancer" && \
+  COLLAB_DISCOVERY_HOST=127.0.0.1 \
+  COLLAB_UPSTREAM_HOST=host.docker.internal \
+  "$PYTHON" update_nginx.py
+) &> "$ROOT_DIR/logs/collab-lb-watcher.log" &
+
 echo "Starting backend"
 (cd "$ROOT_DIR/backend" && "$PYTHON" manage.py runserver 0.0.0.0:8000) \
   &> "$ROOT_DIR/logs/backend.log" &
