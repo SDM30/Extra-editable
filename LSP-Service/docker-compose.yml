@@ -1,42 +1,59 @@
-# docker-compose.yml — Servicio de Lenguaje (LSP Management)
+# docker-compose.yml — Servicio de Lenguaje + Agente de recuperación
 #
-# Redis se ejecuta como contenedor independiente en la máquina del balanceador
-# de carga (ver lsp-load-balancer/install.sh). No se incluye en este compose.
+# Redis se ejecuta como contenedor independiente (ver lsp-load-balancer/install.sh).
+# Cada máquina nodo despliega UN language-service + UN agente sidecar.
+# En desarrollo single-machine se usa --scale para múltiples réplicas.
+
 services:
+
+  # ── Servicio de Lenguaje ────────────────────────────────────────────────────
   language-service:
     build: ./language-service
     labels:
       - "lsp.service=api"
       - "lsp.component=language-service"
-    # Puerto fijo por máquina: cada instancia escucha en su propio puerto.
-    # En single-machine con --scale se usan puertos dinámicos; en multi-machine
-    # cada máquina expone exactamente un puerto fijo (default 8135).
     ports:
-      - "${PORT:-8135}:8135"
+      - "8135"                                # puerto dinámico con --scale
     environment:
+      - PORT=${PORT:-8135}
+      - REDIS_HOST=${REDIS_HOST:-127.0.0.1}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_DB=${REDIS_DB:-0}
       - WS_PUBLIC_HOST=${WS_PUBLIC_HOST:-127.0.0.1}
       - PROJECTS_DIR=/home/projects
       - CONTAINER_IDLE_TIMEOUT=${CONTAINER_IDLE_TIMEOUT:-300000}
       - MAX_CLIENTS_PER_CONTAINER=4
-      # Redis: host externo (IP de la máquina que corre Redis, configurado en .env)
-      - REDIS_HOST=${REDIS_HOST:-127.0.0.1}
-      - REDIS_PORT=${REDIS_PORT:-6379}
-      - REDIS_DB=${REDIS_DB:-0}
-      # Secreto para comunicación interna entre instancias (cross-machine).
-      # En redes privadas puede dejarse vacío. En producción, configurar.
       - LSP_INTERNAL_SECRET=${LSP_INTERNAL_SECRET:-}
-      - PORT=${PORT:-8135}
     volumes:
-      # Docker socket: necesario para crear/destruir contenedores LSP.
       - /var/run/docker.sock:/var/run/docker.sock
-      # Proyectos: bind mount directo al host. En multi-machine este path
-      # debe ser un montaje NFS compartido entre todas las máquinas.
       - /home/projects:/home/projects
-      # Hot-reload del código fuente (solo desarrollo).
       - ./language-service:/app
     networks:
       - lsp-network
-    restart: unless-stopped
+    restart: "no"                            # el agente sidecar controla el reinicio
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8135/lsp/"]
+      interval: 10s
+      timeout: 3s
+      retries: 2
+      start_period: 15s
+
+  # ── Agente de recuperación (sidecar) ────────────────────────────────────────
+  agent:
+    build: ./agent
+    environment:
+      - PYTHONUNBUFFERED=1
+      - LABEL=lsp.service=api
+      - REDIS_HOST=${REDIS_HOST:-127.0.0.1}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - CHECK_SECS=10
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - lsp-network
+    restart: unless-stopped                  # Docker reinicia el agente si muere
+    depends_on:
+      - language-service
 
 networks:
   lsp-network:

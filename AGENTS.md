@@ -25,3 +25,8 @@ No se requiere documentación exhaustiva línea por línea; basta con explicar e
 ### Archivos de configuración
 
 Todos los archivos de configuración (por ejemplo, de herramientas, despliegue, entornos, o cualquier archivo con extensión `.json`, `.yaml`, `.toml`, `.ini`, `.env`, etc.) deben incluir comentarios que expliquen cada sección o parámetro relevante, facilitando su mantenimiento y comprensión. Cuando el formato no soporte comentarios de forma nativa (como JSON puro), se debe adjuntar un archivo de documentación complementario o utilizar un esquema con descripciones.
+
+### Documentación de componente
+Buscar en la raiz del proyecto el directorio Extra-editable.wiki, si no esta no utilizarlo (esperar especificacion del usuario).
+
+Documentar información de diseño y funcionalidades de los componentes: frontend, backend, servicio de lenguaje (LSP-service), servicio de edición colaborativa (collab-service), servicio de ejecución de código (code-execution-service) y balanceadores de carga.

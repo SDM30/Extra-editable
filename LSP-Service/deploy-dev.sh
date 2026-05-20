@@ -68,7 +68,9 @@ echo ""
 
 # Construir y levantar
 echo -e "${YELLOW}Construyendo y levantando servicios...${NC}"
-HOST_IP=$HOST_IP REDIS_HOST=$REDIS_HOST $COMPOSE_CMD up -d --build --scale language-service=${INSTANCES}
+HOST_IP=$HOST_IP REDIS_HOST=$REDIS_HOST $COMPOSE_CMD up -d --build \
+    --scale language-service=${INSTANCES} \
+    --scale agent=1
 
 sleep 2
 
