@@ -78,6 +78,12 @@ if DB_ENGINE == 'django.db.backends.postgresql':
         },
     })
 
+# El esquema lo gestiona db/esquema.sql; el ORM mapea contra tablas existentes.
+MIGRATION_MODULES = {
+    'users': None,
+    'projects': None,
+}
+
 # REST Framework
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (

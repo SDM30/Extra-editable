@@ -10,7 +10,7 @@ class Proyecto(models.Model):
 
     nombre = models.CharField(max_length=255)
     descripcion = models.TextField(blank=True)
-    fecha_creacion = models.DateTimeField(auto_now_add=True, db_column='fechaCreacion')
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
     lenguaje = models.CharField(max_length=10, choices=Lenguaje.choices)
     usuario = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -20,7 +20,7 @@ class Proyecto(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'projects_proyecto'
+        db_table = 'proyectos'
         ordering = ['-fecha_creacion']
         verbose_name = 'proyecto'
 
@@ -36,12 +36,12 @@ class Archivo(models.Model):
         on_delete=models.CASCADE,
         related_name='archivos'
     )
-    fecha_creacion = models.DateTimeField(auto_now_add=True, db_column='fechaCreacion')
-    fecha_actualizacion = models.DateTimeField(auto_now=True, db_column='fechaActualizacion')
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
 
     class Meta:
         managed = False
-        db_table = 'projects_archivo'
+        db_table = 'archivos'
         unique_together = ('proyecto', 'nombre')
         ordering = ['nombre']
         verbose_name = 'archivo'
@@ -67,6 +67,8 @@ class CollabSession(models.Model):
     last_seen = models.DateTimeField(auto_now=True)
 
     class Meta:
+        managed = False
+        db_table = 'collab_sessions'
         ordering = ['-last_seen']
 
     def __str__(self):
