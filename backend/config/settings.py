@@ -56,8 +56,7 @@ TEMPLATES = [
     },
 ]
 
-# ── Base de datos ──────────────────────────────────────────────────────────
-# La BD se crea y gestiona mediante esquema.sql — el ORM no ejecuta migraciones.
+# Database — SQLite dev / PostgreSQL via env
 DB_ENGINE = config('DB_ENGINE', default='django.db.backends.sqlite3')
 
 DATABASES = {
@@ -74,16 +73,12 @@ if DB_ENGINE == 'django.db.backends.postgresql':
         'USER': config('DB_USER', default='postgres'),
         'PASSWORD': config('DB_PASSWORD', default='postgres'),
         'CONN_MAX_AGE': config('DB_CONN_MAX_AGE', default=60, cast=int),
+        'OPTIONS': {
+            'options': config('DB_OPTIONS', default=''),
+        },
     })
 
-# El ORM mapea tablas existentes; las migraciones están deshabilitadas.
-# Toda modificación de esquema se hace directamente en db/esquema.sql.
-MIGRATION_MODULES = {
-    'users': None,
-    'projects': None,
-}
-
-# ── REST Framework ─────────────────────────────────────────────────────────
+# REST Framework
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
@@ -95,7 +90,7 @@ REST_FRAMEWORK = {
     'PAGE_SIZE': 20,
 }
 
-# ── JWT ────────────────────────────────────────────────────────────────────
+# JWT
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
@@ -103,13 +98,13 @@ SIMPLE_JWT = {
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
 
-# ── CORS ───────────────────────────────────────────────────────────────────
+# CORS — Angular dev server
 CORS_ALLOWED_ORIGINS = config(
     'CORS_ALLOWED_ORIGINS',
     default='http://localhost:4200'
 ).split(',')
 
-# ── Static ─────────────────────────────────────────────────────────────────
+# Static
 STATIC_URL = '/static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -125,9 +120,12 @@ TIME_ZONE = 'America/Bogota'
 USE_I18N = True
 USE_TZ = True
 
-# ── Collab (Hocuspocus) ────────────────────────────────────────────────────
+# Collab (Hocuspocus) integration settings
 DEFAULT_MAX_COLLAB_USERS = config('DEFAULT_MAX_COLLAB_USERS', default=4, cast=int)
+# Number of seconds to consider a collab session alive without refresh
 DEFAULT_COLLAB_SESSION_TIMEOUT_SECONDS = config('DEFAULT_COLLAB_SESSION_TIMEOUT_SECONDS', default=60, cast=int)
+# Secret used by backend to sign JWTs for the collab service. Prefer `JWT_SECRET`
+# so backend and collab-service share the same environment variable name.
 COLLAB_JWT_SECRET = config(
     'JWT_SECRET',
     default=config('COLLAB_JWT_SECRET', default='jwt-secreto')
