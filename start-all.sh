@@ -24,6 +24,8 @@ export DB_PORT="5432"
 export JWT_SECRET="$JWT_SECRET"
 export COLLAB_JWT_SECRET="$JWT_SECRET"
 export ALLOWED_HOSTS="localhost,127.0.0.1,172.17.0.1,host.docker.internal"
+export PROJECTS_DIR="$ROOT_DIR/.lsp-projects"
+mkdir -p "$PROJECTS_DIR"
 # Evita que un DEBUG="release" (u otro valor no booleano) rompa python-decouple.
 if [ "${DEBUG:-}" = "release" ]; then
   export DEBUG="False"
@@ -51,8 +53,24 @@ ensure_npm_deps() {
   fi
 }
 
+start_background_command() {
+  local log_file="$1"
+  shift
+  nohup "$@" > "$log_file" 2>&1 &
+}
+
 ensure_python_deps() {
   (cd "$ROOT_DIR/backend" && "$PYTHON" -m pip install -r requirements.txt)
+}
+
+resolve_node_cmd() {
+  if command -v node.exe >/dev/null 2>&1; then
+    echo "node.exe"
+  elif command -v node >/dev/null 2>&1; then
+    echo "node"
+  else
+    echo ""
+  fi
 }
 
 ensure_postgres() {
@@ -84,9 +102,16 @@ start_docker_nginx() {
 }
 
 ensure_npm_deps "$ROOT_DIR/frontend"
+ensure_npm_deps "$ROOT_DIR/code-execution-service"
 ensure_npm_deps "$ROOT_DIR/collab-service"
 ensure_python_deps
 ensure_postgres
+
+NODE_CMD="$(resolve_node_cmd)"
+if [ -z "$NODE_CMD" ]; then
+  echo "ERROR: node.js no está disponible en PATH"
+  exit 1
+fi
 
 wait_for_postgres() {
   local max_attempts=10
@@ -123,34 +148,25 @@ start_docker_nginx collab-lb "$ROOT_DIR/collab-load-balancer/nginx.config" 8083
 start_docker_nginx lsp-lb "$ROOT_DIR/lsp-load-balancer/nginx.conf" 8085
 
 echo "Starting collab load balancer discovery watcher"
-(
-  cd "$ROOT_DIR/collab-load-balancer" && \
-  COLLAB_DISCOVERY_HOST=127.0.0.1 \
-  COLLAB_UPSTREAM_HOST=host.docker.internal \
-  "$PYTHON" update_nginx.py
-) &> "$ROOT_DIR/logs/collab-lb-watcher.log" &
+start_background_command "$ROOT_DIR/logs/collab-lb-watcher.log" \
+  bash -lc "cd '$ROOT_DIR/collab-load-balancer' && COLLAB_DISCOVERY_HOST=127.0.0.1 COLLAB_UPSTREAM_HOST=host.docker.internal '$PYTHON' update_nginx.py"
 
 echo "Starting backend"
-(cd "$ROOT_DIR/backend" && "$PYTHON" manage.py runserver 0.0.0.0:8000) \
-  &> "$ROOT_DIR/logs/backend.log" &
+start_background_command "$ROOT_DIR/logs/backend.log" \
+  bash -lc "cd '$ROOT_DIR/backend' && '$PYTHON' manage.py runserver 0.0.0.0:8000"
 
 echo "Starting frontend"
-(cd "$ROOT_DIR/frontend" && npm start) \
-  &> "$ROOT_DIR/logs/frontend.log" &
+start_background_command "$ROOT_DIR/logs/frontend.log" \
+  bash -lc "cd '$ROOT_DIR/frontend' && npm start"
+
+echo "Starting code-execution-service"
+start_background_command "$ROOT_DIR/logs/code-execution.log" \
+  bash -lc "cd '$ROOT_DIR/code-execution-service' && npm run dev"
 
 for port in 1234 1235 1236; do
   echo "Starting collab-service on port $port"
-  (
-    cd "$ROOT_DIR/collab-service" && \
-    PORT=$port JWT_SECRET="$JWT_SECRET" \
-    DB_ENGINE=django.db.backends.postgresql \
-    DB_NAME=extra_editable \
-    DB_USER=postgres \
-    DB_PASSWORD=postgres \
-    DB_HOST=localhost \
-    DB_PORT=5432 \
-    node src/server.js
-  ) &> "$ROOT_DIR/logs/collab-$port.log" &
+  start_background_command "$ROOT_DIR/logs/collab-$port.log" \
+    bash -lc "cd '$ROOT_DIR/collab-service' && PORT=$port JWT_SECRET='$JWT_SECRET' DB_ENGINE=django.db.backends.postgresql DB_NAME=extra_editable DB_USER=postgres DB_PASSWORD=postgres DB_HOST=localhost DB_PORT=5432 $NODE_CMD src/server.js"
 done
 
 echo "Started backend, frontend, Postgres, gateway, collab LB, and collab instances. Logs: $ROOT_DIR/logs"

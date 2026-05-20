@@ -1,54 +1,306 @@
 Watching for file changes with StatReloader
-[19/May/2026 22:10:07] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
-[19/May/2026 22:10:07] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
-[19/May/2026 22:10:07,235] - Broken pipe from ('172.17.0.6', 47332)
-[19/May/2026 22:10:07] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
-Unauthorized: /api/projects/8/
-[19/May/2026 22:10:08] "GET /api/projects/8/ HTTP/1.1" 401 203
-Unauthorized: /api/projects/2/lsp/token/
-[19/May/2026 22:10:19] "POST /api/projects/2/lsp/token/ HTTP/1.1" 401 123
-Unauthorized: /api/projects/1/lsp/token/
-[19/May/2026 22:10:30] "POST /api/projects/1/lsp/token/ HTTP/1.1" 401 123
-Unauthorized: /api/projects/
-[19/May/2026 22:10:44] "GET /api/projects/ HTTP/1.1" 401 123
-Unauthorized: /api/projects/
-[19/May/2026 22:10:51] "GET /api/projects/ HTTP/1.1" 401 123
-Unauthorized: /api/projects/
-[19/May/2026 22:10:54] "GET /api/projects/ HTTP/1.1" 401 123
-[19/May/2026 22:11:20] "POST /api/auth/login/ HTTP/1.1" 200 483
-[19/May/2026 22:11:35] "POST /api/projects/2/lsp/token/ HTTP/1.1" 200 183
-Not Found: /ap2/projects/1/lsp/token/
-[19/May/2026 22:13:14] "POST /ap2/projects/1/lsp/token/ HTTP/1.1" 404 2366
-[19/May/2026 22:13:50] "POST /api/auth/login/ HTTP/1.1" 200 483
-[19/May/2026 22:13:50] "POST /api/projects/2/lsp/token/ HTTP/1.1" 200 183
-[19/May/2026 22:41:47] "POST /api/projects/2/lsp/token/ HTTP/1.1" 200 183
-Unauthorized: /api/projects/validate-collab-token/
-[19/May/2026 23:18:27] "GET /api/projects/validate-collab-token/ HTTP/1.1" 401 26
-Unauthorized: /api/projects/8/
-[19/May/2026 23:18:27] "GET /api/projects/8/ HTTP/1.1" 401 203
-Unauthorized: /api/projects/8/
-[19/May/2026 23:18:29] "GET /api/projects/8/ HTTP/1.1" 401 203
-[19/May/2026 23:18:34] "POST /api/auth/login/ HTTP/1.1" 200 483
-/home/simondm/Development/ARQ/Proyecto_ARQ/backend/.venv/lib/python3.13/site-packages/rest_framework/pagination.py:200: UnorderedObjectListWarning: Pagination may yield inconsistent results with an unordered object_list: <class 'projects.models.Proyecto'> QuerySet.
+[20/May/2026 11:40:10] "POST /api/auth/login/ HTTP/1.1" 200 483
+[20/May/2026 11:40:11] "GET /api/auth/me/ HTTP/1.1" 200 151
+/home/schitiva/.local/lib/python3.10/site-packages/rest_framework/pagination.py:200: UnorderedObjectListWarning: Pagination may yield inconsistent results with an unordered object_list: <class 'projects.models.Proyecto'> QuerySet.
   paginator = self.django_paginator_class(queryset, page_size)
-[19/May/2026 23:18:34] "GET /api/projects/ HTTP/1.1" 200 496
-[19/May/2026 23:18:35] "GET /api/projects/8/ HTTP/1.1" 200 926
-[19/May/2026 23:18:35] "GET /api/auth/me/ HTTP/1.1" 200 148
-[19/May/2026 23:18:36] "POST /api/projects/8/collab/join/ HTTP/1.1" 200 182
-[19/May/2026 23:18:36] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
-[19/May/2026 23:18:36,096] - Broken pipe from ('172.17.0.6', 46512)
-[19/May/2026 23:18:36] "GET /api/auth/me/ HTTP/1.1" 200 148
-[19/May/2026 23:18:36] "POST /api/projects/8/collab/join/ HTTP/1.1" 200 189
-[19/May/2026 23:18:36] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
-[19/May/2026 23:18:36] "POST /api/projects/8/lsp/token/ HTTP/1.1" 200 182
-[19/May/2026 23:18:58] "POST /api/auth/login/ HTTP/1.1" 200 483
-[19/May/2026 23:18:58] "GET /api/projects/ HTTP/1.1" 200 276
-[19/May/2026 23:18:59] "GET /api/projects/8/ HTTP/1.1" 200 926
-[19/May/2026 23:18:59] "GET /api/auth/me/ HTTP/1.1" 200 154
-[19/May/2026 23:18:59] "POST /api/projects/8/collab/join/ HTTP/1.1" 200 184
-[19/May/2026 23:18:59] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
-[19/May/2026 23:18:59,756] - Broken pipe from ('172.17.0.6', 35754)
-[19/May/2026 23:18:59] "GET /api/auth/me/ HTTP/1.1" 200 154
-[19/May/2026 23:18:59] "POST /api/projects/8/collab/join/ HTTP/1.1" 200 191
-[19/May/2026 23:18:59] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
-[19/May/2026 23:18:59] "POST /api/projects/8/lsp/token/ HTTP/1.1" 200 184
+Internal Server Error: /api/projects/
+Traceback (most recent call last):
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/db/backends/utils.py", line 89, in _execute
+    return self.cursor.execute(sql, params)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/psycopg/cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+psycopg.errors.UndefinedTable: relation "proyecto_colaboradores" does not exist
+LINE 1: ...rchivos" FROM "projects_proyecto" LEFT OUTER JOIN "proyecto_...
+                                                             ^
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/core/handlers/base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/views/decorators/csrf.py", line 56, in wrapper_view
+    return view_func(*args, **kwargs)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/rest_framework/viewsets.py", line 125, in view
+    return self.dispatch(request, *args, **kwargs)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/rest_framework/views.py", line 509, in dispatch
+    response = self.handle_exception(exc)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/rest_framework/views.py", line 469, in handle_exception
+    self.raise_uncaught_exception(exc)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/rest_framework/views.py", line 480, in raise_uncaught_exception
+    raise exc
+  File "/home/schitiva/.local/lib/python3.10/site-packages/rest_framework/views.py", line 506, in dispatch
+    response = handler(request, *args, **kwargs)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/rest_framework/mixins.py", line 40, in list
+    page = self.paginate_queryset(queryset)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/rest_framework/generics.py", line 171, in paginate_queryset
+    return self.paginator.paginate_queryset(queryset, self.request, view=self)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/rest_framework/pagination.py", line 204, in paginate_queryset
+    self.page = paginator.page(page_number)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/core/paginator.py", line 72, in page
+    number = self.validate_number(number)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/core/paginator.py", line 53, in validate_number
+    if number > self.num_pages:
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/utils/functional.py", line 57, in __get__
+    res = instance.__dict__[self.name] = self.func(instance)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/core/paginator.py", line 99, in num_pages
+    if self.count == 0 and not self.allow_empty_first_page:
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/utils/functional.py", line 57, in __get__
+    res = instance.__dict__[self.name] = self.func(instance)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/core/paginator.py", line 93, in count
+    return c()
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/db/models/query.py", line 608, in count
+    return self.query.get_count(using=self.db)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/db/models/sql/query.py", line 568, in get_count
+    return obj.get_aggregation(using, {"__count": Count("*")})["__count"]
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/db/models/sql/query.py", line 554, in get_aggregation
+    result = compiler.execute_sql(SINGLE)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/db/models/sql/compiler.py", line 1562, in execute_sql
+    cursor.execute(sql, params)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/db/backends/utils.py", line 102, in execute
+    return super().execute(sql, params)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/db/backends/utils.py", line 67, in execute
+    return self._execute_with_wrappers(
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/db/backends/utils.py", line 80, in _execute_with_wrappers
+    return executor(sql, params, many, context)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/db/backends/utils.py", line 84, in _execute
+    with self.db.wrap_database_errors:
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/db/utils.py", line 91, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/db/backends/utils.py", line 89, in _execute
+    return self.cursor.execute(sql, params)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/psycopg/cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+django.db.utils.ProgrammingError: relation "proyecto_colaboradores" does not exist
+LINE 1: ...rchivos" FROM "projects_proyecto" LEFT OUTER JOIN "proyecto_...
+                                                             ^
+[20/May/2026 11:40:11] "GET /api/projects/ HTTP/1.1" 500 196122
+[20/May/2026 11:40:11] "POST /api/projects/ HTTP/1.1" 201 173
+[20/May/2026 11:40:12] "POST /api/projects/5/lsp/token/ HTTP/1.1" 200 183
+Internal Server Error: /api/projects/5/
+Traceback (most recent call last):
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/db/backends/utils.py", line 89, in _execute
+    return self.cursor.execute(sql, params)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/psycopg/cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+psycopg.errors.UndefinedTable: relation "proyecto_colaboradores" does not exist
+LINE 1: DELETE FROM "proyecto_colaboradores" WHERE "proyecto_colabor...
+                    ^
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/core/handlers/base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/views/decorators/csrf.py", line 56, in wrapper_view
+    return view_func(*args, **kwargs)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/rest_framework/viewsets.py", line 125, in view
+    return self.dispatch(request, *args, **kwargs)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/rest_framework/views.py", line 509, in dispatch
+    response = self.handle_exception(exc)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/rest_framework/views.py", line 469, in handle_exception
+    self.raise_uncaught_exception(exc)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/rest_framework/views.py", line 480, in raise_uncaught_exception
+    raise exc
+  File "/home/schitiva/.local/lib/python3.10/site-packages/rest_framework/views.py", line 506, in dispatch
+    response = handler(request, *args, **kwargs)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/rest_framework/mixins.py", line 91, in destroy
+    self.perform_destroy(instance)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/rest_framework/mixins.py", line 95, in perform_destroy
+    instance.delete()
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/db/models/base.py", line 1132, in delete
+    return collector.delete()
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/db/models/deletion.py", line 472, in delete
+    count = qs._raw_delete(using=self.using)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/db/models/query.py", line 1170, in _raw_delete
+    cursor = query.get_compiler(using).execute_sql(CURSOR)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/db/models/sql/compiler.py", line 1562, in execute_sql
+    cursor.execute(sql, params)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/db/backends/utils.py", line 102, in execute
+    return super().execute(sql, params)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/db/backends/utils.py", line 67, in execute
+    return self._execute_with_wrappers(
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/db/backends/utils.py", line 80, in _execute_with_wrappers
+    return executor(sql, params, many, context)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/db/backends/utils.py", line 84, in _execute
+    with self.db.wrap_database_errors:
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/db/utils.py", line 91, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/db/backends/utils.py", line 89, in _execute
+    return self.cursor.execute(sql, params)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/psycopg/cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+django.db.utils.ProgrammingError: relation "proyecto_colaboradores" does not exist
+LINE 1: DELETE FROM "proyecto_colaboradores" WHERE "proyecto_colabor...
+                    ^
+[20/May/2026 11:40:15] "DELETE /api/projects/5/ HTTP/1.1" 500 153658
+[20/May/2026 11:40:40] "POST /api/auth/login/ HTTP/1.1" 200 483
+[20/May/2026 11:40:40] "GET /api/auth/me/ HTTP/1.1" 200 151
+Internal Server Error: /api/projects/
+Traceback (most recent call last):
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/db/backends/utils.py", line 89, in _execute
+    return self.cursor.execute(sql, params)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/psycopg/cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+psycopg.errors.UndefinedTable: relation "proyecto_colaboradores" does not exist
+LINE 1: ...rchivos" FROM "projects_proyecto" LEFT OUTER JOIN "proyecto_...
+                                                             ^
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/core/handlers/base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/views/decorators/csrf.py", line 56, in wrapper_view
+    return view_func(*args, **kwargs)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/rest_framework/viewsets.py", line 125, in view
+    return self.dispatch(request, *args, **kwargs)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/rest_framework/views.py", line 509, in dispatch
+    response = self.handle_exception(exc)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/rest_framework/views.py", line 469, in handle_exception
+    self.raise_uncaught_exception(exc)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/rest_framework/views.py", line 480, in raise_uncaught_exception
+    raise exc
+  File "/home/schitiva/.local/lib/python3.10/site-packages/rest_framework/views.py", line 506, in dispatch
+    response = handler(request, *args, **kwargs)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/rest_framework/mixins.py", line 40, in list
+    page = self.paginate_queryset(queryset)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/rest_framework/generics.py", line 171, in paginate_queryset
+    return self.paginator.paginate_queryset(queryset, self.request, view=self)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/rest_framework/pagination.py", line 204, in paginate_queryset
+    self.page = paginator.page(page_number)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/core/paginator.py", line 72, in page
+    number = self.validate_number(number)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/core/paginator.py", line 53, in validate_number
+    if number > self.num_pages:
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/utils/functional.py", line 57, in __get__
+    res = instance.__dict__[self.name] = self.func(instance)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/core/paginator.py", line 99, in num_pages
+    if self.count == 0 and not self.allow_empty_first_page:
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/utils/functional.py", line 57, in __get__
+    res = instance.__dict__[self.name] = self.func(instance)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/core/paginator.py", line 93, in count
+    return c()
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/db/models/query.py", line 608, in count
+    return self.query.get_count(using=self.db)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/db/models/sql/query.py", line 568, in get_count
+    return obj.get_aggregation(using, {"__count": Count("*")})["__count"]
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/db/models/sql/query.py", line 554, in get_aggregation
+    result = compiler.execute_sql(SINGLE)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/db/models/sql/compiler.py", line 1562, in execute_sql
+    cursor.execute(sql, params)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/db/backends/utils.py", line 102, in execute
+    return super().execute(sql, params)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/db/backends/utils.py", line 67, in execute
+    return self._execute_with_wrappers(
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/db/backends/utils.py", line 80, in _execute_with_wrappers
+    return executor(sql, params, many, context)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/db/backends/utils.py", line 84, in _execute
+    with self.db.wrap_database_errors:
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/db/utils.py", line 91, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/db/backends/utils.py", line 89, in _execute
+    return self.cursor.execute(sql, params)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/psycopg/cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+django.db.utils.ProgrammingError: relation "proyecto_colaboradores" does not exist
+LINE 1: ...rchivos" FROM "projects_proyecto" LEFT OUTER JOIN "proyecto_...
+                                                             ^
+[20/May/2026 11:40:40] "GET /api/projects/ HTTP/1.1" 500 196122
+[20/May/2026 11:40:41] "POST /api/projects/ HTTP/1.1" 201 173
+[20/May/2026 11:40:41] "POST /api/projects/6/lsp/token/ HTTP/1.1" 200 183
+Internal Server Error: /api/projects/6/
+Traceback (most recent call last):
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/db/backends/utils.py", line 89, in _execute
+    return self.cursor.execute(sql, params)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/psycopg/cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+psycopg.errors.UndefinedTable: relation "proyecto_colaboradores" does not exist
+LINE 1: DELETE FROM "proyecto_colaboradores" WHERE "proyecto_colabor...
+                    ^
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/core/handlers/base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/views/decorators/csrf.py", line 56, in wrapper_view
+    return view_func(*args, **kwargs)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/rest_framework/viewsets.py", line 125, in view
+    return self.dispatch(request, *args, **kwargs)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/rest_framework/views.py", line 509, in dispatch
+    response = self.handle_exception(exc)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/rest_framework/views.py", line 469, in handle_exception
+    self.raise_uncaught_exception(exc)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/rest_framework/views.py", line 480, in raise_uncaught_exception
+    raise exc
+  File "/home/schitiva/.local/lib/python3.10/site-packages/rest_framework/views.py", line 506, in dispatch
+    response = handler(request, *args, **kwargs)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/rest_framework/mixins.py", line 91, in destroy
+    self.perform_destroy(instance)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/rest_framework/mixins.py", line 95, in perform_destroy
+    instance.delete()
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/db/models/base.py", line 1132, in delete
+    return collector.delete()
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/db/models/deletion.py", line 472, in delete
+    count = qs._raw_delete(using=self.using)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/db/models/query.py", line 1170, in _raw_delete
+    cursor = query.get_compiler(using).execute_sql(CURSOR)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/db/models/sql/compiler.py", line 1562, in execute_sql
+    cursor.execute(sql, params)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/db/backends/utils.py", line 102, in execute
+    return super().execute(sql, params)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/db/backends/utils.py", line 67, in execute
+    return self._execute_with_wrappers(
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/db/backends/utils.py", line 80, in _execute_with_wrappers
+    return executor(sql, params, many, context)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/db/backends/utils.py", line 84, in _execute
+    with self.db.wrap_database_errors:
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/db/utils.py", line 91, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "/home/schitiva/.local/lib/python3.10/site-packages/django/db/backends/utils.py", line 89, in _execute
+    return self.cursor.execute(sql, params)
+  File "/home/schitiva/.local/lib/python3.10/site-packages/psycopg/cursor.py", line 117, in execute
+    raise ex.with_traceback(None)
+django.db.utils.ProgrammingError: relation "proyecto_colaboradores" does not exist
+LINE 1: DELETE FROM "proyecto_colaboradores" WHERE "proyecto_colabor...
+                    ^
+[20/May/2026 11:40:44] "DELETE /api/projects/6/ HTTP/1.1" 500 153658
+[20/May/2026 11:44:51] "POST /api/auth/login/ HTTP/1.1" 200 483
+[20/May/2026 11:44:51] "GET /api/auth/me/ HTTP/1.1" 200 151
+[20/May/2026 11:44:51] "GET /api/projects/ HTTP/1.1" 200 1154
+[20/May/2026 11:44:52] "POST /api/projects/ HTTP/1.1" 201 173
+[20/May/2026 11:44:52] "POST /api/projects/7/lsp/token/ HTTP/1.1" 200 183
+[20/May/2026 11:48:45] "POST /api/auth/login/ HTTP/1.1" 200 483
+[20/May/2026 11:48:45] "GET /api/auth/me/ HTTP/1.1" 200 151
+[20/May/2026 11:48:46] "GET /api/projects/ HTTP/1.1" 200 1391
+[20/May/2026 11:48:46] "POST /api/projects/ HTTP/1.1" 201 173
+[20/May/2026 11:48:46] "POST /api/projects/8/lsp/token/ HTTP/1.1" 200 183
+[20/May/2026 11:49:36] "POST /api/auth/login/ HTTP/1.1" 200 483
+Unauthorized: /api/projects/
+[20/May/2026 11:49:37] "POST /api/projects/ HTTP/1.1" 401 123
+Not Found: /api/projects//lsp/token/
+[20/May/2026 11:49:37] "POST /api/projects//lsp/token/ HTTP/1.1" 404 7608
+[20/May/2026 11:50:19] "POST /api/auth/login/ HTTP/1.1" 200 483
+[20/May/2026 11:51:13] "POST /api/auth/login/ HTTP/1.1" 200 483
+[20/May/2026 11:51:13] "POST /api/projects/ HTTP/1.1" 201 135
+[20/May/2026 11:51:13] "POST /api/projects/9/lsp/token/ HTTP/1.1" 200 183
+[20/May/2026 11:52:23] "POST /api/auth/login/ HTTP/1.1" 200 483
+[20/May/2026 11:52:23] "GET /api/auth/me/ HTTP/1.1" 200 151
+[20/May/2026 11:52:23] "GET /api/projects/ HTTP/1.1" 200 1827
+[20/May/2026 11:52:23] "POST /api/projects/ HTTP/1.1" 201 174
+[20/May/2026 11:52:24] "POST /api/projects/10/lsp/token/ HTTP/1.1" 200 185
+[20/May/2026 11:52:36] "DELETE /api/projects/10/ HTTP/1.1" 204 0
+[20/May/2026 11:52:48] "POST /api/auth/login/ HTTP/1.1" 200 483
+[20/May/2026 11:52:49] "GET /api/auth/me/ HTTP/1.1" 200 151
+[20/May/2026 11:52:49] "GET /api/projects/ HTTP/1.1" 200 1827
+[20/May/2026 11:52:49] "POST /api/projects/ HTTP/1.1" 201 174
+[20/May/2026 11:52:49] "POST /api/projects/11/lsp/token/ HTTP/1.1" 200 185
+[20/May/2026 11:53:01] "DELETE /api/projects/11/ HTTP/1.1" 204 0
