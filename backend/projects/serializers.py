@@ -1,104 +1,69 @@
-import os
-from datetime import timedelta
-from django.utils import timezone
-
 from rest_framework import serializers
-from .models import Archivo, Proyecto, CollabSession, ProyectoColaborador
+from .models import Archivo, Proyecto
 
-EXTENSIONES_POR_LENGUAJE = {
-    'CPP': ('.cpp', '.hpp', '.h', '.c', '.cc', '.cxx'),
-    'PYTHON': ('.py', '.pyw'),
-    'TYPESCRIPT': ('.ts', '.tsx'),
-}
+MAX_ARCHIVO_BYTES = 65536   # 64 KB — debe coincidir con CHECK en esquema.sql
 
 
 class ArchivoSerializer(serializers.ModelSerializer):
-    fechaCreacion = serializers.DateTimeField(source='fecha_creacion', read_only=True)
-    fechaActualizacion = serializers.DateTimeField(source='fecha_actualizacion', read_only=True)
-
     class Meta:
-        model = Archivo
+        model  = Archivo
         fields = ('id', 'nombre', 'contenido', 'fechaCreacion', 'fechaActualizacion')
         read_only_fields = ('id', 'fechaCreacion', 'fechaActualizacion')
 
-    def validate_nombre(self, value):
-        proyecto = self.context.get('proyecto')
-        if proyecto is not None:
-            _, ext = os.path.splitext(value)
-            validas = EXTENSIONES_POR_LENGUAJE.get(proyecto.lenguaje, ())
-            if validas and ext and ext.lower() not in [v.lower() for v in validas]:
-                raise serializers.ValidationError(
-                    f'La extensión "{ext}" no es válida para un proyecto {proyecto.lenguaje}. '
-                    f'Extensiones permitidas: {", ".join(validas)}'
-                )
-    # Impedir renombrar a un nombre que ya existe en el mismo proyecto
-            exists = Archivo.objects.filter(
-                proyecto=proyecto,
-                nombre__iexact=value,
+    def validate_contenido(self, value):
+        if len(value.encode('utf-8')) > MAX_ARCHIVO_BYTES:
+            raise serializers.ValidationError(
+                f'El archivo supera el límite de {MAX_ARCHIVO_BYTES // 1024} KB.'
             )
-            if self.instance is not None:
-                exists = exists.exclude(pk=self.instance.pk)
-            if exists.exists():
-                raise serializers.ValidationError(
-                    f'Ya existe un archivo llamado "{value}" en este proyecto.'
-                )
         return value
 
+    def validate(self, attrs):
+        # Validar peso total del proyecto al crear o actualizar
+        request = self.context.get('request')
+        view    = self.context.get('view')
 
-class ProyectoListaSerializer(serializers.ModelSerializer):
-    """Lista ligera — pensada para el selector de proyectos."""
-    num_archivos = serializers.SerializerMethodField()
-    num_colaboradores = serializers.SerializerMethodField()
-    colaboradores = serializers.SerializerMethodField()
-    usuario = serializers.CharField(source='usuario.username', read_only=True)
-    fechaCreacion = serializers.DateTimeField(source='fecha_creacion', read_only=True)
+        if view and hasattr(view, 'kwargs'):
+            proyecto_pk = view.kwargs.get('proyecto_pk')
+            if proyecto_pk:
+                try:
+                    proyecto = Proyecto.objects.get(pk=proyecto_pk)
+                except Proyecto.DoesNotExist:
+                    return attrs
 
-    class Meta:
-        model = Proyecto
-        fields = ('id', 'nombre', 'descripcion', 'lenguaje', 'fechaCreacion',
-                  'num_archivos', 'num_colaboradores', 'colaboradores', 'usuario')
-        read_only_fields = fields
+                nuevo_contenido = attrs.get('contenido', '')
+                nuevo_bytes     = len(nuevo_contenido.encode('utf-8'))
 
-    def get_num_archivos(self, obj):
-        return getattr(obj, 'num_archivos', obj.archivos.count())
+                # Excluir el propio archivo en caso de actualización
+                instancia_pk = self.instance.pk if self.instance else None
+                archivos_qs  = proyecto.archivos.all()
+                if instancia_pk:
+                    archivos_qs = archivos_qs.exclude(pk=instancia_pk)
 
-    def get_num_colaboradores(self, obj):
-        if hasattr(obj, 'num_colaboradores'):
-            return obj.num_colaboradores
-        return ProyectoColaborador.objects.filter(proyecto=obj).count() + 1  # +1 dueño
+                bytes_existentes = sum(
+                    len((a.contenido or '').encode('utf-8')) for a in archivos_qs
+                )
 
-    def get_colaboradores(self, obj):
-        if hasattr(obj, 'colaboradores_nombres'):
-            return [{'id': uid, 'username': uname} for uid, uname in obj.colaboradores_nombres]
-        colaboradores = ProyectoColaborador.objects.filter(
-            proyecto=obj
-        ).select_related('usuario')
-        return [{'id': c.usuario.id, 'username': c.usuario.username} for c in colaboradores]
+                if (bytes_existentes + nuevo_bytes) > proyecto.max_bytes_total:
+                    limite_kb = proyecto.max_bytes_total // 1024
+                    raise serializers.ValidationError(
+                        f'El proyecto supera el límite de almacenamiento ({limite_kb} KB total).'
+                    )
+
+        return attrs
 
 
 class ProyectoSerializer(serializers.ModelSerializer):
-    """Creación/edición — acepta colaboradores en create."""
-    archivos = ArchivoSerializer(many=True, read_only=True)
-    fechaCreacion = serializers.DateTimeField(source='fecha_creacion', read_only=True)
-    colaboradores = serializers.ListField(
-        child=serializers.IntegerField(), write_only=True, required=False, max_length=4
-    )
-
+    """Lista — sin archivos anidados para minimizar payload."""
     class Meta:
-        model = Proyecto
-        fields = ('id', 'nombre', 'descripcion', 'lenguaje', 'fechaCreacion', 'archivos', 'colaboradores')
-        read_only_fields = ('id', 'fechaCreacion', 'archivos')
-
-    def create(self, validated_data):
-        """Extrae colaboradores de validated_data antes de crear el Proyecto,
-        para evitar TypeError: Proyecto() got unexpected keyword arguments."""
-        colaboradores = validated_data.pop('colaboradores', [])
-        instance = super().create(validated_data)
-        self._colaboradores = colaboradores
-        return instance
+        model  = Proyecto
+        fields = ('id', 'nombre', 'descripcion', 'lenguaje', 'fechaCreacion',
+                  'max_archivos', 'max_bytes_total')
+        read_only_fields = ('id', 'fechaCreacion')
 
 
 class ProyectoDetailSerializer(ProyectoSerializer):
-    """Detalle — mismo que lista (ya incluye archivos)."""
+    """Detalle — incluye archivos anidados."""
+    archivos = ArchivoSerializer(many=True, read_only=True)
+
     class Meta(ProyectoSerializer.Meta):
-        pass
+        fields = ProyectoSerializer.Meta.fields + ('archivos',)
