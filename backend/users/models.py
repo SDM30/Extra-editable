@@ -15,8 +15,6 @@ class User(AbstractUser):
     email = models.EmailField(unique=True)
 
     class Meta:
-        managed = False
-        db_table = 'usuarios'
         verbose_name = 'usuario'
         verbose_name_plural = 'usuarios'
 
