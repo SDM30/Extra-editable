@@ -223,3 +223,62 @@ docker stop $(docker ps -q --filter label=lsp.service=api)
 # Los agentes recibirán SPAWN y re-levantarán los contenedores.
 # Verificar en logs del agente: "SPAWN recibido → iniciando"
 ```
+
+## Pruebas de autenticación LSP (JWT)
+
+Todos los endpoints REST y conexiones WebSocket del Servicio de Lenguaje requieren
+un token JWT scoped al proyecto. El backend emite tokens LSP en
+`POST /api/projects/{id}/lsp/token/` con payload `{sub, username, room, exp}`.
+
+```bash
+# 1. Login
+ACCESS=$(curl -s -X POST http://localhost:8000/api/auth/login/ \
+  -H "Content-Type: application/json" \
+  -d '{"username":"samuel","password":"User1234!"}' | \
+  python3 -c "import sys,json; print(json.load(sys.stdin)['access'])")
+
+# 2. Obtener token LSP para el proyecto (usá un ID de proyecto que te pertenezca)
+LSP_TOKEN=$(curl -s -X POST http://localhost:8000/api/projects/2/lsp/token/ \
+  -H "Authorization: Bearer $ACCESS" | \
+  python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+
+# 3. Sin token → 401
+curl -i http://localhost:8080/lsp/2
+# → HTTP/1.1 401 Unauthorized
+#   {"detail":"Token requerido"}
+
+# 4. Con token → 200 (crea contenedor LSP multiplexor)
+curl -s http://localhost:8080/lsp/2 \
+  -H "Authorization: Bearer $LSP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"language":"python"}' | python3 -m json.tool
+# → container_id, ws_url, ws_port, etc.
+
+# 5. Token de proyecto A en endpoint de proyecto B → 403
+curl -i http://localhost:8080/lsp/99 \
+  -H "Authorization: Bearer $LSP_TOKEN"
+# → HTTP/1.1 403 Forbidden
+#   {"detail":"No pertenece al proyecto 99"}
+
+# 6. WebSocket sin token → rechazado
+npx wscat -c "ws://localhost:32768"
+# → Disconnected (code: 1008, reason: Token requerido)
+
+# 7. WebSocket con token → conectado
+WS_URL=$(curl -s http://localhost:8080/lsp/2 \
+  -H "Authorization: Bearer $LSP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"language":"python"}' | \
+  python3 -c "import sys,json; print(json.load(sys.stdin)['ws_url'])")
+npx wscat -c "${WS_URL}?token=${LSP_TOKEN}"
+# → Connected (press CTRL+C to quit)
+```
+
+El flujo completo de autenticación es:
+
+```
+Frontend → POST /auth/login/ → access_token
+         → POST /projects/{id}/lsp/token/ (Bearer access_token) → lsp_token {room}
+         → REST /lsp/{id} (Bearer lsp_token) → valida JWT + room == project_id
+         → WS ws://host:port?token=lsp_token → multiplexor valida JWT + room == PROJECT_ID
+```

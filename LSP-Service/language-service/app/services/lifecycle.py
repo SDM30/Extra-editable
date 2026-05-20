@@ -157,7 +157,9 @@ def create_container(project_id: str, language: str, max_clients: int = 4):
                 "MAX_CLIENTS": str(max_clients),
                 "IDLE_TIMEOUT": idle_timeout,
                 "WORKDIR": "/workspace",
-                "LSPMUX_PORT": str(LSPMUX_INTERNAL_PORT)
+                "LSPMUX_PORT": str(LSPMUX_INTERNAL_PORT),
+                "PROJECT_ID": project_id,
+                "JWT_SECRET": os.getenv("JWT_SECRET", "jwt-secreto"),
             },
             volumes={
                 project_path: {

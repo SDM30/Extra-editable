@@ -4,11 +4,12 @@
 # cross-machine (/_internal/destroy) usado por otras instancias del servicio.
 
 import os
-from fastapi import APIRouter, HTTPException, Query, Header
+from fastapi import APIRouter, HTTPException, Query, Header, Depends
 from pydantic import BaseModel, Field
 from typing import Optional
 from app.services import lifecycle
 from app.services import registry
+from app.auth import verify_lsp_access, verify_lsp_token_for_project
 
 router = APIRouter(prefix="/lsp", tags=["lsp"])
 
@@ -39,7 +40,11 @@ class StatusResponse(BaseModel):
     created_at: Optional[str] = None
 
 @router.post("/{project_id}", response_model=CreateResponse)
-def create_lsp(project_id: str, body: CreateRequest):
+def create_lsp(
+    project_id: str,
+    body: CreateRequest,
+    user: dict = Depends(verify_lsp_token_for_project),
+):
     """
     Crea un contenedor LSP multiplexor para el proyecto.
     
@@ -70,7 +75,11 @@ def create_lsp(project_id: str, body: CreateRequest):
 
 
 @router.delete("/{project_id}")
-def destroy_lsp(project_id: str, language: Optional[str] = Query(None, description="Lenguaje (python, cpp, typescript)")):
+def destroy_lsp(
+    project_id: str,
+    language: Optional[str] = Query(None, description="Lenguaje (python, cpp, typescript)"),
+    user: dict = Depends(verify_lsp_token_for_project),
+):
     """Destruye el contenedor LSP de un proyecto."""
     try:
         if language is None:
@@ -97,7 +106,11 @@ def destroy_lsp(project_id: str, language: Optional[str] = Query(None, descripti
 
 
 @router.get("/{project_id}", response_model=StatusResponse)
-def get_status(project_id: str, language: Optional[str] = Query(None, description="Lenguaje (python, cpp, typescript)")):
+def get_status(
+    project_id: str,
+    language: Optional[str] = Query(None, description="Lenguaje (python, cpp, typescript)"),
+    user: dict = Depends(verify_lsp_token_for_project),
+):
     """Retorna el estado detallado del contenedor LSP de un proyecto."""
     try:
         if language is None:
@@ -117,7 +130,8 @@ def get_status(project_id: str, language: Optional[str] = Query(None, descriptio
 def get_logs(
     project_id: str,
     tail: int = Query(100, description="Número de líneas de log a retornar"),
-    language: Optional[str] = Query(None, description="Lenguaje (python, cpp, typescript)")
+    language: Optional[str] = Query(None, description="Lenguaje (python, cpp, typescript)"),
+    user: dict = Depends(verify_lsp_token_for_project),
 ):
     """Obtiene los logs del contenedor para debugging."""
     try:
@@ -136,7 +150,7 @@ def get_logs(
 
 
 @router.get("/")
-def list_all():
+def list_all(user: dict = Depends(verify_lsp_access)):
     """Lista todos los contenedores activos con su información detallada."""
     containers = registry.get_all()
     
@@ -162,7 +176,10 @@ def list_all():
 
 
 @router.post("/cleanup")
-def cleanup_inactive(idle_timeout: int = Query(1800, description="Timeout de inactividad en segundos")):
+def cleanup_inactive(
+    idle_timeout: int = Query(1800, description="Timeout de inactividad en segundos"),
+    user: dict = Depends(verify_lsp_access),
+):
     """
     Limpia contenedores inactivos.
     Útil para liberar recursos automáticamente.

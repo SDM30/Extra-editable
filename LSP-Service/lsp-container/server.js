@@ -2,6 +2,7 @@
 import { WebSocketServer } from "ws";
 import { spawn } from "child_process";
 import { createInterface } from "readline";
+import jwt from "jsonwebtoken";
 
 /**
  * Multiplexor de Language Server Protocol (LSP)
@@ -565,6 +566,43 @@ class LSPMultiplexer {
      * @listens connection
      */
     this.wss.on("connection", (ws, req) => {
+      // ── Autenticación JWT ──────────────────────────────────────────────
+      const JWT_SECRET = process.env.JWT_SECRET || "jwt-secreto";
+      const PROJECT_ID = process.env.PROJECT_ID;
+
+      try {
+        const url = new URL(req.url, "http://localhost");
+        const token = url.searchParams.get("token");
+
+        if (!token) {
+          console.warn("[LSPMultiplexer] Conexión rechazada: token requerido");
+          ws.close(1008, "Token requerido");
+          return;
+        }
+
+        const payload = jwt.verify(token, JWT_SECRET, { algorithms: ["HS256"] });
+
+        if (PROJECT_ID && payload.room !== PROJECT_ID) {
+          console.warn(
+            `[LSPMultiplexer] Conexión rechazada: room ${payload.room} != proyecto ${PROJECT_ID}`,
+          );
+          ws.close(1008, `No pertenece al proyecto ${PROJECT_ID}`);
+          return;
+        }
+
+        ws.lspUser = {
+          id: payload.sub,
+          username: payload.username || "anon",
+        };
+        console.log(
+          `[LSPMultiplexer] Usuario autenticado: ${ws.lspUser.username} (sub=${ws.lspUser.id})`,
+        );
+      } catch (e) {
+        console.warn(`[LSPMultiplexer] Token inválido: ${e.message}`);
+        ws.close(1008, "Token inválido o expirado");
+        return;
+      }
+
       // Validar límite de clientes
       if (this.clients.size >= this.maxClients) {
         console.warn(

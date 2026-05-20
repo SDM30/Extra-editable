@@ -66,6 +66,46 @@ class ValidateCollabTokenView(APIView):
         return resp
 
 
+class LspTokenView(APIView):
+    """Endpoint que emite un token JWT scoped al proyecto para el servicio LSP.
+
+    POST /api/projects/{project_id}/lsp/token/
+    Header: Authorization: Bearer <access_token>
+
+    Retorna { token, room } donde el token incluye:
+      - sub: user_id
+      - username: nombre de usuario
+      - room: project_id
+      - exp: 1 hora
+
+    El LSP service valida este token localmente (HS256, JWT_SECRET compartido)
+    y rechaza requests cuyo room no coincida con el project_id del endpoint.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, project_id=None):
+        proyecto = Proyecto.objects.get(pk=project_id)
+
+        if proyecto.usuario != request.user:
+            if not ProyectoColaborador.objects.filter(
+                proyecto=proyecto, usuario=request.user
+            ).exists():
+                return Response(
+                    {'detail': 'No tienes acceso a este proyecto.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+        payload = {
+            'sub': str(request.user.id),
+            'username': request.user.username,
+            'room': str(project_id),
+            'exp': datetime.utcnow() + timedelta(hours=1),
+        }
+        secret = getattr(settings, 'COLLAB_JWT_SECRET', settings.SECRET_KEY)
+        token = jwt.encode(payload, secret, algorithm='HS256')
+        return Response({'token': token, 'room': str(project_id)})
+
+
 class ProyectoViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsProjectOwner]
 

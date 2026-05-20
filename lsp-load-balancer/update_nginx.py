@@ -38,7 +38,8 @@ UPSTREAM_MARKER      = "# {{LSP_INSTANCES}}"
 _SPAWN_THRESHOLD     = 3
 _EMPTY_STREAK        = 0
 
-# Cliente Redis — misma configuración que el LSP service
+# Nginx — ruta absoluta (evita problemas de PATH en entornos virtuales)
+NGINX_BIN = "/usr/sbin/nginx"
 _redis = redis.Redis(
     host=REDIS_HOST,
     port=REDIS_PORT,
@@ -131,7 +132,7 @@ def generate_and_reload(template: str, instances: list[str]):
 
     # Validar sintaxis antes de recargar
     result = subprocess.run(
-        ["nginx", "-t", "-c", NGINX_CONF_PATH],
+        [NGINX_BIN, "-t", "-c", NGINX_CONF_PATH],
         capture_output=True, text=True
     )
     if result.returncode != 0:
@@ -140,7 +141,7 @@ def generate_and_reload(template: str, instances: list[str]):
 
     # Recargar Nginx
     result = subprocess.run(
-        ["nginx", "-s", "reload"],
+        [NGINX_BIN, "-s", "reload"],
         capture_output=True, text=True
     )
     if result.returncode == 0:

@@ -5,16 +5,16 @@
 ❯ Building...
 ✔ Building...
 Initial chunk files | Names               |  Raw size
-main.js             | main                | 215.08 kB | 
+main.js             | main                | 216.50 kB | 
 chunk-APEK4AIU.js   | -                   |   7.19 kB | 
 styles.css          | styles              | 236 bytes | 
 
-                    | Initial total       | 222.51 kB
+                    | Initial total       | 223.93 kB
 
 Lazy chunk files    | Names               |  Raw size
 chunk-3TXSLBCY.js   | auth-wrap-component |  47.29 kB | 
 
-Application bundle generation complete. [6.112 seconds] - 2026-05-19T23:24:02.441Z
+Application bundle generation complete. [5.058 seconds] - 2026-05-20T03:10:06.475Z
 
 Watch mode enabled. Watching for file changes...
 NOTE: Raw file sizes do not reflect development server per-request transformations.
