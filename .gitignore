@@ -97,6 +97,7 @@ public/
 Extra-editable.wiki/
 # ==== Servicio de lenguaje ====
 .codex
+opencode.json
 **/__pycache__/
 *.pyc
 *.pyo

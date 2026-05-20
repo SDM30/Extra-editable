@@ -31,7 +31,7 @@ PORTS=($(discover_ports))
 
 if [ ${#PORTS[@]} -eq 0 ]; then
     echo "No se encontraron instancias del API corriendo."
-    echo "Levanta las instancias primero: docker compose up -d --scale language-service=3"
+    echo "Levanta las instancias primero: docker compose up -d --scale language-service=3 --scale agent=1"
     exit 1
 fi
 

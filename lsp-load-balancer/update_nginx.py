@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """
 Watcher de instancias del Servicio de Lenguaje.
-Lee los puertos mapeados por Docker (filtrando por label) y actualiza nginx.conf.
-No depende de Redis para el descubrimiento de red.
+Lee las instancias activas desde Redis (lsp:instances + heartbeat) y actualiza
+nginx.conf. Si detecta cero instancias, publica un comando SPAWN vía Redis Pub/Sub
+para que los agentes sidecar en cada nodo levanten sus contenedores LSP.
 """
 
 import subprocess
 import os
 import time
-import re
 import logging
+import redis
 
 logging.basicConfig(
     level=logging.INFO,
@@ -25,15 +26,27 @@ TEMPLATE_PATH        = os.getenv("NGINX_TEMPLATE_PATH",  os.path.join(BASE_DIR, 
 NGINX_CONF_PATH      = os.getenv("NGINX_CONF_PATH",      os.path.join(BASE_DIR, "nginx.conf"))
 POLL_INTERVAL        = int(os.getenv("POLL_INTERVAL", 2))
 
-# Filtros de Docker (solo contenedores del Servicio de Lenguaje)
-DOCKER_LABEL         = os.getenv("DOCKER_LABEL", "lsp.service=api")
-DOCKER_NAME_FILTER   = os.getenv("DOCKER_NAME_FILTER", "lsp-service-language-service")
+# Redis — service registry compartido
+REDIS_HOST           = os.getenv("REDIS_HOST", "localhost")
+REDIS_PORT           = int(os.getenv("REDIS_PORT", 6379))
+REDIS_DB             = int(os.getenv("REDIS_DB", 0))
 
 # Marcador dentro del template que será reemplazado por los servidores dinámicos
 UPSTREAM_MARKER      = "# {{LSP_INSTANCES}}"
 
-# Puerto interno del API (para extraer el mapeo)
-INTERNAL_PORT        = "8135"
+# Auto-spawn: cuántos polls consecutivos vacíos antes de publicar SPAWN
+_SPAWN_THRESHOLD     = 3
+_EMPTY_STREAK        = 0
+
+# Cliente Redis — misma configuración que el LSP service
+_redis = redis.Redis(
+    host=REDIS_HOST,
+    port=REDIS_PORT,
+    db=REDIS_DB,
+    decode_responses=True,
+    socket_connect_timeout=5,
+    socket_timeout=5
+)
 
 
 def load_template() -> str:
@@ -48,97 +61,68 @@ def load_template() -> str:
     return content
 
 
-def get_docker_ports() -> list[str]:
+def get_redis_instances() -> list[str]:
     """
-    Obtiene los puertos mapeados de los contenedores del Servicio de Lenguaje.
-    Filtra por label (lsp.service=api) y por nombre del contenedor.
-    
-    Retorna lista de "127.0.0.1:puerto" ordenados numéricamente.
+    Lee lsp:instances (Set) de Redis y filtra por heartbeat vivo.
+    Cada miembro del set tiene el formato "<ip>:<port>:<pid>".
+    Solo se incluyen aquellos cuya key lsp:heartbeat:<id> existe (TTL activo).
+
+    Retorna lista de "ip:puerto" ordenados numéricamente por puerto.
     """
     try:
-        # Intentar filtrar por label primero (más preciso)
-        result = subprocess.run(
-            ["docker", "ps", 
-             "--filter", f"label={DOCKER_LABEL}",
-             "--format", "{{.Ports}}"],
-            capture_output=True, text=True, timeout=5
-        )
-        
-        ports = set()
-        for line in result.stdout.strip().split("\n"):
-            if not line:
-                continue
-            # Buscar patrón: "0.0.0.0:32801->8135/tcp" o "[::]:32801->8135/tcp"
-            match = re.search(r'(?:0\.0\.0\.0|\[::\]):(\d+)->' + INTERNAL_PORT, line)
-            if match:
-                ports.add(f"127.0.0.1:{match.group(1)}")
-        
-        # Si no encontró por label, intentar por nombre (fallback)
-        if not ports:
-            logger.debug("Label no encontró contenedores, intentando por nombre...")
-            result = subprocess.run(
-                ["docker", "ps",
-                 "--filter", f"name={DOCKER_NAME_FILTER}",
-                 "--format", "{{.Ports}}"],
-                capture_output=True, text=True, timeout=5
-            )
-            for line in result.stdout.strip().split("\n"):
-                if not line:
-                    continue
-                match = re.search(r'(?:0\.0\.0\.0|\[::\]):(\d+)->' + INTERNAL_PORT, line)
-                if match:
-                    ports.add(f"127.0.0.1:{match.group(1)}")
-        
-        return sorted(ports, key=lambda x: int(x.split(":")[1]))
-    
-    except subprocess.TimeoutExpired:
-        logger.error("Timeout consultando Docker")
-        return []
-    except FileNotFoundError:
-        logger.error("Comando 'docker' no encontrado. ¿Está instalado?")
-        return []
-    except Exception as e:
-        logger.error("Error consultando Docker: %s", e)
+        members = _redis.smembers("lsp:instances")
+    except redis.RedisError as e:
+        logger.error("Error leyendo lsp:instances de Redis: %s", e)
         return []
 
+    live = []
+    for member in members:
+        try:
+            ip, port, _ = member.rsplit(":", 2)
+        except ValueError:
+            logger.debug("Formato inesperado en lsp:instances: %s", member)
+            continue
+        if _redis.exists(f"lsp:heartbeat:{member}"):
+            live.append(f"{ip}:{port}")
 
-def health_check(host_port: str) -> bool:
+    return sorted(live, key=lambda x: int(x.split(":")[1]))
+
+
+def maybe_spawn(live_instances: list[str]):
     """
-    Verifica que la instancia responda correctamente.
+    Si se detectan 0 instancias por _SPAWN_THRESHOLD polls consecutivos,
+    publica un comando SPAWN en Redis Pub/Sub para que los agentes sidecar
+    en cada nodo levanten sus contenedores LSP.
     """
-    try:
-        result = subprocess.run(
-            ["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}",
-             "--connect-timeout", "2", "--max-time", "3",
-             f"http://{host_port}/lsp/"],
-            capture_output=True, text=True, timeout=5
-        )
-        is_healthy = result.stdout.strip() in ("200", "404")  # 404 también es válido (sin contenedores LSP)
-        if not is_healthy:
-            logger.debug("Health check fallido para %s: HTTP %s", host_port, result.stdout.strip())
-        return is_healthy
-    except subprocess.TimeoutExpired:
-        logger.debug("Timeout en health check para %s", host_port)
-        return False
-    except Exception as e:
-        logger.debug("Error en health check para %s: %s", host_port, e)
-        return False
+    global _EMPTY_STREAK
+    if live_instances:
+        _EMPTY_STREAK = 0
+        return
+    _EMPTY_STREAK += 1
+    if _EMPTY_STREAK >= _SPAWN_THRESHOLD:
+        logger.critical("0 instancias por %d polls consecutivos — publicando SPAWN", _EMPTY_STREAK)
+        try:
+            _redis.publish("lb:lsp:commands", "SPAWN")
+            logger.info("Comando SPAWN publicado en canal lb:lsp:commands")
+        except redis.RedisError as e:
+            logger.error("No se pudo publicar SPAWN en Redis: %s", e)
+        _EMPTY_STREAK = 0
 
 
 def generate_and_reload(template: str, instances: list[str]):
     """
     Reemplaza el marcador en el template con los servidores activos,
     valida la configuración y recarga Nginx.
+    Si no hay instancias, el upstream queda sin backends (nginx responde 502).
     """
-    if not instances:
-        logger.warning("No hay instancias activas — nginx.conf no se actualiza")
-        return
+    if instances:
+        server_lines = "\n".join(
+            f"        server {instance} max_fails=3 fail_timeout=30s;"
+            for instance in instances
+        )
+    else:
+        server_lines = "        # sin backends — nginx devolverá 502"
 
-    # Construir las líneas de servidor que reemplazan el marcador
-    server_lines = "\n".join(
-        f"        server {instance} max_fails=3 fail_timeout=30s;"
-        for instance in instances
-    )
     config = template.replace(UPSTREAM_MARKER, server_lines)
 
     # Escribir nueva configuración
@@ -160,7 +144,7 @@ def generate_and_reload(template: str, instances: list[str]):
         capture_output=True, text=True
     )
     if result.returncode == 0:
-        logger.info("✅ nginx.conf actualizado con %d instancias: %s", len(instances), instances)
+        logger.info("nginx.conf actualizado con %d backends: %s", len(instances), instances or [])
     else:
         logger.error("Error al recargar Nginx: %s", result.stderr)
 
@@ -169,10 +153,12 @@ def print_banner(template: str):
     """Muestra información de inicio."""
     logger.info("=" * 55)
     logger.info("  LSP Load Balancer Watcher")
-    logger.info("  Fuente: Docker (label: %s)", DOCKER_LABEL)
+    logger.info("  Fuente: Redis (lsp:instances + heartbeat)")
+    logger.info("  Redis: %s:%d", REDIS_HOST, REDIS_PORT)
     logger.info("  Intervalo: %ds", POLL_INTERVAL)
     logger.info("  Template: %s", TEMPLATE_PATH)
     logger.info("  Nginx conf: %s", NGINX_CONF_PATH)
+    logger.info("  Canal SPAWN: lb:lsp:commands")
     logger.info("=" * 55)
 
 
@@ -184,19 +170,18 @@ if __name__ == "__main__":
 
     while True:
         try:
-            # Obtener puertos de Docker
-            instances = get_docker_ports()
-            
-            # Filtrar solo las que pasan health check
-            live_instances = [i for i in instances if health_check(i)]
-            
-            if not live_instances and instances:
-                logger.warning("Se encontraron puertos pero ningún health check pasó: %s", instances)
-            
+            # Obtener instancias vivas desde Redis
+            live_instances = get_redis_instances()
+
+            if not live_instances:
+                logger.warning("0 instancias vivas — nginx sin backends")
+
+            maybe_spawn(live_instances)
+
             current = set(live_instances)
 
             if current != last_instances:
-                logger.info("Cambio detectado: %s → %s", 
+                logger.info("Cambio detectado: %s → %s",
                            sorted(last_instances) if last_instances else "[]",
                            sorted(current))
                 generate_and_reload(template, live_instances)

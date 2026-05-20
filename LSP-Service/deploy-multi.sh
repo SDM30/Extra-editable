@@ -105,8 +105,8 @@ if [ "${1:-}" = "--build" ]; then
     echo -e "${YELLOW}Reconstruyendo imagen...${NC}"
 fi
 
-echo -e "${YELLOW}Levantando servicio...${NC}"
-$COMPOSE_CMD up -d language-service $BUILD_FLAG
+echo -e "${YELLOW}Levantando servicios (language-service + agent)...${NC}"
+$COMPOSE_CMD up -d $BUILD_FLAG
 
 sleep 3
 
@@ -118,8 +118,9 @@ if curl -s -o /dev/null -w "%{http_code}" "http://localhost:${PORT:-8135}/health
     echo "  Health:  http://${WS_PUBLIC_HOST}:${PORT:-8135}/health"
     echo "  API:     http://${WS_PUBLIC_HOST}:${PORT:-8135}/lsp/"
     echo ""
-    echo "  Logs:    $COMPOSE_CMD logs -f"
+    echo "  Logs:    $COMPOSE_CMD logs -f [language-service|agent]"
     echo "  Estado:  $COMPOSE_CMD ps"
+    echo "  Agente:  $COMPOSE_CMD logs agent  (watchdog + subscriber Redis)"
     echo "  Detener: $COMPOSE_CMD down"
 else
     echo -e "${RED}ERROR: El servicio no responde en http://localhost:${PORT:-8135}/health${NC}"
