@@ -38,10 +38,12 @@ Ese arranque levanta:
 
 ## Requisitos
 
-- Python 3.13+ o el launcher `py`
-- Node.js 22+
+- Python 3.10+
+- Node.js 20+
 - npm
 - Docker
+
+> `start-all.sh` verifica automáticamente `docker`, `python3`, `node` y `npm` antes de arrancar. Si falta alguno, aborta con un mensaje de error.
 
 ## Variables clave
 
@@ -236,3 +238,12 @@ Frontend → POST /auth/login/ → access_token
          → REST /lsp/{id} (Bearer lsp_token) → valida JWT + room == project_id
          → WS ws://host:port?token=lsp_token → multiplexor valida JWT + room == PROJECT_ID
 ```
+
+## Cambios recientes en `start-all.sh`
+
+- **Verificación de prerrequisitos**: ahora `start-all.sh` comprueba `docker`, `python3`, `node` y `npm` antes de arrancar. Si falta alguno, aborta con un mensaje.
+- **LSP Load Balancer en red LSP**: el contenedor `lsp-lb` se crea con `--network lsp-service_lsp-network` y se conecta también a `bridge` para que el gateway (8080) pueda alcanzarlo.
+- **Watcher con venv**: `update_nginx.py` se ejecuta con `./venv/bin/python3` (entorno virtual local) en vez del `python3` del sistema.
+- **Watcher recarga nginx del contenedor**: usa `docker exec lsp-lb nginx -s reload` en lugar de requerir nginx instalado en el host.
+- **Build automático de `lsp-multiplexor`**: si la imagen no existe, `start-all.sh` la construye desde `LSP-Service/lsp-container/` antes de levantar el watcher.
+- **API gateway corrige proxy_pass**: `/api/` ahora apunta a `host.docker.internal:8000` (Django) en vez de `:8080`.

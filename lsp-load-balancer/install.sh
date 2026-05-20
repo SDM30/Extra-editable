@@ -39,8 +39,11 @@ command -v redis-cli >/dev/null 2>&1 || {
 }
 echo -e "${GREEN}✓ redis-cli encontrado${NC}"
 
-# Buscar Python del venv del proyecto
-if [ -f "$PROJECT_DIR/.venv/bin/python3" ]; then
+# Buscar Python del venv local (creado con `python3 -m venv venv`)
+LOCAL_VENV="$SCRIPT_DIR/venv/bin/python3"
+if [ -f "$LOCAL_VENV" ]; then
+    PYTHON_BIN="$LOCAL_VENV"
+elif [ -f "$PROJECT_DIR/.venv/bin/python3" ]; then
     PYTHON_BIN="$PROJECT_DIR/.venv/bin/python3"
 elif [ -f "$HOME/Development/ARQ/Proyecto_ARQ/.venv_lsp/bin/python3" ]; then
     PYTHON_BIN="$HOME/Development/ARQ/Proyecto_ARQ/.venv_lsp/bin/python3"
@@ -55,7 +58,7 @@ echo -e "${YELLOW}[*] Verificando dependencias Python...${NC}"
 REQUIRED_MODULES="redis"
 for module in $REQUIRED_MODULES; do
     if ! $PYTHON_BIN -c "import $module" 2>/dev/null; then
-        echo "   Instalando $module..."
+        echo "   Instalando $module en $PYTHON_BIN..."
         $PYTHON_BIN -m pip install $module
     else
         echo -e "   ${GREEN}✓ $module ya instalado${NC}"

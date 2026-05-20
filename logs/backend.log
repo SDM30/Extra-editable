@@ -2,62 +2,32 @@ Watching for file changes with StatReloader
 Performing system checks...
 
 System check identified no issues (0 silenced).
-May 20, 2026 - 10:50:17
+May 20, 2026 - 12:15:55
 Django version 4.2.20, using settings 'config.settings'
 Starting development server at http://0.0.0.0:8000/
 Quit the server with CONTROL-C.
 
+[20/May/2026 12:16:08] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[20/May/2026 12:16:08] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[20/May/2026 12:16:09] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[20/May/2026 12:16:09] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[20/May/2026 12:16:10] "GET /api/projects/1/ HTTP/1.1" 200 624
+[20/May/2026 12:16:10] "GET /api/auth/me/ HTTP/1.1" 200 148
+[20/May/2026 12:16:10] "POST /api/projects/1/collab/join/ HTTP/1.1" 200 182
+[20/May/2026 12:16:10] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[20/May/2026 12:16:11] "GET /api/auth/me/ HTTP/1.1" 200 148
+[20/May/2026 12:16:11] "POST /api/projects/1/collab/join/ HTTP/1.1" 200 186
+[20/May/2026 12:16:11] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[20/May/2026 12:16:11] "POST /api/projects/1/lsp/token/ HTTP/1.1" 200 182
+[20/May/2026 12:16:34] "POST /api/auth/login/ HTTP/1.1" 200 483
 /usr/local/lib/python3.10/dist-packages/rest_framework/pagination.py:200: UnorderedObjectListWarning: Pagination may yield inconsistent results with an unordered object_list: <class 'projects.models.Proyecto'> QuerySet.
   paginator = self.django_paginator_class(queryset, page_size)
-[20/May/2026 10:50:35] "GET /api/projects/ HTTP/1.1" 200 52
-[20/May/2026 10:50:41] "GET /api/projects/ HTTP/1.1" 200 52
-[20/May/2026 10:51:17] "POST /api/auth/login/ HTTP/1.1" 200 483
-[20/May/2026 10:51:17] "GET /api/projects/ HTTP/1.1" 200 52
-[20/May/2026 10:51:37] "OPTIONS /api/auth/search/?q=si HTTP/1.1" 200 0
-[20/May/2026 10:51:37] "GET /api/auth/search/?q=si HTTP/1.1" 200 29
-[20/May/2026 10:51:38] "OPTIONS /api/auth/search/?q=sim HTTP/1.1" 200 0
-[20/May/2026 10:51:38] "GET /api/auth/search/?q=sim HTTP/1.1" 200 29
-[20/May/2026 10:51:46] "POST /api/projects/ HTTP/1.1" 201 129
-[20/May/2026 10:51:46] "OPTIONS /api/projects/1/ HTTP/1.1" 200 0
-[20/May/2026 10:51:46] "GET /api/projects/1/ HTTP/1.1" 200 129
-[20/May/2026 10:52:07] "POST /api/auth/login/ HTTP/1.1" 200 483
-[20/May/2026 10:52:07] "GET /api/projects/ HTTP/1.1" 200 272
-[20/May/2026 10:52:11] "GET /api/projects/1/ HTTP/1.1" 200 129
-[20/May/2026 10:52:16] "OPTIONS /api/projects/1/archivos/ HTTP/1.1" 200 0
-[20/May/2026 10:52:16] "POST /api/projects/1/archivos/ HTTP/1.1" 201 248
-[20/May/2026 10:52:16] "OPTIONS /api/auth/me/ HTTP/1.1" 200 0
-[20/May/2026 10:52:16] "GET /api/auth/me/ HTTP/1.1" 200 148
-[20/May/2026 10:52:16] "OPTIONS /api/projects/1/collab/join/ HTTP/1.1" 200 0
-[20/May/2026 10:52:16] "OPTIONS /api/projects/1/lsp/token/ HTTP/1.1" 200 0
-[20/May/2026 10:52:16] "POST /api/projects/1/collab/join/ HTTP/1.1" 200 186
-[20/May/2026 10:52:16] "POST /api/projects/1/lsp/token/ HTTP/1.1" 200 182
-[20/May/2026 10:52:16] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
-[20/May/2026 10:52:23] "GET /api/projects/1/ HTTP/1.1" 200 377
-[20/May/2026 10:52:23] "GET /api/auth/me/ HTTP/1.1" 200 154
-[20/May/2026 10:52:23] "POST /api/projects/1/collab/join/ HTTP/1.1" 200 184
-[20/May/2026 10:52:23] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
-[20/May/2026 10:52:23,244] - Broken pipe from ('172.17.0.5', 50706)
-[20/May/2026 10:52:23] "GET /api/auth/me/ HTTP/1.1" 200 154
-[20/May/2026 10:52:23] "POST /api/projects/1/lsp/token/ HTTP/1.1" 200 184
-[20/May/2026 10:52:23] "POST /api/projects/1/collab/join/ HTTP/1.1" 200 189
-[20/May/2026 10:52:23] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
-[20/May/2026 10:52:34] "POST /api/projects/1/archivos/ HTTP/1.1" 201 246
-[20/May/2026 10:52:34] "GET /api/auth/me/ HTTP/1.1" 200 154
-[20/May/2026 10:52:34] "POST /api/projects/1/collab/join/ HTTP/1.1" 200 189
-[20/May/2026 10:52:34] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
-[20/May/2026 10:52:34] "GET /api/projects/1/ HTTP/1.1" 200 624
-[20/May/2026 10:52:34] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
-[20/May/2026 10:52:50] "GET /api/auth/me/ HTTP/1.1" 200 148
-[20/May/2026 10:52:50] "POST /api/projects/1/collab/join/ HTTP/1.1" 200 182
-[20/May/2026 10:52:50] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
-[20/May/2026 10:52:50] "GET /api/projects/1/ HTTP/1.1" 200 624
-[20/May/2026 10:52:52] "GET /api/auth/me/ HTTP/1.1" 200 148
-[20/May/2026 10:52:52] "POST /api/projects/1/collab/join/ HTTP/1.1" 200 186
-[20/May/2026 10:52:52] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
-[20/May/2026 10:52:52] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
-[20/May/2026 10:52:56] "GET /api/auth/me/ HTTP/1.1" 200 148
-[20/May/2026 10:52:56] "POST /api/projects/1/collab/join/ HTTP/1.1" 200 186
-[20/May/2026 10:52:56] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
-[20/May/2026 10:52:56] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
-[20/May/2026 11:00:58] "OPTIONS /api/auth/login/ HTTP/1.1" 200 0
-[20/May/2026 11:07:57] "OPTIONS /api/auth/login/ HTTP/1.1" 200 0
+[20/May/2026 12:16:34] "GET /api/projects/ HTTP/1.1" 200 272
+[20/May/2026 12:16:36] "GET /api/projects/1/ HTTP/1.1" 200 624
+[20/May/2026 12:16:36] "GET /api/auth/me/ HTTP/1.1" 200 154
+[20/May/2026 12:16:36] "POST /api/projects/1/collab/join/ HTTP/1.1" 200 184
+[20/May/2026 12:16:36] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11
+[20/May/2026 12:16:36] "GET /api/auth/me/ HTTP/1.1" 200 154
+[20/May/2026 12:16:36] "POST /api/projects/1/collab/join/ HTTP/1.1" 200 189
+[20/May/2026 12:16:36] "POST /api/projects/1/lsp/token/ HTTP/1.1" 200 184
+[20/May/2026 12:16:36] "GET /api/projects/validate-collab-token/ HTTP/1.1" 200 11

@@ -38,11 +38,11 @@ reciben `SPAWN` y re-levantan sus contenedores LSP.
 
 ## 📋 Prerequisitos
 
-1. **Nginx instalado** en la máquina host
-2. **Redis corriendo** con keys `lsp:instances` (Set) y `lsp:heartbeat:*` (String con TTL 30s)
-3. **2-3 instancias del Servicio de Lenguaje** ejecutándose en puertos distintos (ver `LSP-Service/`)
-4. El **Nginx principal** (puerto 8080) debe reenviar requests de `/lsp/` a este balanceador
-5. **JWT_SECRET** compartido entre backend, LSP Service y multiplexor
+1. **Redis corriendo** con keys `lsp:instances` (Set) y `lsp:heartbeat:*` (String con TTL 30s)
+2. **2-3 instancias del Servicio de Lenguaje** ejecutándose en puertos distintos (ver `LSP-Service/`)
+3. El **Nginx principal** (puerto 8080) debe reenviar requests de `/lsp/` a este balanceador
+4. **JWT_SECRET** compartido entre backend, LSP Service y multiplexor
+5. **Imagen `lsp-multiplexor:latest`** construida (el script `start-all.sh` la construye automáticamente si no existe)
 
 ## 📦 Instalación
 
@@ -97,9 +97,7 @@ publica un comando `SPAWN` en el canal Redis Pub/Sub `lb:lsp:commands`.
 
 ```bash
 cd lsp-load-balancer
-python3 update_nginx.py
-# O con el venv del proyecto:
-# /home/simondm/Development/ARQ/Proyecto_ARQ/.venv/bin/python3 update_nginx.py
+./venv/bin/python3 update_nginx.py
 ```
 
 Para producción, usar el servicio systemd que instala `install.sh`:
@@ -174,7 +172,7 @@ Cliente → localhost:8080/lsp/ → Nginx Principal
 | `SMEMBERS` vacío o sin heartbeats | El LSP Service no se registró en Redis. Revisar logs: `docker compose logs language-service` |
 | Requests no se distribuyen | Verificar que hay 2+ instancias levantadas y que `update_nginx.py` regeneró el `nginx.conf` |
 | Contenedores duplicados por proyecto | Verificar que Redis está corriendo y que `REDIS_HOST` está configurado en `.env` |
-| Watcher no puede reloadear nginx | El watcher debe correr como `User=root` (systemd) para enviar señales a nginx. Ver `install.sh` |
+| Watcher no puede reloadear nginx | El watcher ejecuta `docker exec lsp-lb nginx -s reload`. Verificar que el contenedor `lsp-lb` esté corriendo y que el usuario tenga permisos Docker. No se requiere nginx instalado en el host. |
 
 ## 📝 Notas operacionales
 

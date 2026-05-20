@@ -42,6 +42,12 @@ stop_previous() {
 
 stop_previous
 
+# ── Verificar prerrequisitos ──
+for cmd in docker python3 node npm; do
+  command -v "$cmd" >/dev/null 2>&1 || { echo "ERROR: $cmd no instalado"; exit 1; }
+done
+echo "Prerrequisitos OK: docker, python3, node, npm"
+
 ensure_npm_deps() {
   local dir="$1"
   if [ -f "$dir/package-lock.json" ]; then
@@ -120,7 +126,15 @@ echo "Seeding initial users"
 
 start_docker_nginx extra-editable-gateway "$ROOT_DIR/nginx.conf" 8080
 start_docker_nginx collab-lb "$ROOT_DIR/collab-load-balancer/nginx.config" 8083
-start_docker_nginx lsp-lb "$ROOT_DIR/lsp-load-balancer/nginx.conf" 8085
+# LSP LB necesita alcanzar los contenedores LSP en lsp-service_lsp-network
+docker rm -f lsp-lb >/dev/null 2>&1 || true
+docker run -d --name lsp-lb \
+  --network lsp-service_lsp-network \
+  -p 8085:8085 \
+  -v "$ROOT_DIR/lsp-load-balancer/nginx.conf:/etc/nginx/nginx.conf:ro" \
+  nginx:alpine >/dev/null
+# Conectar también a la red bridge para que el gateway (extra-editable-gateway) lo alcance
+docker network connect bridge lsp-lb 2>/dev/null || true
 
 # ── LSP Service + agente sidecar ────────────────────────────────────────────────
 LSP_DIR="$ROOT_DIR/LSP-Service"
@@ -132,8 +146,15 @@ if [ -f "$LSP_DIR/deploy-dev.sh" ]; then
     echo "  Building LSP image first..."
     (cd "$LSP_DIR" && bash setup-dev.sh 3)
   fi
+  # Build lsp-multiplexor image (required by lifecycle.create_container)
+  if docker image inspect lsp-multiplexor:latest &>/dev/null 2>&1; then
+    echo "  LSP multiplexor image already exists"
+  else
+    echo "  Building lsp-multiplexor image..."
+    (cd "$LSP_DIR/lsp-container" && docker build -t lsp-multiplexor:latest -t lsp-server:latest .)
+  fi
   echo "Starting LSP Load Balancer watcher"
-  (cd "$ROOT_DIR/lsp-load-balancer" && python3 update_nginx.py) \
+  (cd "$ROOT_DIR/lsp-load-balancer" && ./venv/bin/python3 update_nginx.py) \
     &> "$ROOT_DIR/logs/lsp-watcher.log" &
 else
   echo "LSP-Service not found, skipping"
