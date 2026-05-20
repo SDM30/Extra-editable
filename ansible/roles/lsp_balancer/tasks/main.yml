@@ -12,6 +12,7 @@
     name:
       - nginx
       - redis-tools
+      - python3-redis
     state: present
 
 - name: Crear directorio de configuración del balanceador

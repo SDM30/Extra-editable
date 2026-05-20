@@ -19,6 +19,24 @@
     chdir: "{{ project_dir }}/code-execution-service"
   become_user: estudiante
 
+- name: Construir imagen Docker para C++
+  command: docker build -t secure-cpp-runner:latest .
+  args:
+    chdir: "{{ project_dir }}/code-execution-service/docker-images/cpp"
+  become_user: estudiante
+
+- name: Construir imagen Docker para Python
+  command: docker build -t secure-python-runner:latest .
+  args:
+    chdir: "{{ project_dir }}/code-execution-service/docker-images/python"
+  become_user: estudiante
+
+- name: Construir imagen Docker para TypeScript
+  command: docker build -t secure-typescript-runner:latest .
+  args:
+    chdir: "{{ project_dir }}/code-execution-service/docker-images/typescript"
+  become_user: estudiante
+
 - name: Instalar servicio systemd de code execution
   template:
     src: extra-code-exec.service.j2

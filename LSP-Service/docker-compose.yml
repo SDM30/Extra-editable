@@ -32,7 +32,7 @@ services:
       - lsp-network
     restart: "no"                            # el agente sidecar controla el reinicio
     healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:8135/lsp/"]
+      test: ["CMD", "curl", "-sf", "http://localhost:8135/health"]
       interval: 10s
       timeout: 3s
       retries: 2

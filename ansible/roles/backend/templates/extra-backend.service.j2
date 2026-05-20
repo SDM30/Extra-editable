@@ -9,6 +9,7 @@ User=estudiante
 Group=estudiante
 WorkingDirectory={{ project_dir }}/backend
 ExecStart={{ project_dir }}/backend/venv/bin/python manage.py runserver 0.0.0.0:{{ backend_port }}
+Environment=DJANGO_SETTINGS_MODULE=config.settings
 Restart=always
 RestartSec=5
 StandardOutput=journal

@@ -29,7 +29,7 @@ EXPOSE 8135
 # El agente sidecar lee {{.State.Health.Status}} para decidir
 # si el contenedor necesita docker start.
 HEALTHCHECK --interval=10s --timeout=3s --retries=2 --start-period=15s \
-    CMD curl -sf http://localhost:8135/lsp/ || exit 1
+    CMD curl -sf http://localhost:8135/health || exit 1
 
 # Comando para ejecutar la aplicación
 CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8135"]
