@@ -147,6 +147,12 @@ echo "Seeding initial users"
   &> "$ROOT_DIR/logs/backend-seed.log"
 
 start_docker_nginx extra-editable-gateway "$ROOT_DIR/nginx.conf" 8080
+
+# Collab watcher: debe correr antes que collab-lb para que los backends ya estén
+# escritos en nginx.config cuando nginx arranque.
+echo "Starting Collab Load Balancer watcher"
+(cd "$ROOT_DIR/collab-load-balancer" && python3 update_nginx.py) \
+  &> "$ROOT_DIR/logs/collab-lb-watcher.log" &
 start_docker_nginx collab-lb "$ROOT_DIR/collab-load-balancer/nginx.config" 8083
 # ── LSP Service + agente sidecar ────────────────────────────────────────────────
 LSP_DIR="$ROOT_DIR/LSP-Service"
@@ -204,13 +210,17 @@ if [ -f "$LSP_DIR/deploy-dev.sh" ]; then
   fi
   # Conectar también a la red bridge para que el gateway (extra-editable-gateway) lo alcance
   docker network connect bridge lsp-lb 2>/dev/null || true
+  # Verificar que lsp-lb está en lsp-service_lsp-network (puede perderse si compose recreó la red)
+  if ! docker inspect lsp-lb --format '{{range .NetworkSettings.Networks}}{{.NetworkID}} {{end}}' 2>/dev/null | grep -q "$(docker network inspect lsp-service_lsp-network --format '{{.ID}}' 2>/dev/null)"; then
+    echo "  Reconectando lsp-lb a lsp-service_lsp-network..."
+    docker network connect lsp-service_lsp-network lsp-lb 2>/dev/null || echo "  WARNING: no se pudo conectar lsp-lb a lsp-service_lsp-network"
+  fi
   echo "Starting LSP Load Balancer watcher"
   (cd "$ROOT_DIR/lsp-load-balancer" && ./venv/bin/python3 update_nginx.py) \
     &> "$ROOT_DIR/logs/lsp-watcher.log" &
 else
   echo "LSP-Service not found, skipping"
 fi
-start_docker_nginx lsp-lb "$ROOT_DIR/lsp-load-balancer/nginx.conf" 8085
 
 echo "Starting collab load balancer discovery watcher"
 start_background_command "$ROOT_DIR/logs/collab-lb-watcher.log" \

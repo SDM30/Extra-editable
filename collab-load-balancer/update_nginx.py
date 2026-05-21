@@ -32,6 +32,24 @@ START_MARKER = '# {{COLLAB_INSTANCES_BEGIN}}'
 END_MARKER = '# {{COLLAB_INSTANCES_END}}'
 
 
+DOCKER_BIN = shutil.which('docker')
+NGINX_CONTAINER = os.getenv('NGINX_CONTAINER', 'collab-lb')
+
+
+def ensure_nginx_running() -> None:
+    """Asegura que el contenedor nginx esté corriendo antes de validar/recargar."""
+    if not DOCKER_BIN:
+        return
+    result = subprocess.run(
+        [DOCKER_BIN, 'inspect', '-f', '{{.State.Running}}', NGINX_CONTAINER],
+        capture_output=True, text=True,
+    )
+    if result.stdout.strip() != 'true':
+        print(f'[collab-lb] Contenedor {NGINX_CONTAINER} no está corriendo, intentando docker start...')
+        subprocess.run([DOCKER_BIN, 'start', NGINX_CONTAINER], capture_output=True)
+        time.sleep(1)
+
+
 def discover_live_ports() -> list[int]:
     """Devuelve los puertos que responden correctamente a /dev-token."""
     live_ports: list[int] = []
@@ -89,18 +107,19 @@ def rewrite_nginx_config(ports: list[int]) -> bool:
 
 def reload_nginx() -> None:
     """Recarga Nginx dentro del contenedor o en el host, según el entorno."""
-    docker_bin = shutil.which('docker')
-    if docker_bin:
+    ensure_nginx_running()
+
+    if DOCKER_BIN:
         result = subprocess.run(
-            [docker_bin, 'ps', '--format', '{{.Names}}'],
+            [DOCKER_BIN, 'ps', '--format', '{{.Names}}'],
             capture_output=True,
             text=True,
             check=False,
         )
         containers = {line.strip() for line in result.stdout.splitlines() if line.strip()}
         if 'collab-lb' in containers:
-            subprocess.run([docker_bin, 'exec', 'collab-lb', 'nginx', '-t'], check=True)
-            subprocess.run([docker_bin, 'exec', 'collab-lb', 'nginx', '-s', 'reload'], check=True)
+            subprocess.run([DOCKER_BIN, 'exec', 'collab-lb', 'nginx', '-t'], check=True)
+            subprocess.run([DOCKER_BIN, 'exec', 'collab-lb', 'nginx', '-s', 'reload'], check=True)
             return
 
     nginx_bin = shutil.which('nginx')
