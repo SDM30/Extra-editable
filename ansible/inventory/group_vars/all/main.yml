@@ -30,7 +30,7 @@ lsp_nodes:
 
 # ── Proyecto ──
 project_repo: "https://github.com/SDM30/Extra-editable.git"
-project_branch: ansible # Cambiar a Main para producción
+project_branch: dev # Cambiar a Main para producción
 project_dir: /opt/extra-editable
 
 # ── JWT ──
