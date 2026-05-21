@@ -215,6 +215,82 @@ def get_jwt() -> Optional[str]:
     return None
 
 
+# ── Proyecto de prueba y LSP token ─────────────────────────────────────────────
+# El LSP service exige un token específico por proyecto (no el JWT general).
+# Flujo: crear proyecto → POST /api/projects/{id}/lsp/token/ → usar ese token.
+
+_test_project_id: Optional[str] = None
+_lsp_token: Optional[str] = None
+
+
+def create_test_project(jwt: str) -> Optional[str]:
+    """Crea un proyecto de prueba y retorna su ID."""
+    global _test_project_id
+    if _test_project_id:
+        return _test_project_id
+    try:
+        r = httpx.post(
+            f"{BACKEND_URL}/api/projects/",
+            json={"nombre": "lb-test-project", "descripcion": "proyecto prueba LB", "lenguaje": "PYTHON"},
+            headers={"Authorization": f"Bearer {jwt}"},
+            timeout=10,
+        )
+        if r.status_code == 201:
+            _test_project_id = str(r.json().get("id", ""))
+            print(f"  Proyecto de prueba creado: ID={_test_project_id}")
+            return _test_project_id
+        print(f"  create_project → HTTP {r.status_code}: {r.text[:150]}")
+    except Exception as exc:
+        print(f"  create_project error: {exc}")
+    return None
+
+
+def get_lsp_token(project_id: str, jwt: str) -> Optional[str]:
+    """Obtiene el LSP token específico para el proyecto."""
+    global _lsp_token
+    if _lsp_token:
+        return _lsp_token
+    try:
+        r = httpx.post(
+            f"{BACKEND_URL}/api/projects/{project_id}/lsp/token/",
+            headers={"Authorization": f"Bearer {jwt}"},
+            timeout=10,
+        )
+        if r.status_code == 200:
+            _lsp_token = r.json().get("token", "")
+            print(f"  LSP token obtenido para proyecto {project_id}.")
+            return _lsp_token
+        print(f"  lsp/token → HTTP {r.status_code}: {r.text[:150]}")
+    except Exception as exc:
+        print(f"  lsp/token error: {exc}")
+    return None
+
+
+def delete_test_project(project_id: str, jwt: str) -> None:
+    """Limpia el proyecto de prueba al finalizar."""
+    try:
+        httpx.delete(
+            f"{BACKEND_URL}/api/projects/{project_id}/",
+            headers={"Authorization": f"Bearer {jwt}"},
+            timeout=10,
+        )
+    except Exception:
+        pass
+
+
+def lsp_cleanup_containers(project_ids: List[str], lsp_tok: str) -> None:
+    """Elimina contenedores LSP creados durante los tests."""
+    for pid in project_ids:
+        try:
+            httpx.delete(
+                f"{LSP_LB_URL}/lsp/{pid}?language=python",
+                headers={"Authorization": f"Bearer {lsp_tok}"},
+                timeout=5,
+            )
+        except Exception:
+            pass
+
+
 def extract_lsp_upstream(data: dict) -> str:
     """Extrae la IP del upstream desde la respuesta de POST /lsp/{id}.
 
@@ -253,16 +329,6 @@ def start_collab_instance(port: int) -> bool:
     return ssh_ok(MELISSA_IP, f"sudo systemctl start extra-collab@{port}.service")
 
 
-def lsp_cleanup(project_ids: List[str], jwt: str) -> None:
-    for pid in project_ids:
-        try:
-            httpx.delete(
-                f"{LSP_LB_URL}/lsp/{pid}?language=python",
-                headers={"Authorization": f"Bearer {jwt}"},
-                timeout=5,
-            )
-        except Exception:
-            pass
 
 
 # ── Resultado ───────────────────────────────────────────────────────────────────
@@ -287,33 +353,53 @@ def _print_result(r: TestResult) -> None:
 
 # ── Tests ────────────────────────────────────────────────────────────────────────
 
+def _setup_lsp(test_name: str) -> Tuple[Optional[str], Optional[str]]:
+    """Obtiene JWT + LSP token. Crea proyecto si no existe. Retorna (jwt, lsp_token)."""
+    jwt = get_jwt()
+    if not jwt:
+        return None, None
+    proj_id = create_test_project(jwt)
+    if not proj_id:
+        print(f"  ERROR [{test_name}]: no se pudo crear proyecto de prueba")
+        return jwt, None
+    lsp_tok = get_lsp_token(proj_id, jwt)
+    if not lsp_tok:
+        print(f"  ERROR [{test_name}]: no se pudo obtener LSP token")
+    return jwt, lsp_tok
+
+
 def test_lsp_distribution(n_requests: int = 30) -> TestResult:
     """LB-LSP-1: Distribución least_conn entre Gabriel y Simon."""
     desc = f"LSP least_conn: distribución de {n_requests} requests entre nodos"
     print(f"\n[LB-LSP-1] {desc}")
 
-    jwt = get_jwt()
-    if not jwt:
-        return TestResult("LB-LSP-1", desc, False, error="Sin token JWT")
+    jwt, lsp_tok = _setup_lsp("LB-LSP-1")
+    if not lsp_tok:
+        return TestResult("LB-LSP-1", desc, False,
+                          error="Sin LSP token — revisa backend y proyecto de prueba")
 
     upstream_counts: Counter = Counter()
     errors = 0
-    project_ids: List[str] = []
+    container_project_ids: List[str] = []
+
+    # Usamos el project_id real para los contenedores LSP
+    base_project_id = _test_project_id or "lb1-test"
 
     print(f"  Enviando {n_requests} requests a POST {LSP_LB_URL}/lsp/{{id}}...")
     for i in range(n_requests):
-        project_id = f"lb1-{i:03d}-{int(time.time() * 1000) % 100000}"
+        # Cada request usa un project_id único para forzar distintos contenedores
+        pid = f"{base_project_id}-lb1-{i:03d}"
         try:
             r = httpx.post(
-                f"{LSP_LB_URL}/lsp/{project_id}",
+                f"{LSP_LB_URL}/lsp/{pid}",
                 json={"language": "python", "max_clients": 4},
-                headers={"Authorization": f"Bearer {jwt}"},
+                headers={"Authorization": f"Bearer {lsp_tok}"},
                 timeout=15,
             )
             if r.status_code == 200:
                 upstream = extract_lsp_upstream(r.json())
                 upstream_counts[upstream] += 1
-                project_ids.append(project_id)
+                container_project_ids.append(pid)
             else:
                 errors += 1
                 print(f"    request {i:02d}: HTTP {r.status_code}")
@@ -322,7 +408,7 @@ def test_lsp_distribution(n_requests: int = 30) -> TestResult:
             print(f"    request {i:02d}: {type(exc).__name__}")
         time.sleep(0.1)
 
-    lsp_cleanup(project_ids, jwt)
+    lsp_cleanup_containers(container_project_ids, lsp_tok)
 
     total_ok = sum(upstream_counts.values())
     print(f"\n  Distribución ({total_ok}/{n_requests} exitosos, {errors} errores):")
@@ -332,8 +418,6 @@ def test_lsp_distribution(n_requests: int = 30) -> TestResult:
         bar = "█" * int(pct / 2)
         print(f"    {label:8s} ({ip}): {count:3d}  {pct:5.1f}%  {bar}")
 
-    # Criterio: ≥90% requests exitosos, con al menos 2 upstreams respondiendo,
-    # y desviación <20% de la media.
     passed = False
     max_deviation = 0.0
     if len(upstream_counts) == 0:
@@ -341,7 +425,6 @@ def test_lsp_distribution(n_requests: int = 30) -> TestResult:
     elif len(upstream_counts) == 1:
         only_up = list(upstream_counts.keys())[0]
         detail_dist = f"Solo 1 upstream: {LSP_NODE_NAMES.get(only_up, only_up)}"
-        # Si hay solo 1 nodo activo, la distribución es 100/0 — normal si el otro está caído
         passed = total_ok >= n_requests * 0.9
     else:
         mean = total_ok / len(upstream_counts)
@@ -366,29 +449,33 @@ def test_lsp_failover(failover_wait: int = NGINX_FAIL_TIMEOUT + 5) -> TestResult
     desc = "LSP failover: Gabriel cae → Simon atiende → Gabriel vuelve al pool"
     print(f"\n[LB-LSP-2] {desc}")
 
-    jwt = get_jwt()
-    if not jwt:
-        return TestResult("LB-LSP-2", desc, False, error="Sin token JWT")
+    jwt, lsp_tok = _setup_lsp("LB-LSP-2")
+    if not lsp_tok:
+        return TestResult("LB-LSP-2", desc, False,
+                          error="Sin LSP token — revisa backend y proyecto de prueba")
+
+    base_pid = _test_project_id or "lb2-test"
 
     # Detener Gabriel
     print(f"  Deteniendo LSP en Gabriel ({GABRIEL_IP})...")
     if not stop_lsp_node(GABRIEL_IP):
-        print("  WARN: SSH a Gabriel falló. Puede que ya esté detenido.")
+        print("  WARN: SSH a Gabriel falló. "
+              "¿Está sshpass instalado? ¿Está GABRIEL_SSH_PASS exportado?")
     time.sleep(3)
 
-    # 15 requests con Gabriel caído → todos deben ir a Simon
+    # 15 requests con Gabriel caído
     print("  Enviando 15 requests al LB con Gabriel caído...")
     simon_count = 0
     total_ok = 0
     to_clean: List[str] = []
 
     for i in range(15):
-        project_id = f"lb2-fail-{i:02d}-{int(time.time() * 1000) % 100000}"
+        pid = f"{base_pid}-lb2-{i:02d}"
         try:
             r = httpx.post(
-                f"{LSP_LB_URL}/lsp/{project_id}",
+                f"{LSP_LB_URL}/lsp/{pid}",
                 json={"language": "python"},
-                headers={"Authorization": f"Bearer {jwt}"},
+                headers={"Authorization": f"Bearer {lsp_tok}"},
                 timeout=10,
             )
             if r.status_code == 200:
@@ -396,37 +483,36 @@ def test_lsp_failover(failover_wait: int = NGINX_FAIL_TIMEOUT + 5) -> TestResult
                 upstream = extract_lsp_upstream(r.json())
                 if upstream == SIMON_IP:
                     simon_count += 1
-                to_clean.append(project_id)
+                to_clean.append(pid)
             else:
                 print(f"    request {i:02d}: HTTP {r.status_code}")
         except Exception as exc:
             print(f"    request {i:02d}: {type(exc).__name__}")
         time.sleep(0.3)
 
-    lsp_cleanup(to_clean, jwt)
+    lsp_cleanup_containers(to_clean, lsp_tok)
     print(f"  Exitosos: {total_ok}/15 | Ruteados a Simon: {simon_count}")
 
-    # Reiniciar Gabriel y esperar reincorporación
-    print(f"  Reiniciando Gabriel y esperando {failover_wait}s (nginx fail_timeout={NGINX_FAIL_TIMEOUT}s)...")
+    # Reiniciar Gabriel
+    print(f"  Reiniciando Gabriel y esperando {failover_wait}s...")
     start_lsp_node(GABRIEL_IP)
     time.sleep(failover_wait)
 
-    # Verificar que Gabriel vuelve al pool
+    # Verificar reincorporación
     gabriel_back = False
     print("  Verificando reincorporación de Gabriel al pool...")
     for i in range(15):
-        project_id = f"lb2-back-{i:02d}-{int(time.time() * 1000) % 100000}"
+        pid = f"{base_pid}-lb2-back-{i:02d}"
         try:
             r = httpx.post(
-                f"{LSP_LB_URL}/lsp/{project_id}",
+                f"{LSP_LB_URL}/lsp/{pid}",
                 json={"language": "python"},
-                headers={"Authorization": f"Bearer {jwt}"},
+                headers={"Authorization": f"Bearer {lsp_tok}"},
                 timeout=10,
             )
             if r.status_code == 200:
                 upstream = extract_lsp_upstream(r.json())
-                httpx.delete(f"{LSP_LB_URL}/lsp/{project_id}?language=python",
-                             headers={"Authorization": f"Bearer {jwt}"}, timeout=5)
+                lsp_cleanup_containers([pid], lsp_tok)
                 if upstream == GABRIEL_IP:
                     gabriel_back = True
                     print(f"    Gabriel respondió en request #{i}")
@@ -437,11 +523,10 @@ def test_lsp_failover(failover_wait: int = NGINX_FAIL_TIMEOUT + 5) -> TestResult
 
     if not gabriel_back:
         print("  WARN: Gabriel no apareció en el pool. "
-              "¿El campo 'host' en la respuesta expone la IP del nodo?")
+              "La respuesta del LSP puede no exponer la IP del nodo en 'host'.")
 
-    # Failover exitoso si ≥12/15 requests fueron exitosos con Gabriel caído
     failover_ok = total_ok >= 12
-    passed = failover_ok  # gabriel_back es informativo pero no bloqueante (depende de la API)
+    passed = failover_ok
 
     return TestResult("LB-LSP-2", desc, passed, {
         "exitosos_sin_gabriel": f"{total_ok}/15",
@@ -722,6 +807,12 @@ def main() -> None:
 
         _print_result(r)
         results.append(r)
+
+    # Limpiar proyecto de prueba al terminar
+    jwt_cleanup = get_jwt()
+    if _test_project_id and jwt_cleanup:
+        print(f"\n  Limpiando proyecto de prueba ID={_test_project_id}...")
+        delete_test_project(_test_project_id, jwt_cleanup)
 
     passed = sum(1 for r in results if r.passed)
     total  = len(results)
