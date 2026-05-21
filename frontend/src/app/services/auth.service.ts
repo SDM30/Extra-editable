@@ -98,6 +98,27 @@ export class AuthService {
     }
   }
 
+  /**
+   * Renueva la marca de actividad de una sesión colaborativa abierta.
+   * No recrea la conexión WebSocket; solo evita que el backend marque la sala
+   * como inactiva mientras el editor sigue en uso.
+   */
+  async refreshCollabSession(projectId: number, archivoId?: number): Promise<void> {
+    const access = this.getToken();
+    if (!access) {
+      return;
+    }
+
+    const headers = new HttpHeaders({ Authorization: `Bearer ${access}` });
+    await firstValueFrom(
+      this.http.post(
+        `${this.base}/projects/${projectId}/collab/heartbeat/`,
+        archivoId ? { archivo_id: archivoId } : {},
+        { headers },
+      ),
+    );
+  }
+
   private getOrCreateAnonymousIdentity(): { userId: string; username: string } {
     const windowLike = window as Window & { name: string };
 

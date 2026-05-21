@@ -1,7 +1,0 @@
-
-  Hocuspocus v2.15.3 running at:
-
-  > HTTP: http://0.0.0.0:1234
-  > WebSocket: ws://0.0.0.0:1234
-[collab] Servidor en http/ws://localhost:1234
-[collab] Endpoint de token de prueba: POST http://localhost:1234/dev-token

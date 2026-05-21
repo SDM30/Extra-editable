@@ -13,7 +13,7 @@ ExecStart=/usr/bin/node {{ project_dir }}/collab-service/src/server.js
 Environment=PORT=%i
 Environment=JWT_SECRET={{ jwt_secret }}
 Environment=FRONTEND_ORIGIN=http://{{ frontend_host }}:{{ frontend_port }}
-Environment=DB_HOST={{ db_host }}
+Environment=DB_HOST={{ backend_host }}
 Environment=DB_PORT={{ db_port }}
 Environment=DB_NAME={{ db_name }}
 Environment=DB_USER={{ db_user }}

@@ -9,6 +9,7 @@ instancias de **collab-service** (Hocuspocus + Yjs).
 
 | Característica | LSP Load Balancer | **Collab Load Balancer** |
 |----------------|-------------------|--------------------------|
+| Descubrimiento | Redis + watcher   | **Health-check de instancias vivas** |
 | Algoritmo      | Round-robin       | **ip_hash (sticky)**     |
 | Protocolo      | HTTP REST         | **WebSocket long-lived** |
 | Estado         | Redis compartido  | **Memoria por instancia** |
@@ -16,13 +17,16 @@ instancias de **collab-service** (Hocuspocus + Yjs).
 
 El servicio Hocuspocus mantiene el estado de cada documento (el `Y.Doc`, el awareness de cursores, el snapshot) **en memoria** de la instancia que lo cargó. Si un cliente se reconecta a una instancia distinta, esa instancia no tiene el documento → el cliente recibe un documento vacío y sobreescribe el contenido colaborativo.
 
-La solución es **sticky sessions por IP** (`ip_hash` en Nginx): el mismo cliente siempre llega a la misma instancia mientras esta esté viva.
+La solución combina **sticky sessions por IP** (`ip_hash` en Nginx) con **descubrimiento dinámico**. El mismo cliente siempre llega a la misma instancia mientras esta esté viva, pero el balanceador elimina del upstream a los puertos que dejan de responder.
 
 > **Escalado horizontal:** Si en el futuro se necesita escalar sin sticky
 > sessions, habrá que persistir los documentos Yjs en una capa compartida
 > (Redis con `y-redis`, PostgreSQL, etc.) y recargar el doc desde ahí en cada
 > conexión nueva. El servidor ya tiene el hook `onLoadDocument`/`onStoreDocument`
 > preparado para eso (`documentSnapshots` en `server.js`).
+
+> El upstream se regenera con `update_nginx.py`, que hace health-check sobre
+> los puertos candidatos y recarga Nginx cuando cambia el conjunto de instancias.
 
 > El navegador guarda el JWT de colaboración en la cookie `collab_token`.
 > El gateway la lee para validar el acceso antes de reenviar el WebSocket al
@@ -110,6 +114,27 @@ nginx -c $(pwd)/nginx.conf -g "daemon off;"
 # O en background
 nginx -c $(pwd)/nginx.conf
 ```
+
+### 2b. Descubrimiento dinámico
+
+El watcher `update_nginx.py` sondea una lista de puertos candidatos, detecta
+cuáles responden a `POST /dev-token`, reescribe el bloque `upstream` y recarga
+Nginx cuando cambia el conjunto de instancias.
+
+```bash
+cd collab-load-balancer
+python3 update_nginx.py
+```
+
+Variables útiles:
+
+- `COLLAB_DISCOVERY_PORTS`: puertos candidatos separados por coma, por ejemplo `1234,1235,1236,1237`
+- `COLLAB_DISCOVERY_HOST`: host usado para el health-check, por defecto `127.0.0.1`
+- `COLLAB_UPSTREAM_HOST`: host que usa Nginx para enrutar, por defecto `host.docker.internal`
+- `POLL_INTERVAL`: intervalo de sondeo en segundos, por defecto `2`
+
+Si levantas el stack con `start-all.sh` o `start-all.ps1`, el watcher se inicia
+automáticamente junto con el balanceador.
 
 ### 3. Flujo de autenticación del gateway
 

@@ -1,5 +1,11 @@
 ---
 # Role: lsp_service — LSP Service Docker Compose (Gabriel + Simon)
+#
+# Arquitectura:
+#   - Gabriel (10.43.100.88) corre redis-lsp como service registry compartido.
+#   - Gabriel y Simon corren language-service + agent en network_mode: host.
+#   - Cada language-service se registra en el Redis de Gabriel.
+#   - El watcher de Campos consulta ese mismo Redis para descubrir backends.
 
 - name: Abrir puertos LSP en UFW
   ufw:
@@ -11,36 +17,98 @@
     - '8136'
     - '8137'
 
-- name: Obtener IP de la interfaz principal
-  shell: hostname -I | awk '{print $1}'
-  register: host_ip_result
-  changed_when: false
+# ── Redis compartido (solo en Gabriel) ─────────────────────────────────────────
+- name: Abrir puerto Redis en UFW desde Simon (solo en Gabriel)
+  ufw:
+    rule: allow
+    port: "{{ redis_lsp_port }}"
+    proto: tcp
+    from_ip: "10.43.99.67"
+  when: inventory_hostname == 'gabriel'
 
-- name: Levantar LSP Service con Docker Compose
-  shell: HOST_IP={{ host_ip_result.stdout }} docker compose up -d --build
-  args:
-    chdir: "{{ project_dir }}/LSP-Service"
-  become_user: estudiante
+- name: Abrir puerto Redis en UFW desde Campos (solo en Gabriel)
+  ufw:
+    rule: allow
+    port: "{{ redis_lsp_port }}"
+    proto: tcp
+    from_ip: "{{ lsp_balancer_host }}"
+  when: inventory_hostname == 'gabriel'
 
-- name: Iniciar contenedor Redis para LSP
+- name: Levantar contenedor Redis compartido (solo en Gabriel)
   shell: |
     docker start redis-lsp 2>/dev/null || \
     docker run -d --name redis-lsp --restart unless-stopped \
-      -p 6379:6379 redis:7-alpine \
+      -p {{ redis_lsp_port }}:6379 redis:7-alpine \
       redis-server --save "" --appendonly no --stop-writes-on-bgsave-error no
   changed_when: false
+  when: inventory_hostname == 'gabriel'
 
-- name: Esperar a que Redis esté saludable
+- name: Esperar a que Redis de Gabriel esté saludable (run_once)
   command: docker exec redis-lsp redis-cli ping
   register: redis_ping
   retries: 10
   delay: 3
   until: redis_ping.stdout == "PONG"
   changed_when: false
+  when: inventory_hostname == 'gabriel'
+
+# ── Compose file de despliegue (reemplaza al del repo) ────────────────────────
+# Usa hostname fijo (IP real del nodo) y puerto 8135:8135 para que el registro
+# en Redis y el balanceador apunten a la IP correcta. Ver Limitación B en DEPLOY.md.
+- name: Generar docker-compose.ansible.yml de despliegue
+  template:
+    src: docker-compose.ansible.yml.j2
+    dest: "{{ project_dir }}/LSP-Service/docker-compose.ansible.yml"
+    owner: estudiante
+    group: estudiante
+    mode: '0644'
+
+# ── Construir imagen del multiplexor LSP (lsp-multiplexor:latest) ────────────
+# Esta es la imagen que language-service usa para spawnear un contenedor LSP
+# por proyecto. Sin ella, los contenedores LSP no se pueden crear.
+- name: Construir imagen Docker lsp-multiplexor:latest
+  command: docker build -t lsp-multiplexor:latest .
+  args:
+    chdir: "{{ project_dir }}/LSP-Service/lsp-container"
+  become_user: estudiante
+
+# ── Levantar el LSP Service en cada nodo ──────────────────────────────────────
+- name: Bajar contenedores previos del compose base (limpia estado viejo)
+  command: docker compose -f docker-compose.yml down --remove-orphans
+  args:
+    chdir: "{{ project_dir }}/LSP-Service"
+  become_user: estudiante
+  failed_when: false
+  changed_when: false
+
+- name: Eliminar contenedores LSP huérfanos (de despliegues previos)
+  shell: |
+    docker ps -aq --filter "label=type=lsp-multiplexor" | xargs -r docker rm -f
+  become_user: estudiante
+  changed_when: false
+
+- name: Levantar LSP Service con el compose de Ansible
+  command: docker compose -f docker-compose.ansible.yml up -d --build --remove-orphans
+  args:
+    chdir: "{{ project_dir }}/LSP-Service"
+  become_user: estudiante
+
+- name: Esperar a que language-service responda en 8135
+  uri:
+    url: "http://127.0.0.1:8135/health"
+    method: GET
+    status_code: 200
+  register: lsp_health
+  retries: 15
+  delay: 3
+  until: lsp_health.status == 200
+  ignore_errors: yes
 
 - name: Ejecutar discover-and-create para contenedores LSP
   command: bash discover-dev.sh
   args:
     chdir: "{{ project_dir }}/LSP-Service"
   become_user: estudiante
-  ignore_errors: yes
+  register: discover_result
+  failed_when: false
+  changed_when: "'descubiertas' in discover_result.stdout | default('')"

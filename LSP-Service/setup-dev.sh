@@ -137,7 +137,13 @@ if grep -q "^version:" docker-compose.yml 2>/dev/null; then
 fi
 
 $COMPOSE_CMD build
-$COMPOSE_CMD up -d --scale language-service=${INSTANCES}
+
+# Detectar IP del host en docker0 para que los contenedores LSP alcancen Redis
+HOST_IP=$(ip addr show docker0 2>/dev/null | grep 'inet ' | awk '{print $2}' | cut -d/ -f1)
+[ -z "$HOST_IP" ] && HOST_IP="127.0.0.1"
+echo "  docker0 IP: $HOST_IP → REDIS_HOST para contenedores LSP"
+
+HOST_IP=$HOST_IP REDIS_HOST=$HOST_IP WS_PUBLIC_HOST=127.0.0.1 $COMPOSE_CMD up -d --scale language-service=${INSTANCES} --scale agent=1
 
 # ─── Resumen final ───
 
@@ -165,7 +171,7 @@ echo "Comandos útiles:"
 echo "  $COMPOSE_CMD logs -f              # Ver logs en tiempo real"
 echo "  $COMPOSE_CMD ps                   # Ver estado de servicios"
 echo "  $COMPOSE_CMD down                 # Detener y eliminar servicios"
-echo "  $COMPOSE_CMD up -d --scale language-service=${INSTANCES}  # Reescalar"
+echo "  $COMPOSE_CMD up -d --scale language-service=${INSTANCES} --scale agent=1  # Reescalar"
 echo ""
 echo "  # Ver instancias del API"
 echo "  docker ps --filter 'name=language-service'"

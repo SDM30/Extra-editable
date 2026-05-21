@@ -36,12 +36,32 @@ Ese arranque levanta:
 ./start-all.sh
 ```
 
+## Detener y limpiar
+
+### Detener todos los servicios
+
+```bash
+./stop-all.sh
+```
+
+Mata los procesos del host (backend, frontend, collab, watcher LSP), detiene y elimina los contenedores Docker del proyecto y cierra túneles SSH en puertos 8080/8050.
+
+### Reiniciar desde cero (Docker)
+
+```bash
+./reset-docker.sh
+```
+
+Elimina **todos** los contenedores, imágenes, redes y volúmenes Docker del proyecto. Útil para pruebas limpias antes de un nuevo `start-all.sh`. Las imágenes base (`nginx:alpine`, `redis:7-alpine`, `postgres:15-alpine`) no se eliminan porque pueden ser compartidas con otros proyectos.
+
 ## Requisitos
 
-- Python 3.13+ o el launcher `py`
-- Node.js 22+
+- Python 3.10+
+- Node.js 20+
 - npm
 - Docker
+
+> `start-all.sh` verifica automáticamente `docker`, `python3`, `node` y `npm` antes de arrancar. Si falta alguno, aborta con un mensaje de error.
 
 ## Variables clave
 
@@ -170,56 +190,86 @@ Si el editor sigue perdiendo contenido al cambiar de archivo, revisar también q
 
 Para comprobar sticky sessions de forma manual, abrir dos pestañas del mismo navegador y verificar que ambas mantengan su presencia/cambios al alternar entre archivos.
 
-## Pruebas de resiliencia del LSP (agente sidecar)
+## LSP Service
 
-Cada máquina nodo del Servicio de Lenguaje incluye un contenedor sidecar `lsp-agent` que vigila
-y recupera las instancias del language-service. El agente descubre los contenedores por label
-de Docker (`lsp.service=api`) y los reinicia automáticamente si caen.
+Pruebas de resiliencia del agente sidecar, autenticación JWT y ejecución del Servicio de Lenguaje:
+ver [LSP-Service/README.md](LSP-Service/README.md) y [lsp-load-balancer/README.md](lsp-load-balancer/README.md).
 
-```bash
-cd LSP-Service
-docker compose up -d --build    # levanta language-service + agent
+El diseño de arquitectura y recuperación automática está documentado en la
+[wiki del Servicio de Lenguaje](Extra-editable.wiki/Servicio-de-lenguaje.md).
 
-# 1. Verificar que el agente está corriendo
-docker compose logs agent
-# Debe mostrar: "[agent] iniciando, label: lsp.service=api, intervalo: 10s"
+## Pruebas de autenticación LSP (JWT)
 
-# 2. Verificar que descubrió los contenedores LSP
-docker compose logs agent | grep "no healthy" || echo "todo healthy"
-
-# 3. Simular caída del language-service (stop, NO rm)
-docker stop lsp-service-language-service-1
-
-# 4. Verificar que el agente detecta y reinicia (≤10s)
-docker compose logs -f agent
-# Debe mostrar: "[agent] lsp-service-language-service-1 no healthy → docker start"
-#               "[agent] docker start lsp-service-language-service-1"
-
-# 5. Confirmar que el contenedor revivió
-docker ps --filter label=lsp.service=api
-```
-
-El balanceador LSP (en la máquina LB) ejecuta `update_nginx.py` que:
-- Lee instancias vivas desde Redis (`SMEMBERS lsp:instances` + heartbeat TTL).
-- Si detecta **cero instancias** por 3 polls consecutivos (6s), publica un comando `SPAWN`
-  en el canal Redis Pub/Sub `lb:lsp:commands`.
-- Los agentes sidecar en cada nodo reciben `SPAWN` y hacen `docker start` de sus contenedores LSP.
-
-Para probar el ciclo completo de auto-recovery (LB + agente):
+Todos los endpoints REST y conexiones WebSocket del Servicio de Lenguaje requieren
+un token JWT scoped al proyecto. El backend emite tokens LSP en
+`POST /api/projects/{id}/lsp/token/` con payload `{sub, username, room, exp}`.
 
 ```bash
-# En la máquina LB:
-cd lsp-load-balancer
-python3 update_nginx.py          # watcher con Redis discovery + Pub/Sub
+# 1. Login
+ACCESS=$(curl -s -X POST http://localhost:8000/api/auth/login/ \
+  -H "Content-Type: application/json" \
+  -d '{"username":"samuel","password":"User1234!"}' | \
+  python3 -c "import sys,json; print(json.load(sys.stdin)['access'])")
 
-# En cada máquina nodo:
-cd LSP-Service
-docker compose up -d --build
+# 2. Obtener token LSP para el proyecto (usá un ID de proyecto que te pertenezca)
+LSP_TOKEN=$(curl -s -X POST http://localhost:8000/api/projects/2/lsp/token/ \
+  -H "Authorization: Bearer $ACCESS" | \
+  python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
 
-# Forzar caída total:
-docker stop $(docker ps -q --filter label=lsp.service=api)
+# 3. Sin token → 401
+curl -i http://localhost:8080/lsp/2
+# → HTTP/1.1 401 Unauthorized
+#   {"detail":"Token requerido"}
 
-# El LB publicará SPAWN en ≤36s (30s TTL heartbeat + 6s polls).
-# Los agentes recibirán SPAWN y re-levantarán los contenedores.
-# Verificar en logs del agente: "SPAWN recibido → iniciando"
+# 4. Con token → 200 (crea contenedor LSP multiplexor)
+curl -s http://localhost:8080/lsp/2 \
+  -H "Authorization: Bearer $LSP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"language":"python"}' | python3 -m json.tool
+# → container_id, ws_url, ws_port, etc.
+
+# 5. Token de proyecto A en endpoint de proyecto B → 403
+curl -i http://localhost:8080/lsp/99 \
+  -H "Authorization: Bearer $LSP_TOKEN"
+# → HTTP/1.1 403 Forbidden
+#   {"detail":"No pertenece al proyecto 99"}
+
+# 6. WebSocket sin token → rechazado
+npx wscat -c "ws://localhost:32768"
+# → Disconnected (code: 1008, reason: Token requerido)
+
+# 7. WebSocket con token → conectado
+WS_URL=$(curl -s http://localhost:8080/lsp/2 \
+  -H "Authorization: Bearer $LSP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"language":"python"}' | \
+  python3 -c "import sys,json; print(json.load(sys.stdin)['ws_url'])")
+npx wscat -c "${WS_URL}?token=${LSP_TOKEN}"
+# → Connected (press CTRL+C to quit)
 ```
+
+El flujo completo de autenticación es:
+
+```
+Frontend → POST /auth/login/ → access_token
+         → POST /projects/{id}/lsp/token/ (Bearer access_token) → lsp_token {room}
+         → REST /lsp/{id} (Bearer lsp_token) → valida JWT + room == project_id
+         → WS ws://host:port?token=lsp_token → multiplexor valida JWT + room == PROJECT_ID
+```
+
+## Documentación de diseño
+
+La arquitectura del Servicio de Lenguaje, balanceadores de carga, health sidecars,
+flujo de variables de entorno en dev/producción y el mecanismo de recuperación automática
+están documentados en la [wiki del proyecto](Extra-editable.wiki/Home.md).
+
+# Distribuición VM
+| Name | Username | Password | IP_Address | Servicios |
+|------|----------|----------|------------|-----------|
+| S. Osorio | estudiante | | 10.43.99.252 | Control Node (solo Ansible) |
+| Simón | estudiante | F0c4-16M4p4c | 10.43.99.67 | LSP Service (réplica) |
+| David | estudiante | arquiDavid911 | 10.43.98.3 | Backend + Frontend + Gateway + Collab LB |
+| S. Campos | estudiante | C4m4l30n+26C | 10.43.99.20 | LSP Load Balancer |
+| Gabriel | estudiante | Gorila/32Ard | 10.43.100.88 | LSP Service (primario) |
+| Chitiva | estudiante | Ll4m4/47M0n0 | 10.43.99.41 | Code Execution Service |
+| Melissa | estudiante | Pulp0/373l3f | 10.43.100.126 | Collab Service (3 instancias) |

@@ -28,6 +28,11 @@ lsp_nodes:
   - "10.43.100.88"    # Gabriel (primario)
   - "10.43.99.67"     # Simon (réplica)
 
+# Redis compartido del LSP: vive en Gabriel y actúa como service registry
+# para que el watcher de Campos descubra todas las instancias LSP.
+redis_lsp_host: "10.43.100.88"
+redis_lsp_port: 6379
+
 # ── Proyecto ──
 project_repo: "https://github.com/SDM30/Extra-editable.git"
 project_branch: dev # Cambiar a Main para producción

@@ -42,25 +42,11 @@ http {
             proxy_next_upstream error timeout invalid_header http_500 http_502 http_503;
         }
 
-        # ── Auth subrequest contra el backend ──
-        location = /_auth {
-            internal;
-            proxy_pass http://{{ backend_host }}:{{ backend_port }}/api/projects/validate-collab-token/?token=$arg_token;
-            proxy_pass_request_body off;
-            proxy_set_header Content-Length "";
-            proxy_set_header Host $host;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-            proxy_set_header Authorization $http_authorization;
-        }
-
         # ── WebSocket de colaboración ──
+        # NO se valida el token aquí: Hocuspocus lo envía después del handshake
+        # (no en la URL), así que el auth_request rompía la conexión. El propio
+        # servicio collab valida el JWT en su hook onAuthenticate (server.js).
         location / {
-            auth_request /_auth;
-            auth_request_set $auth_user_id $upstream_http_x_auth_user_id;
-            auth_request_set $auth_username $upstream_http_x_auth_username;
-            auth_request_set $auth_room $upstream_http_x_auth_room;
-
             proxy_pass http://collab_backend;
             proxy_http_version 1.1;
             proxy_set_header Upgrade    $http_upgrade;
@@ -69,11 +55,6 @@ http {
             proxy_set_header X-Real-IP  $remote_addr;
             proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
-
-            # Identidad validada por el gateway
-            proxy_set_header X-Auth-User-Id $auth_user_id;
-            proxy_set_header X-Auth-Username $auth_username;
-            proxy_set_header X-Auth-Room $auth_room;
 
             proxy_read_timeout    3600s;
             proxy_send_timeout    3600s;

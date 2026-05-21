@@ -66,6 +66,46 @@ class ValidateCollabTokenView(APIView):
         return resp
 
 
+class LspTokenView(APIView):
+    """Endpoint que emite un token JWT scoped al proyecto para el servicio LSP.
+
+    POST /api/projects/{project_id}/lsp/token/
+    Header: Authorization: Bearer <access_token>
+
+    Retorna { token, room } donde el token incluye:
+      - sub: user_id
+      - username: nombre de usuario
+      - room: project_id
+      - exp: 1 hora
+
+    El LSP service valida este token localmente (HS256, JWT_SECRET compartido)
+    y rechaza requests cuyo room no coincida con el project_id del endpoint.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, project_id=None):
+        proyecto = Proyecto.objects.get(pk=project_id)
+
+        if proyecto.usuario != request.user:
+            if not ProyectoColaborador.objects.filter(
+                proyecto=proyecto, usuario=request.user
+            ).exists():
+                return Response(
+                    {'detail': 'No tienes acceso a este proyecto.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+        payload = {
+            'sub': str(request.user.id),
+            'username': request.user.username,
+            'room': str(project_id),
+            'exp': datetime.utcnow() + timedelta(hours=1),
+        }
+        secret = getattr(settings, 'COLLAB_JWT_SECRET', settings.SECRET_KEY)
+        token = jwt.encode(payload, secret, algorithm='HS256')
+        return Response({'token': token, 'room': str(project_id)})
+
+
 class ProyectoViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsProjectOwner]
 
@@ -154,6 +194,32 @@ class ProyectoViewSet(viewsets.ModelViewSet):
         session.save()
 
         return Response({'token': token, 'room': room})
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated], url_path='collab/heartbeat')
+    def collab_heartbeat(self, request, pk=None):
+        """Mantiene viva la sesión colaborativa sin generar un nuevo token.
+
+        El frontend llama este endpoint periódicamente mientras el editor sigue
+        abierto, de modo que `last_seen` no quede obsoleto por inactividad.
+        """
+        proyecto = self.get_object()
+
+        if proyecto.usuario != request.user:
+            if not ProyectoColaborador.objects.filter(
+                proyecto=proyecto, usuario=request.user
+            ).exists():
+                return Response(
+                    {'detail': 'No tienes acceso a este proyecto.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+        session, _ = CollabSession.objects.get_or_create(
+            proyecto=proyecto,
+            usuario=request.user if request.user.is_authenticated else None,
+        )
+        session.save()
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=['get'], permission_classes=[IsAuthenticated], url_path='collaborators')
     def collaborators(self, request, pk=None):

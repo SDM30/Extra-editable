@@ -16,12 +16,47 @@
     enabled: yes
     state: started
 
-- name: Abrir puerto PostgreSQL en UFW (solo loopback)
+- name: Detectar directorio de configuración de PostgreSQL
+  shell: |
+    set -e
+    for d in /etc/postgresql/*/main; do
+      [ -d "$d" ] && echo "$d" && exit 0
+    done
+    exit 1
+  register: pg_conf_dir
+  changed_when: false
+
+- name: Configurar listen_addresses para aceptar conexiones desde la subred
+  lineinfile:
+    path: "{{ pg_conf_dir.stdout }}/postgresql.conf"
+    regexp: '^\s*#?\s*listen_addresses\s*='
+    line: "listen_addresses = 'localhost,{{ backend_host }}'"
+    state: present
+  notify: restart postgresql
+
+- name: Permitir conexiones del collab service (Melissa) en pg_hba.conf
+  lineinfile:
+    path: "{{ pg_conf_dir.stdout }}/pg_hba.conf"
+    line: "host    {{ db_name }}    {{ db_user }}    {{ collab_host }}/32    md5"
+    state: present
+  notify: restart postgresql
+
+- name: Aplicar cambios de configuración de PostgreSQL ahora
+  meta: flush_handlers
+
+- name: Abrir puerto PostgreSQL en UFW desde loopback
   ufw:
     rule: allow
     port: "{{ db_port }}"
     proto: tcp
     from_ip: "127.0.0.1"
+
+- name: Abrir puerto PostgreSQL en UFW desde el collab service (Melissa)
+  ufw:
+    rule: allow
+    port: "{{ db_port }}"
+    proto: tcp
+    from_ip: "{{ collab_host }}"
 
 - name: Terminar conexiones activas a la base de datos
   command: >

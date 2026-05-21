@@ -1,0 +1,60 @@
+# Generado por Ansible — NO editar manualmente.
+# Compose file de despliegue: reemplaza al docker-compose.yml del repo para
+# inyectar configuración específica del despliegue (Redis compartido, hostname
+# fijo para registro correcto en Redis, puerto 8135 mapeado al host).
+#
+# Por qué hostname: con el hostname puesto a la IP real del nodo,
+# socket.gethostbyname(socket.gethostname()) dentro del contenedor devuelve
+# la IP del host (no la del bridge docker). Ver Limitación B en DEPLOY.md.
+
+services:
+  language-service:
+    build: ./language-service
+    hostname: "{{ ansible_host }}"
+    labels:
+      - "lsp.service=api"
+      - "lsp.component=language-service"
+    ports:
+      - "8135:8135"
+    environment:
+      - PORT=8135
+      - REDIS_HOST={{ redis_lsp_host }}
+      - REDIS_PORT={{ redis_lsp_port }}
+      - REDIS_DB=0
+      - WS_PUBLIC_HOST={{ ansible_host }}
+      - PROJECTS_DIR=/home/projects
+      - CONTAINER_IDLE_TIMEOUT=300000
+      - MAX_CLIENTS_PER_CONTAINER=4
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /home/projects:/home/projects
+      - ./language-service:/app
+    networks:
+      - lsp-network
+    restart: "no"
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8135/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 2
+      start_period: 15s
+
+  agent:
+    build: ./agent
+    environment:
+      - PYTHONUNBUFFERED=1
+      - LABEL=lsp.service=api
+      - REDIS_HOST={{ redis_lsp_host }}
+      - REDIS_PORT={{ redis_lsp_port }}
+      - CHECK_SECS=10
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - lsp-network
+    restart: unless-stopped
+    depends_on:
+      - language-service
+
+networks:
+  lsp-network:
+    driver: bridge

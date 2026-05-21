@@ -14,9 +14,10 @@
  */
 // app/services/lsp.service.ts
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable, ReplaySubject, Subject, firstValueFrom } from 'rxjs';
 import { enviroment } from '../environments/enviroment';
+import { AuthService } from './auth.service';
 
 /**
  * Respuesta de la API al crear/consultar un contenedor LSP
@@ -71,6 +72,7 @@ export interface LSPSession {
   connected: boolean;
   initialized: boolean;
   messageId: number;
+  lspToken: string;
   pendingRequests: Map<number, (response: any) => void>;
 }
 
@@ -79,6 +81,31 @@ export interface LSPSession {
 })
 export class LspService {
   private readonly API_URL = enviroment.apiUrlLanguageServer || 'http://localhost:8080';
+  private lspTokenCache: Map<string, string> = new Map();
+
+  /**
+   * Obtiene un token JWT scoped al proyecto para el servicio LSP.
+   * El token es emitido por el backend y contiene room=project_id.
+   */
+  private async getLspToken(projectId: string): Promise<string> {
+    const cached = this.lspTokenCache.get(projectId);
+    if (cached) return cached;
+
+    const accessToken = this.authService.getToken();
+    const token = await firstValueFrom(
+      this.http.post<{ token: string }>(
+        `${enviroment.apiBaseUrl}/projects/${projectId}/lsp/token/`,
+        {},
+        {
+          headers: new HttpHeaders({
+            ...(accessToken && { Authorization: `Bearer ${accessToken}` }),
+          }),
+        },
+      ),
+    );
+    this.lspTokenCache.set(projectId, token.token);
+    return token.token;
+  }
   private activeSessions: Map<string, LSPSession> = new Map();
   private saveTimersByUri: Map<string, any> = new Map();
 
@@ -89,7 +116,7 @@ export class LspService {
   private completionSubject = new Subject<{ id: number; items: any[] }>();
   public completion$ = this.completionSubject.asObservable();
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient, private authService: AuthService) {}
 
   /**
    * Crea o recupera un contenedor LSP para el proyecto
@@ -112,10 +139,14 @@ export class LspService {
     language: string,
     maxClients: number = 4,
   ): Promise<LSPContainerResponse> {
+    const lspToken = await this.getLspToken(projectId);
+
     const response = await firstValueFrom(
       this.http.post<LSPContainerResponse>(`${this.API_URL}/lsp/${projectId}`, {
         language,
         max_clients: maxClients,
+      }, {
+        headers: new HttpHeaders({ Authorization: `Bearer ${lspToken}` }),
       }),
     );
     return response;
@@ -153,7 +184,8 @@ export class LspService {
       }
     }
 
-    // Crear contenedor vía API
+    // Crear contenedor vía API (incluye obtener y enviar token)
+    const lspToken = await this.getLspToken(projectId);
     const container = await this.getOrCreateContainer(projectId, language);
 
     // Crear sesión
@@ -167,6 +199,7 @@ export class LspService {
       connected: false,
       initialized: false,
       messageId: 1,
+      lspToken,
       pendingRequests: new Map(),
     };
 
@@ -178,21 +211,38 @@ export class LspService {
   }
 
   /**
-   * Conecta el WebSocket al multiplexor LSP
+   * Conecta el WebSocket al multiplexor LSP con reintentos.
    */
   private connectWebSocket(session: LSPSession): Promise<void> {
-    return new Promise((resolve, reject) => {
-      console.log(`[LSP] Conectando a ${session.wsUrl}`);
+    return this._connectWebSocketAttempt(session, 0);
+  }
 
-      const socket = new WebSocket(session.wsUrl);
+  private _connectWebSocketAttempt(session: LSPSession, attempt: number): Promise<void> {
+    const MAX_ATTEMPTS = 3;
+    const RETRY_DELAY_MS = 2000;
+
+    return new Promise<void>((resolve, reject) => {
+      const wsUrl = `${session.wsUrl}?token=${session.lspToken}`;
+      console.log(`[LSP] Conectando a ${wsUrl} (intento ${attempt + 1}/${MAX_ATTEMPTS})`);
+
+      const socket = new WebSocket(wsUrl);
       session.socket = socket;
 
       const timeout = setTimeout(() => {
-        reject(new Error('Timeout conectando al LSP'));
-      }, 10000);
+        if (attempt + 1 < MAX_ATTEMPTS) {
+          console.warn(`[LSP] Timeout intento ${attempt + 1}, reintentando en ${RETRY_DELAY_MS}ms...`);
+          socket.close();
+          setTimeout(() => {
+            this._connectWebSocketAttempt(session, attempt + 1)
+              .then(resolve).catch(reject);
+          }, RETRY_DELAY_MS);
+        } else {
+          reject(new Error('Timeout conectando al LSP'));
+        }
+      }, 20000);
 
       socket.onopen = () => {
-        console.log(`[LSP] WebSocket conectado para ${session.projectId}`);
+        console.log(`[LSP] WebSocket conectado para ${session.projectId} (intento ${attempt + 1})`);
         session.connected = true;
         clearTimeout(timeout);
 
@@ -208,9 +258,19 @@ export class LspService {
         this.handleMessage(session, event.data);
       };
 
-      socket.onerror = (error) => {
-        console.error(`[LSP] Error WebSocket:`, error);
+      socket.onerror = () => {
+        console.error(`[LSP] Error WebSocket en intento ${attempt + 1}`);
         session.connected = false;
+        clearTimeout(timeout);
+        if (attempt + 1 < MAX_ATTEMPTS) {
+          console.warn(`[LSP] Error de conexión, reintentando en ${RETRY_DELAY_MS}ms...`);
+          setTimeout(() => {
+            this._connectWebSocketAttempt(session, attempt + 1)
+              .then(resolve).catch(reject);
+          }, RETRY_DELAY_MS);
+        } else {
+          reject(new Error('Error de conexión WebSocket al LSP'));
+        }
       };
 
       socket.onclose = (event) => {
@@ -560,11 +620,16 @@ export class LspService {
    * @throws {Error} Si la API retorna error
    */
   async getContainerStatus(projectId: string, language?: string): Promise<any> {
+    const lspToken = await this.getLspToken(projectId);
     const url = language
       ? `${this.API_URL}/lsp/${projectId}?language=${encodeURIComponent(language)}`
       : `${this.API_URL}/lsp/${projectId}`;
 
-    return firstValueFrom(this.http.get(url));
+    return firstValueFrom(
+      this.http.get(url, {
+        headers: new HttpHeaders({ Authorization: `Bearer ${lspToken}` }),
+      }),
+    );
   }
 
   /**
@@ -579,11 +644,16 @@ export class LspService {
    * @throws {Error} Si la API retorna error
    */
   async destroyContainer(projectId: string, language?: string): Promise<void> {
+    const lspToken = await this.getLspToken(projectId);
     const url = language
       ? `${this.API_URL}/lsp/${projectId}?language=${encodeURIComponent(language)}`
       : `${this.API_URL}/lsp/${projectId}`;
 
-    await firstValueFrom(this.http.delete(url));
+    await firstValueFrom(
+      this.http.delete(url, {
+        headers: new HttpHeaders({ Authorization: `Bearer ${lspToken}` }),
+      }),
+    );
   }
 
   private getSessionKey(projectId: string, language: string): string {

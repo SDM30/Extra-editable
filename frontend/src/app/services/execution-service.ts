@@ -21,19 +21,28 @@ export class ExecutionService {
     onMessage: (message: ExecutionMessage) => void,
     onError?: () => void,
     onClose?: () => void,
+    onOpen?: (socket: WebSocket) => void,
   ): void {
-    this.socket = new WebSocket(`${enviroment.ejecutarUrl}`);
 
-    this.socket.onmessage = (event) => {
+    const socket = new WebSocket(enviroment.ejecutarUrl);
+
+    this.socket = socket;
+
+    socket.onopen = () => {
+      console.log('[ExecutionService] WebSocket conectado');
+      if (onOpen) onOpen(socket);
+    };
+
+    socket.onmessage = (event) => {
       const message = JSON.parse(event.data) as ExecutionMessage;
       onMessage(message);
     };
 
-    this.socket.onerror = () => {
+    socket.onerror = () => {
       if (onError) onError();
     };
 
-    this.socket.onclose = () => {
+    socket.onclose = () => {
       if (onClose) onClose();
     };
   }

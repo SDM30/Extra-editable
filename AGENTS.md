@@ -30,3 +30,14 @@ Todos los archivos de configuración (por ejemplo, de herramientas, despliegue, 
 Buscar en la raiz del proyecto el directorio Extra-editable.wiki, si no esta no utilizarlo (esperar especificacion del usuario).
 
 Documentar información de diseño y funcionalidades de los componentes: frontend, backend, servicio de lenguaje (LSP-service), servicio de edición colaborativa (collab-service), servicio de ejecución de código (code-execution-service) y balanceadores de carga.
+
+## Distribuición de maquinas
+| Name | Username | Password | IP_Address | Servicios |
+|------|----------|----------|------------|-----------|
+| S. Osorio | estudiante | | 10.43.99.252 | Control Node (solo Ansible) |
+| Simón | estudiante | F0c4-16M4p4c | 10.43.99.67 | LSP Service (réplica) |
+| David | estudiante | arquiDavid911 | 10.43.98.3 | Backend + Frontend + Gateway + Collab LB |
+| S. Campos | estudiante | C4m4l30n+26C | 10.43.99.20 | LSP Load Balancer |
+| Gabriel | estudiante | Gorila/32Ard | 10.43.100.88 | LSP Service (primario) |
+| Chitiva | estudiante | Ll4m4/47M0n0 | 10.43.99.41 | Code Execution Service |
+| Melissa | estudiante | Pulp0/373l3f | 10.43.100.126 | Collab Service (3 instancias) |

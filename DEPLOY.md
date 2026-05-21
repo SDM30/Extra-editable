@@ -18,7 +18,56 @@
 
 ## Cómo abrir la aplicación web
 
-Una vez que el despliegue terminó exitosamente, abrir en el navegador:
+La app vive dentro de la subred del laboratorio (10.43.x.x), no es accesible
+directamente desde un portátil fuera del lab. Hay dos formas de abrirla:
+
+### Opción A — Desde una VM dentro del lab (la más simple)
+
+Si ya estás sentado frente a una VM del lab con navegador (cualquiera de las
+del inventario), abrir directo:
+
+```
+http://10.43.98.3:4200
+```
+
+### Opción B — Desde un portátil vía túnel SOCKS sobre SSH
+
+Si estás trabajando desde tu portátil (Windows / macOS / Linux) y sólo tienes
+SSH a Samuel:
+
+**Paso 1 — Abrir el túnel SOCKS (déjalo corriendo en una ventana):**
+
+```bash
+ssh -D 1080 -N estudiante@10.43.99.252
+```
+
+El `-D 1080` abre un proxy SOCKS5 local en `127.0.0.1:1080`. El `-N` evita
+abrir una shell; el túnel sigue vivo hasta que matas el comando con `Ctrl+C`.
+
+**Paso 2 — Abrir Chrome con un perfil aislado que use ese proxy:**
+
+Windows (cmd / PowerShell):
+```cmd
+"C:\Program Files\Google\Chrome\Application\chrome.exe" --user-data-dir="%TEMP%\uni-chrome" --proxy-server="socks5://127.0.0.1:1080"
+```
+
+macOS:
+```bash
+/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
+  --user-data-dir="/tmp/uni-chrome" \
+  --proxy-server="socks5://127.0.0.1:1080"
+```
+
+Linux:
+```bash
+google-chrome --user-data-dir="/tmp/uni-chrome" --proxy-server="socks5://127.0.0.1:1080"
+```
+
+`--user-data-dir` crea un perfil de Chrome separado, así no contaminas tu
+perfil normal con el proxy. Cuando cierras esa ventana, el perfil temporal
+queda en disco pero no afecta a tu Chrome de uso diario.
+
+**Paso 3 — Navegar a la app:**
 
 ```
 http://10.43.98.3:4200
@@ -191,6 +240,55 @@ sudo systemctl restart lsp-watcher
 docker restart api-gateway
 docker restart collab-lb
 ```
+
+---
+
+## Limitaciones conocidas (requieren cambio de código)
+
+Estas limitaciones provienen del código de los servicios y NO se arreglan en
+el playbook Ansible. Se documentan aquí para futura referencia.
+
+### A. `collab-service` ignora la variable `FRONTEND_ORIGIN`
+
+En `collab-service/src/server.js:7` el origen permitido para CORS está
+hardcodeado a `http://localhost:4200` y el código no lee la variable de
+entorno `FRONTEND_ORIGIN` aunque el systemd la inyecte.
+
+**Impacto:** las respuestas HTTP directas al servicio collab (por ejemplo
+`/dev-token`) devuelven `Access-Control-Allow-Origin: http://localhost:4200`.
+Las conexiones WebSocket no se ven afectadas porque Hocuspocus no valida
+Origin por defecto, y el cliente normalmente entra por el gateway (que sí
+toma la IP correcta).
+
+**Workaround:** sólo es relevante si se accede directo al collab desde un
+Origin distinto. Acceder vía el gateway (`http://10.43.98.3:8080/collab`)
+sigue funcionando. Resolución definitiva: PR al código que cambie la línea 7
+a `const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN ?? 'http://localhost:4200';`.
+
+### B. `language-service` se registra en Redis con la IP del bridge docker
+
+En `LSP-Service/language-service/app/main.py:48`, el `instance_id` que se
+guarda en `lsp:instances` se calcula con
+`socket.gethostbyname(socket.gethostname())`. Dentro de un contenedor en
+modo bridge eso devuelve la IP del bridge (172.x.x.x), no la del host.
+Resultado: el watcher en Campos genera upstreams a IPs inalcanzables.
+
+**Workaround aplicado en el playbook:** Ansible despliega un
+`docker-compose.ansible.yml` en cada nodo LSP (reemplaza al
+`docker-compose.yml` del repo al lanzar el stack) que pone
+`hostname: <ip_del_nodo>` y `ports: "8135:8135"` para el servicio
+`language-service`. Con el hostname puesto a una IP literal,
+`socket.gethostbyname(socket.gethostname())` la devuelve tal cual sin pasar
+por /etc/hosts ni DNS, así que el `instance_id` que se registra en Redis
+queda como `10.43.100.88:8135:<pid>` (o `10.43.99.67:8135:<pid>`) — la IP
+real del nodo, alcanzable desde Campos.
+
+El servicio se lanza con
+`docker compose -f docker-compose.ansible.yml up -d --build`. El archivo
+`docker-compose.yml` original del repo queda intacto para desarrollo local.
+
+Resolución definitiva: PR al código que cambie `_get_instance_id` a usar
+`os.getenv("WS_PUBLIC_HOST")` antes de caer en `gethostbyname`.
 
 ---
 

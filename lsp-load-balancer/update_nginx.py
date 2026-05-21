@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Para usar el venv local: ./venv/bin/python3 update_nginx.py
 """
 Watcher de instancias del Servicio de Lenguaje.
 Lee las instancias activas desde Redis (lsp:instances + heartbeat) y actualiza
@@ -38,7 +39,8 @@ UPSTREAM_MARKER      = "# {{LSP_INSTANCES}}"
 _SPAWN_THRESHOLD     = 3
 _EMPTY_STREAK        = 0
 
-# Cliente Redis — misma configuración que el LSP service
+# Nginx — se ejecuta dentro del contenedor Docker lsp-lb
+NGINX_CONTAINER = os.getenv("NGINX_CONTAINER", "lsp-lb")
 _redis = redis.Redis(
     host=REDIS_HOST,
     port=REDIS_PORT,
@@ -109,12 +111,26 @@ def maybe_spawn(live_instances: list[str]):
         _EMPTY_STREAK = 0
 
 
+def ensure_nginx_running():
+    """Asegura que el contenedor nginx esté corriendo antes de validar/recargar."""
+    result = subprocess.run(
+        ["docker", "inspect", "-f", "{{.State.Running}}", NGINX_CONTAINER],
+        capture_output=True, text=True
+    )
+    if result.stdout.strip() != "true":
+        logger.warning("Contenedor %s no está corriendo, intentando docker start...", NGINX_CONTAINER)
+        subprocess.run(["docker", "start", NGINX_CONTAINER], capture_output=True)
+        time.sleep(1)
+
+
 def generate_and_reload(template: str, instances: list[str]):
     """
     Reemplaza el marcador en el template con los servidores activos,
     valida la configuración y recarga Nginx.
     Si no hay instancias, el upstream queda sin backends (nginx responde 502).
     """
+    ensure_nginx_running()
+
     if instances:
         server_lines = "\n".join(
             f"        server {instance} max_fails=3 fail_timeout=30s;"
@@ -129,18 +145,18 @@ def generate_and_reload(template: str, instances: list[str]):
     with open(NGINX_CONF_PATH, "w") as f:
         f.write(config)
 
-    # Validar sintaxis antes de recargar
+    # Validar sintaxis antes de recargar (dentro del contenedor)
     result = subprocess.run(
-        ["nginx", "-t", "-c", NGINX_CONF_PATH],
+        ["docker", "exec", NGINX_CONTAINER, "nginx", "-t"],
         capture_output=True, text=True
     )
     if result.returncode != 0:
         logger.error("nginx -t falló — nginx.conf no se recargará:\n%s", result.stderr)
         return
 
-    # Recargar Nginx
+    # Recargar Nginx dentro del contenedor
     result = subprocess.run(
-        ["nginx", "-s", "reload"],
+        ["docker", "exec", NGINX_CONTAINER, "nginx", "-s", "reload"],
         capture_output=True, text=True
     )
     if result.returncode == 0:

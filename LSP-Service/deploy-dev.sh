@@ -45,7 +45,9 @@ HOST_IP=$(ip addr show docker0 2>/dev/null | grep 'inet ' | awk '{print $2}' | c
 if [ -f .env ]; then
     source .env
 fi
-REDIS_HOST="${REDIS_HOST:-$HOST_IP}"
+# En modo single-machine forzar REDIS_HOST al gateway docker0 para
+# que los contenedores LSP alcancen Redis corriendo en el host.
+REDIS_HOST="$HOST_IP"
 echo "Host IP: $HOST_IP  |  Redis: $REDIS_HOST"
 
 # Iniciar Redis si no esta corriendo (ya no esta en docker-compose)
@@ -68,7 +70,7 @@ echo ""
 
 # Construir y levantar
 echo -e "${YELLOW}Construyendo y levantando servicios...${NC}"
-HOST_IP=$HOST_IP REDIS_HOST=$REDIS_HOST $COMPOSE_CMD up -d --build \
+HOST_IP=$HOST_IP REDIS_HOST=$REDIS_HOST WS_PUBLIC_HOST=127.0.0.1 $COMPOSE_CMD up -d --build \
     --scale language-service=${INSTANCES} \
     --scale agent=1
 
