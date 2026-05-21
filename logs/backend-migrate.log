@@ -1,6 +1,5 @@
 Operations to perform:
   Apply all migrations: admin, auth, contenttypes, projects, sessions, users
 Running migrations:
-  No migrations to apply.
-  Your models in app(s): 'projects' have changes that are not yet reflected in a migration, and so won't be applied.
-  Run 'manage.py makemigrations' to make new migrations, and then re-run 'manage.py migrate' to apply them.
+  Applying projects.0003_alter_proyectocolaborador_options... OK
+  Applying projects.0004_create_proyectocolaboradores_table... OK

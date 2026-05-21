@@ -13,36 +13,20 @@ websocket connection issues.
 ❯ Building...
 ✔ Building...
 Initial chunk files | Names               |  Raw size
-main.js             | main                | 217.01 kB | 
-chunk-APEK4AIU.js   | -                   |   7.19 kB | 
+main.js             | main                | 219.22 kB | 
+chunk-CB6N2QIK.js   | -                   |   7.77 kB | 
 styles.css          | styles              | 236 bytes | 
 
-                    | Initial total       | 224.44 kB
+                    | Initial total       | 227.22 kB
 
 Lazy chunk files    | Names               |  Raw size
-chunk-3TXSLBCY.js   | auth-wrap-component |  47.29 kB | 
+chunk-S2HWJ4OD.js   | auth-wrap-component |  47.29 kB | 
 
-Application bundle generation complete. [4.619 seconds] - 2026-05-21T01:06:04.300Z
+Application bundle generation complete. [6.682 seconds] - 2026-05-21T03:10:46.817Z
 
 Watch mode enabled. Watching for file changes...
 NOTE: Raw file sizes do not reflect development server per-request transformations.
   ➜  Local:   http://localhost:4200/
-  ➜  Network: http://10.195.44.141:4200/
+  ➜  Network: http://192.168.20.217:4200/
   ➜  Network: http://172.18.0.1:4200/
   ➜  Network: http://172.17.0.1:4200/
-❯ Changes detected. Rebuilding...
-✔ Changes detected. Rebuilding...
-Initial chunk files | Names |  Raw size
-main.js             | main  | 217.61 kB | 
-
-Application bundle generation complete. [1.532 seconds] - 2026-05-21T02:02:45.972Z
-
-Page reload sent to client(s).
-❯ Changes detected. Rebuilding...
-✔ Changes detected. Rebuilding...
-Initial chunk files | Names |  Raw size
-main.js             | main  | 218.04 kB | 
-
-Application bundle generation complete. [0.350 seconds] - 2026-05-21T02:03:08.614Z
-
-Page reload sent to client(s).

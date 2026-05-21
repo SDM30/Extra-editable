@@ -7,6 +7,7 @@ $root = Split-Path -Parent $MyInvocation.MyCommand.Definition
 $backendDir = Join-Path $root 'backend'
 $frontendDir = Join-Path $root 'frontend'
 $collabDir = Join-Path $root 'collab-service'
+$collabLbDir = Join-Path $root 'collab-load-balancer'
 $gatewayConfig = Join-Path $root 'nginx.conf'
 $collabLbConfig = Join-Path $root 'collab-load-balancer\nginx.config'
 $postgresContainer = 'extra-editable-postgres'
@@ -205,6 +206,10 @@ $collabLbArgs = @(
 )
 Restart-DockerContainer $collabLbContainer $collabLbArgs
 Write-Host 'Collaboration load balancer started on 8083'
+
+$collabWatcherCommand = "Set-Location -LiteralPath '$collabLbDir'; `$env:COLLAB_DISCOVERY_HOST = '127.0.0.1'; `$env:COLLAB_UPSTREAM_HOST = 'host.docker.internal'; & '$backendPython' update_nginx.py"
+Start-Window $collabLbDir $collabWatcherCommand
+Write-Host 'Collaboration discovery watcher started (new window)'
 
 $backendCommand = "Set-Location -LiteralPath '$backendDir'; & '$backendPython' manage.py runserver 8000"
 Start-Window $backendDir $backendCommand

@@ -1,0 +1,6 @@
+2026/05/21 03:10:37 [emerg] 34#34: no servers are inside upstream in /etc/nginx/nginx.conf:38
+nginx: [emerg] no servers are inside upstream in /etc/nginx/nginx.conf:38
+nginx: configuration file /etc/nginx/nginx.conf test failed
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+2026/05/21 03:10:40 [notice] 46#46: signal process started
