@@ -18,7 +18,56 @@
 
 ## Cómo abrir la aplicación web
 
-Una vez que el despliegue terminó exitosamente, abrir en el navegador:
+La app vive dentro de la subred del laboratorio (10.43.x.x), no es accesible
+directamente desde un portátil fuera del lab. Hay dos formas de abrirla:
+
+### Opción A — Desde una VM dentro del lab (la más simple)
+
+Si ya estás sentado frente a una VM del lab con navegador (cualquiera de las
+del inventario), abrir directo:
+
+```
+http://10.43.98.3:4200
+```
+
+### Opción B — Desde un portátil vía túnel SOCKS sobre SSH
+
+Si estás trabajando desde tu portátil (Windows / macOS / Linux) y sólo tienes
+SSH a Samuel:
+
+**Paso 1 — Abrir el túnel SOCKS (déjalo corriendo en una ventana):**
+
+```bash
+ssh -D 1080 -N estudiante@10.43.99.252
+```
+
+El `-D 1080` abre un proxy SOCKS5 local en `127.0.0.1:1080`. El `-N` evita
+abrir una shell; el túnel sigue vivo hasta que matas el comando con `Ctrl+C`.
+
+**Paso 2 — Abrir Chrome con un perfil aislado que use ese proxy:**
+
+Windows (cmd / PowerShell):
+```cmd
+"C:\Program Files\Google\Chrome\Application\chrome.exe" --user-data-dir="%TEMP%\uni-chrome" --proxy-server="socks5://127.0.0.1:1080"
+```
+
+macOS:
+```bash
+/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
+  --user-data-dir="/tmp/uni-chrome" \
+  --proxy-server="socks5://127.0.0.1:1080"
+```
+
+Linux:
+```bash
+google-chrome --user-data-dir="/tmp/uni-chrome" --proxy-server="socks5://127.0.0.1:1080"
+```
+
+`--user-data-dir` crea un perfil de Chrome separado, así no contaminas tu
+perfil normal con el proxy. Cuando cierras esa ventana, el perfil temporal
+queda en disco pero no afecta a tu Chrome de uso diario.
+
+**Paso 3 — Navegar a la app:**
 
 ```
 http://10.43.98.3:4200
