@@ -380,15 +380,17 @@ def test_lsp_distribution(n_requests: int = 30) -> TestResult:
 
     upstream_counts: Counter = Counter()
     errors = 0
-    container_project_ids: List[str] = []
 
-    # Usamos el project_id real para los contenedores LSP
-    base_project_id = _test_project_id or "lb1-test"
+    # Usamos el project_id real del token (room == project_id en la URL).
+    # Hacemos create → leer host → delete en cada iteración para que
+    # least_conn pueda elegir nodo distinto en cada request.
+    pid = _test_project_id
+    if not pid:
+        return TestResult("LB-LSP-1", desc, False,
+                          error="No hay project_id de prueba disponible")
 
-    print(f"  Enviando {n_requests} requests a POST {LSP_LB_URL}/lsp/{{id}}...")
+    print(f"  Enviando {n_requests} requests a POST {LSP_LB_URL}/lsp/{pid} (create→delete)...")
     for i in range(n_requests):
-        # Cada request usa un project_id único para forzar distintos contenedores
-        pid = f"{base_project_id}-lb1-{i:03d}"
         try:
             r = httpx.post(
                 f"{LSP_LB_URL}/lsp/{pid}",
@@ -399,16 +401,22 @@ def test_lsp_distribution(n_requests: int = 30) -> TestResult:
             if r.status_code == 200:
                 upstream = extract_lsp_upstream(r.json())
                 upstream_counts[upstream] += 1
-                container_project_ids.append(pid)
+                # Eliminar para que el siguiente request cree uno nuevo en cualquier nodo
+                try:
+                    httpx.delete(
+                        f"{LSP_LB_URL}/lsp/{pid}?language=python",
+                        headers={"Authorization": f"Bearer {lsp_tok}"},
+                        timeout=5,
+                    )
+                except Exception:
+                    pass
             else:
                 errors += 1
                 print(f"    request {i:02d}: HTTP {r.status_code}")
         except Exception as exc:
             errors += 1
             print(f"    request {i:02d}: {type(exc).__name__}")
-        time.sleep(0.1)
-
-    lsp_cleanup_containers(container_project_ids, lsp_tok)
+        time.sleep(0.2)
 
     total_ok = sum(upstream_counts.values())
     print(f"\n  Distribución ({total_ok}/{n_requests} exitosos, {errors} errores):")
@@ -454,7 +462,36 @@ def test_lsp_failover(failover_wait: int = NGINX_FAIL_TIMEOUT + 5) -> TestResult
         return TestResult("LB-LSP-2", desc, False,
                           error="Sin LSP token — revisa backend y proyecto de prueba")
 
-    base_pid = _test_project_id or "lb2-test"
+    # Usamos el project_id real (room del token debe coincidir con la URL).
+    pid = _test_project_id
+    if not pid:
+        return TestResult("LB-LSP-2", desc, False,
+                          error="No hay project_id de prueba disponible")
+
+    def _lsp_create_delete(label: str) -> Optional[str]:
+        """Crea contenedor, lee upstream, borra. Retorna IP del nodo o None."""
+        try:
+            r = httpx.post(
+                f"{LSP_LB_URL}/lsp/{pid}",
+                json={"language": "python"},
+                headers={"Authorization": f"Bearer {lsp_tok}"},
+                timeout=10,
+            )
+            if r.status_code == 200:
+                up = extract_lsp_upstream(r.json())
+                try:
+                    httpx.delete(
+                        f"{LSP_LB_URL}/lsp/{pid}?language=python",
+                        headers={"Authorization": f"Bearer {lsp_tok}"},
+                        timeout=5,
+                    )
+                except Exception:
+                    pass
+                return up
+            print(f"    {label}: HTTP {r.status_code}")
+        except Exception as exc:
+            print(f"    {label}: {type(exc).__name__}")
+        return None
 
     # Detener Gabriel
     print(f"  Deteniendo LSP en Gabriel ({GABRIEL_IP})...")
@@ -467,30 +504,15 @@ def test_lsp_failover(failover_wait: int = NGINX_FAIL_TIMEOUT + 5) -> TestResult
     print("  Enviando 15 requests al LB con Gabriel caído...")
     simon_count = 0
     total_ok = 0
-    to_clean: List[str] = []
 
     for i in range(15):
-        pid = f"{base_pid}-lb2-{i:02d}"
-        try:
-            r = httpx.post(
-                f"{LSP_LB_URL}/lsp/{pid}",
-                json={"language": "python"},
-                headers={"Authorization": f"Bearer {lsp_tok}"},
-                timeout=10,
-            )
-            if r.status_code == 200:
-                total_ok += 1
-                upstream = extract_lsp_upstream(r.json())
-                if upstream == SIMON_IP:
-                    simon_count += 1
-                to_clean.append(pid)
-            else:
-                print(f"    request {i:02d}: HTTP {r.status_code}")
-        except Exception as exc:
-            print(f"    request {i:02d}: {type(exc).__name__}")
+        up = _lsp_create_delete(f"request {i:02d}")
+        if up is not None:
+            total_ok += 1
+            if up == SIMON_IP:
+                simon_count += 1
         time.sleep(0.3)
 
-    lsp_cleanup_containers(to_clean, lsp_tok)
     print(f"  Exitosos: {total_ok}/15 | Ruteados a Simon: {simon_count}")
 
     # Reiniciar Gabriel
@@ -502,23 +524,11 @@ def test_lsp_failover(failover_wait: int = NGINX_FAIL_TIMEOUT + 5) -> TestResult
     gabriel_back = False
     print("  Verificando reincorporación de Gabriel al pool...")
     for i in range(15):
-        pid = f"{base_pid}-lb2-back-{i:02d}"
-        try:
-            r = httpx.post(
-                f"{LSP_LB_URL}/lsp/{pid}",
-                json={"language": "python"},
-                headers={"Authorization": f"Bearer {lsp_tok}"},
-                timeout=10,
-            )
-            if r.status_code == 200:
-                upstream = extract_lsp_upstream(r.json())
-                lsp_cleanup_containers([pid], lsp_tok)
-                if upstream == GABRIEL_IP:
-                    gabriel_back = True
-                    print(f"    Gabriel respondió en request #{i}")
-                    break
-        except Exception:
-            pass
+        up = _lsp_create_delete(f"  check gabriel #{i}")
+        if up == GABRIEL_IP:
+            gabriel_back = True
+            print(f"    Gabriel respondió en check #{i}")
+            break
         time.sleep(1)
 
     if not gabriel_back:
