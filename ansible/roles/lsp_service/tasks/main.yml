@@ -63,6 +63,15 @@
     group: estudiante
     mode: '0644'
 
+# ── Construir imagen del multiplexor LSP (lsp-multiplexor:latest) ────────────
+# Esta es la imagen que language-service usa para spawnear un contenedor LSP
+# por proyecto. Sin ella, los contenedores LSP no se pueden crear.
+- name: Construir imagen Docker lsp-multiplexor:latest
+  command: docker build -t lsp-multiplexor:latest .
+  args:
+    chdir: "{{ project_dir }}/LSP-Service/lsp-container"
+  become_user: estudiante
+
 # ── Levantar el LSP Service en cada nodo ──────────────────────────────────────
 - name: Bajar contenedores previos del compose base (limpia estado viejo)
   command: docker compose -f docker-compose.yml down --remove-orphans
@@ -70,6 +79,12 @@
     chdir: "{{ project_dir }}/LSP-Service"
   become_user: estudiante
   failed_when: false
+  changed_when: false
+
+- name: Eliminar contenedores LSP huérfanos (de despliegues previos)
+  shell: |
+    docker ps -aq --filter "label=type=lsp-multiplexor" | xargs -r docker rm -f
+  become_user: estudiante
   changed_when: false
 
 - name: Levantar LSP Service con el compose de Ansible
