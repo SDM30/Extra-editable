@@ -1,0 +1,3 @@
+2026/05/20 16:39:59 [emerg] 42#42: no servers are inside upstream in /etc/nginx/nginx.conf:38
+nginx: [emerg] no servers are inside upstream in /etc/nginx/nginx.conf:38
+nginx: configuration file /etc/nginx/nginx.conf test failed

@@ -15,6 +15,7 @@ _client = None
 
 LANGUAGES = ["python", "cpp", "typescript"]
 LSPMUX_INTERNAL_PORT = 3000  # Puerto interno del contenedor
+LSPMUX_HOST_PORT = int(os.environ.get("LSP_HOST_PORT", LSPMUX_INTERNAL_PORT))
 
 
 def _get_local_host() -> str:
@@ -85,21 +86,22 @@ def create_container(project_id: str, language: str, max_clients: int = 4):
             container = found[0]
             container.reload()
             if container.status == "running":
-                port_mapping = container.attrs["NetworkSettings"]["Ports"][f"{LSPMUX_INTERNAL_PORT}/tcp"]
-                if port_mapping:
+                port_mapping = container.attrs.get("NetworkSettings", {}).get("Ports", {}).get(f"{LSPMUX_INTERNAL_PORT}/tcp")
+                host_port = LSPMUX_HOST_PORT
+                if port_mapping and port_mapping[0].get("HostPort"):
                     host_port = int(port_mapping[0]["HostPort"])
-                    ws_url = f"ws://{ws_public_host}:{host_port}"
-                    registry.add(
-                        project_id=project_id,
-                        language=language,
-                        container_id=container.id,
-                        ws_port=host_port,
-                        ws_url=ws_url,
-                        max_clients=int(container.labels.get("max_clients", max_clients)),
-                        host=ws_public_host,
-                    )
-                    logger.info(f"Contenedor existente detectado por labels: {container.id[:12]} - WS: {ws_url}")
-                    return registry.get(project_id, language)
+                ws_url = f"ws://{ws_public_host}:{host_port}"
+                registry.add(
+                    project_id=project_id,
+                    language=language,
+                    container_id=container.id,
+                    ws_port=host_port,
+                    ws_url=ws_url,
+                    max_clients=int(container.labels.get("max_clients", max_clients)),
+                    host=ws_public_host,
+                )
+                logger.info(f"Contenedor existente detectado por labels: {container.id[:12]} - WS: {ws_url}")
+                return registry.get(project_id, language)
             else:
                 logger.warning(f"Contenedor encontrado por labels pero no está corriendo ({container.status}); eliminando...")
                 container.remove(force=True)
@@ -168,7 +170,7 @@ def create_container(project_id: str, language: str, max_clients: int = 4):
                 }
             },
             ports={
-                f"{LSPMUX_INTERNAL_PORT}/tcp": None
+                f"{LSPMUX_INTERNAL_PORT}/tcp": LSPMUX_HOST_PORT
             },
             labels={
                 "project_id": project_id,
@@ -182,11 +184,11 @@ def create_container(project_id: str, language: str, max_clients: int = 4):
         time.sleep(1)
         container.reload()
         
-        port_mapping = container.attrs["NetworkSettings"]["Ports"][f"{LSPMUX_INTERNAL_PORT}/tcp"]
-        if not port_mapping:
-            raise RuntimeError(f"No se pudo obtener el puerto mapeado")
-        
-        host_port = int(port_mapping[0]["HostPort"])
+        port_mapping = container.attrs.get("NetworkSettings", {}).get("Ports", {}).get(f"{LSPMUX_INTERNAL_PORT}/tcp")
+        host_port = LSPMUX_HOST_PORT
+        if port_mapping and port_mapping[0].get("HostPort"):
+            host_port = int(port_mapping[0]["HostPort"])
+
         ws_url = f"ws://{ws_public_host}:{host_port}"
         
         logger.info(f"Contenedor {container.id[:12]} creado - WS: {ws_url}")

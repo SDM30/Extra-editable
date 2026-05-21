@@ -1,12 +1,12 @@
-2026-05-20 14:04:50,819 [INFO] Template cargado desde: /home/simondm/Development/ARQ/Proyecto_ARQ/lsp-load-balancer/nginx_template.conf
-2026-05-20 14:04:50,819 [INFO] =======================================================
-2026-05-20 14:04:50,819 [INFO]   LSP Load Balancer Watcher
-2026-05-20 14:04:50,819 [INFO]   Fuente: Redis (lsp:instances + heartbeat)
-2026-05-20 14:04:50,819 [INFO]   Redis: localhost:6379
-2026-05-20 14:04:50,819 [INFO]   Intervalo: 2s
-2026-05-20 14:04:50,819 [INFO]   Template: /home/simondm/Development/ARQ/Proyecto_ARQ/lsp-load-balancer/nginx_template.conf
-2026-05-20 14:04:50,819 [INFO]   Nginx conf: /home/simondm/Development/ARQ/Proyecto_ARQ/lsp-load-balancer/nginx.conf
-2026-05-20 14:04:50,819 [INFO]   Canal SPAWN: lb:lsp:commands
-2026-05-20 14:04:50,819 [INFO] =======================================================
-2026-05-20 14:04:50,831 [INFO] Cambio detectado: [] → ['172.18.0.2:8135', '172.18.0.3:8135', '172.18.0.7:8135']
-2026-05-20 14:04:51,197 [INFO] nginx.conf actualizado con 3 backends: ['172.18.0.7:8135', '172.18.0.3:8135', '172.18.0.2:8135']
+2026-05-20 15:48:12,604 [INFO] Template cargado desde: /home/simondm/Development/ARQ/Proyecto_ARQ/lsp-load-balancer/nginx_template.conf
+2026-05-20 15:48:12,627 [INFO] =======================================================
+2026-05-20 15:48:12,627 [INFO]   LSP Load Balancer Watcher
+2026-05-20 15:48:12,627 [INFO]   Fuente: Redis (lsp:instances + heartbeat)
+2026-05-20 15:48:12,627 [INFO]   Redis: localhost:6379
+2026-05-20 15:48:12,628 [INFO]   Intervalo: 2s
+2026-05-20 15:48:12,628 [INFO]   Template: /home/simondm/Development/ARQ/Proyecto_ARQ/lsp-load-balancer/nginx_template.conf
+2026-05-20 15:48:12,628 [INFO]   Nginx conf: /home/simondm/Development/ARQ/Proyecto_ARQ/lsp-load-balancer/nginx.conf
+2026-05-20 15:48:12,628 [INFO]   Canal SPAWN: lb:lsp:commands
+2026-05-20 15:48:12,628 [INFO] =======================================================
+2026-05-20 15:48:12,655 [INFO] Cambio detectado: [] → ['172.18.0.2:8135', '172.18.0.3:8135', '172.18.0.4:8135']
+2026-05-20 15:48:12,953 [INFO] nginx.conf actualizado con 3 backends: ['172.18.0.3:8135', '172.18.0.4:8135', '172.18.0.2:8135']
