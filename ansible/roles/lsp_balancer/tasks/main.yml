@@ -1,5 +1,13 @@
 ---
 # Role: lsp_balancer — LSP Load Balancer Nginx nativo (Campos)
+#
+# El balanceador es dinámico: update_nginx.py descubre las instancias LSP
+# desde el Redis compartido en Gabriel y regenera nginx.conf en cada cambio.
+# Esta rol sólo:
+#   1. Prepara el entorno (paquetes, UFW, directorios).
+#   2. Genera un nginx.conf inicial válido (sin backends) para que nginx pueda
+#      arrancar antes de que el watcher escriba la primera versión real.
+#   3. Instala y arranca lsp-nginx + lsp-watcher.
 
 - name: Abrir puerto del LSP balancer en UFW
   ufw:
@@ -23,14 +31,20 @@
     group: estudiante
     mode: '0755'
 
-- name: Generar nginx config del LSP balancer
-  template:
-    src: nginx_lb.conf.j2
-    dest: "{{ project_dir }}/lsp-load-balancer/nginx.conf"
-    owner: estudiante
-    group: estudiante
-    mode: '0644'
-  notify: reload lsp nginx
+- name: Verificar que el template del watcher existe (clonado del repo)
+  stat:
+    path: "{{ project_dir }}/lsp-load-balancer/nginx_template.conf"
+  register: nginx_template_stat
+  failed_when: not nginx_template_stat.stat.exists
+
+- name: Generar nginx.conf inicial sin backends (será reescrito por el watcher)
+  shell: |
+    sed 's|# {{ '{{' }}LSP_INSTANCES{{ '}}' }}|# sin backends — esperando que el watcher escriba la primera versión|' \
+      {{ project_dir }}/lsp-load-balancer/nginx_template.conf \
+      > {{ project_dir }}/lsp-load-balancer/nginx.conf
+  args:
+    creates: "{{ project_dir }}/lsp-load-balancer/nginx.conf"
+  become_user: estudiante
 
 - name: Detener nginx del sistema (usamos nuestra propia config)
   systemd:
@@ -50,6 +64,7 @@
     src: lsp-watcher.service.j2
     dest: /etc/systemd/system/lsp-watcher.service
     mode: '0644'
+  notify: restart lsp watcher
 
 - name: Recargar systemd
   systemd:

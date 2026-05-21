@@ -1,0 +1,27 @@
+# Generado por Ansible — NO editar manualmente.
+# Pone language-service en network_mode: host para que se registre en Redis
+# con la IP real del nodo (no la del bridge docker). Ver Limitación B en DEPLOY.md.
+#
+# Con network_mode: host, docker compose ignora el bloque `ports` del base
+# (language-service escucha directo en el puerto 8135 del host).
+services:
+  language-service:
+    network_mode: host
+    environment:
+      - PORT=8135
+      - REDIS_HOST={{ redis_lsp_host }}
+      - REDIS_PORT={{ redis_lsp_port }}
+      - REDIS_DB=0
+      - WS_PUBLIC_HOST={{ ansible_host }}
+      - HOST_IP={{ ansible_host }}
+      - PROJECTS_DIR=/home/projects
+      - CONTAINER_IDLE_TIMEOUT=300000
+      - MAX_CLIENTS_PER_CONTAINER=4
+
+  agent:
+    environment:
+      - PYTHONUNBUFFERED=1
+      - LABEL=lsp.service=api
+      - REDIS_HOST={{ redis_lsp_host }}
+      - REDIS_PORT={{ redis_lsp_port }}
+      - CHECK_SECS=10

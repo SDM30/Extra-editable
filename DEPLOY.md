@@ -194,6 +194,52 @@ docker restart collab-lb
 
 ---
 
+## Limitaciones conocidas (requieren cambio de código)
+
+Estas limitaciones provienen del código de los servicios y NO se arreglan en
+el playbook Ansible. Se documentan aquí para futura referencia.
+
+### A. `collab-service` ignora la variable `FRONTEND_ORIGIN`
+
+En `collab-service/src/server.js:7` el origen permitido para CORS está
+hardcodeado a `http://localhost:4200` y el código no lee la variable de
+entorno `FRONTEND_ORIGIN` aunque el systemd la inyecte.
+
+**Impacto:** las respuestas HTTP directas al servicio collab (por ejemplo
+`/dev-token`) devuelven `Access-Control-Allow-Origin: http://localhost:4200`.
+Las conexiones WebSocket no se ven afectadas porque Hocuspocus no valida
+Origin por defecto, y el cliente normalmente entra por el gateway (que sí
+toma la IP correcta).
+
+**Workaround:** sólo es relevante si se accede directo al collab desde un
+Origin distinto. Acceder vía el gateway (`http://10.43.98.3:8080/collab`)
+sigue funcionando. Resolución definitiva: PR al código que cambie la línea 7
+a `const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN ?? 'http://localhost:4200';`.
+
+### B. `language-service` se registra en Redis con la IP del bridge docker
+
+En `LSP-Service/language-service/app/main.py:48`, el `instance_id` que se
+guarda en `lsp:instances` se calcula con
+`socket.gethostbyname(socket.gethostname())`. Dentro de un contenedor en
+modo bridge eso devuelve la IP del bridge (172.x.x.x), no la del host.
+Resultado: el watcher en Campos genera upstreams a IPs inalcanzables.
+
+**Workaround aplicado en el playbook:** Ansible despliega un
+`docker-compose.override.yml` en cada nodo LSP con
+`network_mode: host` para el servicio `language-service`. Con red host,
+`gethostname()` devuelve el hostname real del nodo (Gabriel / Simon) y
+`gethostbyname()` resuelve a su IP de subred.
+
+**Efecto secundario:** el `language-service` ya no usa la red `lsp-network`
+del compose. El puerto 8135 queda expuesto directamente en el host (no más
+mapeo dinámico de puertos). Está bien porque sólo corre 1 instancia por
+nodo.
+
+Resolución definitiva: PR al código que cambie `_get_instance_id` a usar
+`os.getenv("WS_PUBLIC_HOST")` antes de caer en `gethostbyname`.
+
+---
+
 ## Solución de errores comunes
 
 ### Frontend — La página no carga en `http://10.43.98.3:4200`

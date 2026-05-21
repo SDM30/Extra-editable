@@ -17,6 +17,8 @@ Environment=NGINX_TEMPLATE_PATH={{ project_dir }}/lsp-load-balancer/nginx_templa
 Environment=NGINX_CONF_PATH={{ project_dir }}/lsp-load-balancer/nginx.conf
 Environment=POLL_INTERVAL=1
 Environment=PYTHONUNBUFFERED=1
+Environment=REDIS_HOST={{ redis_lsp_host }}
+Environment=REDIS_PORT={{ redis_lsp_port }}
 
 [Install]
 WantedBy=multi-user.target
