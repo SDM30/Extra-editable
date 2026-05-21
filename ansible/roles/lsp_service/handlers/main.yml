@@ -2,5 +2,5 @@
 - name: restart lsp service
   shell: |
     cd {{ project_dir }}/LSP-Service
-    docker compose down
-    docker compose up -d --build
+    docker compose -f docker-compose.ansible.yml down
+    docker compose -f docker-compose.ansible.yml up -d --build

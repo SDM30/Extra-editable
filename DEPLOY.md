@@ -225,15 +225,18 @@ modo bridge eso devuelve la IP del bridge (172.x.x.x), no la del host.
 Resultado: el watcher en Campos genera upstreams a IPs inalcanzables.
 
 **Workaround aplicado en el playbook:** Ansible despliega un
-`docker-compose.override.yml` en cada nodo LSP con
-`network_mode: host` para el servicio `language-service`. Con red host,
-`gethostname()` devuelve el hostname real del nodo (Gabriel / Simon) y
-`gethostbyname()` resuelve a su IP de subred.
+`docker-compose.ansible.yml` en cada nodo LSP (reemplaza al
+`docker-compose.yml` del repo al lanzar el stack) que pone
+`hostname: <ip_del_nodo>` y `ports: "8135:8135"` para el servicio
+`language-service`. Con el hostname puesto a una IP literal,
+`socket.gethostbyname(socket.gethostname())` la devuelve tal cual sin pasar
+por /etc/hosts ni DNS, así que el `instance_id` que se registra en Redis
+queda como `10.43.100.88:8135:<pid>` (o `10.43.99.67:8135:<pid>`) — la IP
+real del nodo, alcanzable desde Campos.
 
-**Efecto secundario:** el `language-service` ya no usa la red `lsp-network`
-del compose. El puerto 8135 queda expuesto directamente en el host (no más
-mapeo dinámico de puertos). Está bien porque sólo corre 1 instancia por
-nodo.
+El servicio se lanza con
+`docker compose -f docker-compose.ansible.yml up -d --build`. El archivo
+`docker-compose.yml` original del repo queda intacto para desarrollo local.
 
 Resolución definitiva: PR al código que cambie `_get_instance_id` a usar
 `os.getenv("WS_PUBLIC_HOST")` antes de caer en `gethostbyname`.

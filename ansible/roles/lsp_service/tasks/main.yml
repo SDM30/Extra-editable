@@ -52,18 +52,28 @@
   changed_when: false
   when: inventory_hostname == 'gabriel'
 
-# ── Override de docker-compose con network_mode: host ─────────────────────────
-- name: Generar docker-compose.override.yml con red host y REDIS_HOST compartido
+# ── Compose file de despliegue (reemplaza al del repo) ────────────────────────
+# Usa hostname fijo (IP real del nodo) y puerto 8135:8135 para que el registro
+# en Redis y el balanceador apunten a la IP correcta. Ver Limitación B en DEPLOY.md.
+- name: Generar docker-compose.ansible.yml de despliegue
   template:
-    src: docker-compose.override.yml.j2
-    dest: "{{ project_dir }}/LSP-Service/docker-compose.override.yml"
+    src: docker-compose.ansible.yml.j2
+    dest: "{{ project_dir }}/LSP-Service/docker-compose.ansible.yml"
     owner: estudiante
     group: estudiante
     mode: '0644'
 
 # ── Levantar el LSP Service en cada nodo ──────────────────────────────────────
-- name: Levantar LSP Service con Docker Compose
-  command: docker compose up -d --build
+- name: Bajar contenedores previos del compose base (limpia estado viejo)
+  command: docker compose -f docker-compose.yml down --remove-orphans
+  args:
+    chdir: "{{ project_dir }}/LSP-Service"
+  become_user: estudiante
+  failed_when: false
+  changed_when: false
+
+- name: Levantar LSP Service con el compose de Ansible
+  command: docker compose -f docker-compose.ansible.yml up -d --build --remove-orphans
   args:
     chdir: "{{ project_dir }}/LSP-Service"
   become_user: estudiante
