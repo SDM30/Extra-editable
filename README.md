@@ -36,12 +36,32 @@ Ese arranque levanta:
 ./start-all.sh
 ```
 
+## Detener y limpiar
+
+### Detener todos los servicios
+
+```bash
+./stop-all.sh
+```
+
+Mata los procesos del host (backend, frontend, collab, watcher LSP), detiene y elimina los contenedores Docker del proyecto y cierra túneles SSH en puertos 8080/8050.
+
+### Reiniciar desde cero (Docker)
+
+```bash
+./reset-docker.sh
+```
+
+Elimina **todos** los contenedores, imágenes, redes y volúmenes Docker del proyecto. Útil para pruebas limpias antes de un nuevo `start-all.sh`. Las imágenes base (`nginx:alpine`, `redis:7-alpine`, `postgres:15-alpine`) no se eliminan porque pueden ser compartidas con otros proyectos.
+
 ## Requisitos
 
-- Python 3.13+ o el launcher `py`
-- Node.js 22+
+- Python 3.10+
+- Node.js 20+
 - npm
 - Docker
+
+> `start-all.sh` verifica automáticamente `docker`, `python3`, `node` y `npm` antes de arrancar. Si falta alguno, aborta con un mensaje de error.
 
 ## Variables clave
 
@@ -236,3 +256,23 @@ Frontend → POST /auth/login/ → access_token
          → REST /lsp/{id} (Bearer lsp_token) → valida JWT + room == project_id
          → WS ws://host:port?token=lsp_token → multiplexor valida JWT + room == PROJECT_ID
 ```
+
+## Cambios recientes en `start-all.sh`
+
+- **Verificación de prerrequisitos**: ahora `start-all.sh` comprueba `docker`, `python3`, `node` y `npm` antes de arrancar. Si falta alguno, aborta con un mensaje.
+- **LSP Load Balancer en red LSP**: el contenedor `lsp-lb` se crea con `--network lsp-service_lsp-network` y se conecta también a `bridge` para que el gateway (8080) pueda alcanzarlo.
+- **Watcher con venv**: `update_nginx.py` se ejecuta con `./venv/bin/python3` (entorno virtual local) en vez del `python3` del sistema.
+- **Watcher recarga nginx del contenedor**: usa `docker exec lsp-lb nginx -s reload` en lugar de requerir nginx instalado en el host.
+- **Build automático de `lsp-multiplexor`**: si la imagen no existe, `start-all.sh` la construye desde `LSP-Service/lsp-container/` antes de levantar el watcher.
+- **API gateway corrige proxy_pass**: `/api/` ahora apunta a `host.docker.internal:8000` (Django) en vez de `:8080`.
+
+# Distribuición VM
+| Name | Username | Password | IP_Address | Servicios |
+|------|----------|----------|------------|-----------|
+| S. Osorio | estudiante | | 10.43.99.252 | Control Node (solo Ansible) |
+| Simón | estudiante | F0c4-16M4p4c | 10.43.99.67 | LSP Service (réplica) |
+| David | estudiante | arquiDavid911 | 10.43.98.3 | Backend + Frontend + Gateway + Collab LB |
+| S. Campos | estudiante | C4m4l30n+26C | 10.43.99.20 | LSP Load Balancer |
+| Gabriel | estudiante | Gorila/32Ard | 10.43.100.88 | LSP Service (primario) |
+| Chitiva | estudiante | Ll4m4/47M0n0 | 10.43.99.41 | Code Execution Service |
+| Melissa | estudiante | Pulp0/373l3f | 10.43.100.126 | Collab Service (3 instancias) |

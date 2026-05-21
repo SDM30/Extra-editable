@@ -110,3 +110,29 @@
   max-width: 520px;
   white-space: pre-wrap;
 }
+
+/* Cursores remotos (y-codemirror.next) */
+:host ::ng-deep .cm-ySelection {
+  opacity: 0.4;
+}
+:host ::ng-deep .cm-ySelectionCaret {
+  position: relative;
+  border-left: 2px solid;
+  margin-left: -1px;
+  margin-right: -1px;
+  box-sizing: border-box;
+}
+:host ::ng-deep .cm-ySelectionCaret > .cm-ySelectionInfo {
+  position: absolute;
+  top: -1.3em;
+  left: -1px;
+  font-size: 0.75em;
+  font-family: sans-serif;
+  white-space: nowrap;
+  color: white;
+  padding: 1px 4px;
+  border-radius: 3px;
+  line-height: normal;
+  user-select: none;
+  pointer-events: none;
+}

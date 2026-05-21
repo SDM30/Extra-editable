@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Para usar el venv local: ./venv/bin/python3 update_nginx.py
 """
 Watcher de instancias del Servicio de Lenguaje.
 Lee las instancias activas desde Redis (lsp:instances + heartbeat) y actualiza
@@ -38,8 +39,8 @@ UPSTREAM_MARKER      = "# {{LSP_INSTANCES}}"
 _SPAWN_THRESHOLD     = 3
 _EMPTY_STREAK        = 0
 
-# Nginx — ruta absoluta (evita problemas de PATH en entornos virtuales)
-NGINX_BIN = "/usr/sbin/nginx"
+# Nginx — se ejecuta dentro del contenedor Docker lsp-lb
+NGINX_CONTAINER = os.getenv("NGINX_CONTAINER", "lsp-lb")
 _redis = redis.Redis(
     host=REDIS_HOST,
     port=REDIS_PORT,
@@ -130,18 +131,18 @@ def generate_and_reload(template: str, instances: list[str]):
     with open(NGINX_CONF_PATH, "w") as f:
         f.write(config)
 
-    # Validar sintaxis antes de recargar
+    # Validar sintaxis antes de recargar (dentro del contenedor)
     result = subprocess.run(
-        [NGINX_BIN, "-t", "-c", NGINX_CONF_PATH],
+        ["docker", "exec", NGINX_CONTAINER, "nginx", "-t"],
         capture_output=True, text=True
     )
     if result.returncode != 0:
         logger.error("nginx -t falló — nginx.conf no se recargará:\n%s", result.stderr)
         return
 
-    # Recargar Nginx
+    # Recargar Nginx dentro del contenedor
     result = subprocess.run(
-        [NGINX_BIN, "-s", "reload"],
+        ["docker", "exec", NGINX_CONTAINER, "nginx", "-s", "reload"],
         capture_output=True, text=True
     )
     if result.returncode == 0:
