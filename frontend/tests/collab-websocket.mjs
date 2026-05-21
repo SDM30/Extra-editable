@@ -5,9 +5,9 @@ import { HocuspocusProvider } from '@hocuspocus/provider';
 import * as Y from 'yjs';
 import { WebSocket } from 'ws';
 
-const API_BASE_URL = process.env.API_BASE_URL ?? 'http://10.43.98.3:8080/api';
-const WS_BASE_URL = process.env.COLLAB_WS_URL ?? 'ws://10.43.100.126:1234';
- 
+const API_BASE_URL = process.env.API_BASE_URL ?? 'http://localhost:8000/api';
+const WS_BASE_URL = process.env.COLLAB_WS_URL ?? 'ws://localhost:1234';
+
 const PASSWORDS = {
   admin1: 'Admin1234!',
   david: 'User1234!',
@@ -75,39 +75,7 @@ async function loginUser(username) {
 }
 
 async function ensureUsers(usernames) {
-  const entries = await Promise.all(usernames.map(async (username) => {
-    const password = PASSWORDS[username];
-    assert(password, `No password configured for ${username}`);
-
-    const login = await requestJson(`${API_BASE_URL}/auth/login/`, {
-      method: 'POST',
-      body: JSON.stringify({ username, password }),
-    });
-
-    if (login.response.status !== 200 || !login.body?.access) {
-      const reg = await requestJson(`${API_BASE_URL}/auth/register/`, {
-        method: 'POST',
-        body: JSON.stringify({ username, email: `${username}@myide.com`, password: 'User1234!', nombre: username }),
-      });
-
-      if (reg.response.status === 200 || reg.response.status === 201) {
-        PASSWORDS[username] = 'User1234!';
-        return [username, await loginUser(username)];
-      }
-
-      // User already exists but login failed — wrong password or inactive account.
-      assert.fail(`Login failed for ${username}: ${JSON.stringify(login.body)}`);
-    }
-
-    const me = await requestJson(`${API_BASE_URL}/auth/me/`, {
-      headers: { Authorization: `Bearer ${login.body.access}` },
-    });
-    assert.equal(me.response.status, 200, `me() failed for ${username}: ${JSON.stringify(me.body)}`);
-
-    const session = { username, password, access: login.body.access, refresh: login.body.refresh, profile: me.body };
-    USER_CACHE.set(username, session);
-    return [username, session];
-  }));
+  const entries = await Promise.all(usernames.map(async (username) => [username, await loginUser(username)]));
   return Object.fromEntries(entries);
 }
 
@@ -552,9 +520,6 @@ async function main() {
 
   if (passed !== 7) {
     process.exitCode = 1;
-  }
-  else{
-    process.exit(0);
   }
 }
 

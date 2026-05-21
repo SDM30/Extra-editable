@@ -5,8 +5,8 @@ import { HocuspocusProvider } from '@hocuspocus/provider';
 import * as Y from 'yjs';
 import { WebSocket } from 'ws';
 
-const API_BASE_URL = process.env.API_BASE_URL ?? 'http://10.43.98.3:8000/api';
-const WS_BASE_URL = process.env.COLLAB_WS_URL ?? 'ws://10.43.100.126:1234';
+const API_BASE_URL = process.env.API_BASE_URL ?? 'http://localhost:8000/api';
+const WS_BASE_URL = process.env.COLLAB_WS_URL ?? 'ws://localhost:1234';
 
 const PASSWORDS = {
   admin1: 'Admin1234!',
