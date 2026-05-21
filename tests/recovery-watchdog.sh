@@ -43,7 +43,8 @@ GABRIEL_IP="${GABRIEL_IP:-10.43.100.88}"
 SIMON_IP="${SIMON_IP:-10.43.99.67}"
 LSP_LB_URL="${LSP_LB_URL:-http://10.43.99.20:8085}"
 SSH_USER="${SSH_USER:-estudiante}"
-SSH_PASS="${SSH_PASS:-}"
+GABRIEL_SSH_PASS="${GABRIEL_SSH_PASS:-${SSH_PASS:-}}"
+SIMON_SSH_PASS="${SIMON_SSH_PASS:-${SSH_PASS:-}}"
 PROJECT_DIR="${PROJECT_DIR:-/opt/extra-editable}"
 CHECK_INTERVAL="${CHECK_INTERVAL:-10}"
 RECOVERY_WAIT="${RECOVERY_WAIT:-15}"
@@ -62,8 +63,14 @@ ssh_cmd() {
     local host="$1"
     shift
     local cmd="$*"
-    if [ -n "$SSH_PASS" ] && command -v sshpass &>/dev/null; then
-        sshpass -p "$SSH_PASS" ssh \
+    # Seleccionar contraseña según el host
+    local pass=""
+    case "$host" in
+        "$GABRIEL_IP") pass="$GABRIEL_SSH_PASS" ;;
+        "$SIMON_IP")   pass="$SIMON_SSH_PASS" ;;
+    esac
+    if [ -n "$pass" ] && command -v sshpass &>/dev/null; then
+        sshpass -p "$pass" ssh \
             -o StrictHostKeyChecking=no \
             -o BatchMode=no \
             -o ConnectTimeout=10 \

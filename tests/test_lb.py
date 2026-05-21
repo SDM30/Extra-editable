@@ -71,8 +71,11 @@ SIMON_IP    = os.environ.get("SIMON_IP",    "10.43.99.67")
 CAMPOS_IP   = os.environ.get("CAMPOS_IP",   "10.43.99.20")
 
 SSH_USER    = os.environ.get("SSH_USER",    "estudiante")
-SSH_PASS    = os.environ.get("SSH_PASS",    "")
+SSH_PASS    = os.environ.get("SSH_PASS",    "")   # contraseña genérica (fallback)
 PROJECT_DIR = os.environ.get("PROJECT_DIR", "/opt/extra-editable")
+
+# Contraseñas SSH por VM (tienen prioridad sobre SSH_PASS genérico)
+_SSH_PASS_BY_IP: Dict[str, str] = {}  # se llena tras definir las IPs
 
 BACKEND_URL   = os.environ.get("BACKEND_URL",   f"http://{DAVID_IP}:8000")
 LSP_LB_URL    = os.environ.get("LSP_LB_URL",    f"http://{CAMPOS_IP}:8085")
@@ -92,10 +95,20 @@ NGINX_FAIL_TIMEOUT = 30  # fail_timeout configurado en lsp-nginx.conf
 RESULTS_DIR = Path("results")
 RESULTS_DIR.mkdir(exist_ok=True)
 
+# Mapa IP → contraseña SSH (lee variables de entorno por VM)
+_SSH_PASS_BY_IP = {
+    GABRIEL_IP: os.environ.get("GABRIEL_SSH_PASS", SSH_PASS),
+    SIMON_IP:   os.environ.get("SIMON_SSH_PASS",   SSH_PASS),
+    MELISSA_IP: os.environ.get("MELISSA_SSH_PASS", SSH_PASS),
+    DAVID_IP:   os.environ.get("DAVID_SSH_PASS",   SSH_PASS),
+    CAMPOS_IP:  os.environ.get("CAMPOS_SSH_PASS",  SSH_PASS),
+}
+
 
 # ── SSH ─────────────────────────────────────────────────────────────────────────
 
 def _build_ssh_cmd(host: str, command: str) -> List[str]:
+    password = _SSH_PASS_BY_IP.get(host, SSH_PASS)
     base = [
         "ssh",
         "-o", "StrictHostKeyChecking=no",
@@ -104,8 +117,8 @@ def _build_ssh_cmd(host: str, command: str) -> List[str]:
         f"{SSH_USER}@{host}",
         command,
     ]
-    if SSH_PASS and shutil.which("sshpass"):
-        return ["sshpass", "-p", SSH_PASS] + base
+    if password and shutil.which("sshpass"):
+        return ["sshpass", "-p", password] + base
     return base
 
 
