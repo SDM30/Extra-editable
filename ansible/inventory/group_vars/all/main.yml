@@ -35,7 +35,7 @@ redis_lsp_port: 6379
 
 # ── Proyecto ──
 project_repo: "https://github.com/SDM30/Extra-editable.git"
-project_branch: dev # Cambiar a Main para producción
+project_branch: ansible # Cambiar a Main para producción
 project_dir: /opt/extra-editable
 
 # ── JWT ──
