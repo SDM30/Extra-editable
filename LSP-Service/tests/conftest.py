@@ -1,78 +1,84 @@
-import os
-import time
-import pytest
+"""
+Fixtures compartidas para pruebas de integración del Servicio de Lenguaje (LSP).
 
-try:
-    import jwt
-except Exception:
-    jwt = None
+Contrato (se consume desde `run_lsp_tests.py` o manualmente):
+- LSP_BASE_URL: base URL del LSP Load Balancer (default: http://127.0.0.1:8085)
+- LSP_TEST_PROJECT: project_id usado por los tests (si no, se genera uno)
+- TEST_JWT: token JWT HS256 cuyo claim `room` coincide con el project_id
+- JWT_SECRET: secreto HS256 usado para generar TEST_JWT si no se provee
+"""
 
-import requests
+from __future__ import annotations
 
-
-@pytest.fixture(scope="session")
-def lsp_base_url():
-    return os.environ.get("LSP_BASE_URL", "http://127.0.0.1:8085")
-
-
-@pytest.fixture(scope="session")
-def project_id():
-    # default project id used in tests
-    return os.environ.get("LSP_TEST_PROJECT", "proj-1")
-
-
-@pytest.fixture(scope="session")
-def jwt_for_project(project_id):
-    # Prefer externally-provided token
-    token = os.environ.get("TEST_JWT")
-    if token:
-        return token
-
-    # Try to generate a simple HS256 token if PyJWT available
-    secret = os.environ.get("JWT_SECRET", "jwt-secreto")
-    if jwt is None:
-        raise RuntimeError("No TEST_JWT set and PyJWT not installed to generate tokens")
-
-    payload = {"room": project_id, "iss": "tests", "iat": int(time.time())}
-    return jwt.encode(payload, secret, algorithm="HS256")
 import os
 import sys
 import time
 import uuid
-import jwt
+
 import pytest
 
-# Ensure tests/ directory is on sys.path so test modules can import helpers
-tests_dir = os.path.dirname(__file__)
-if tests_dir not in sys.path:
-    sys.path.insert(0, tests_dir)
 
-ROOT_URL = os.environ.get("LSP_BASE_URL", "http://127.0.0.1:8085")
-
-
-@pytest.fixture(scope="session")
-def lsp_base_url():
-    return ROOT_URL
+def _get_env(name: str, default: str | None = None) -> str | None:
+    value = os.environ.get(name)
+    if value is not None and value.strip() == "":
+        return default
+    return value if value is not None else default
 
 
-@pytest.fixture(scope="session")
-def project_id():
-    return f"test-project-{uuid.uuid4().hex[:8]}"
+# Asegura que `LSP-Service/tests` esté en sys.path para importar `utils.*`
+_TESTS_DIR = os.path.dirname(__file__)
+if _TESTS_DIR not in sys.path:
+    sys.path.insert(0, _TESTS_DIR)
 
 
 @pytest.fixture(scope="session")
-def jwt_for_project(project_id):
-    # Prefer externally provided token for real runs
-    token = os.environ.get("TEST_JWT")
+def lsp_base_url() -> str:
+    """Base URL del LSP Load Balancer."""
+    return (_get_env("LSP_BASE_URL", "http://127.0.0.1:8085") or "").rstrip("/")
+
+
+@pytest.fixture(scope="session")
+def project_id() -> str:
+    """Project ID de prueba; debe coincidir con el claim `room` del JWT."""
+    return _get_env("LSP_TEST_PROJECT") or f"test-project-{uuid.uuid4().hex[:10]}"
+
+
+@pytest.fixture(scope="session")
+def jwt_for_project(project_id: str) -> str:
+    """
+    JWT para autenticación.
+
+    Si TEST_JWT está definido, se usa tal cual. Si no, se genera un token HS256
+    con PyJWT usando JWT_SECRET.
+    """
+    token = _get_env("TEST_JWT")
     if token:
         return token
 
-    # Fallback: generate a HS256 token using JWT_SECRET or default
-    secret = os.environ.get("JWT_SECRET", "jwt-secreto")
-    payload = {"room": project_id, "iat": int(time.time())}
+    try:
+        import jwt  # type: ignore
+    except Exception as exc:  # pragma: no cover
+        raise RuntimeError(
+            "No hay TEST_JWT y no se pudo generar un token (falta PyJWT). "
+            f"Detalle: {exc}"
+        )
+
+    secret = _get_env("JWT_SECRET", "jwt-secreto") or "jwt-secreto"
+    now = int(time.time())
+    payload = {
+        "sub": "tests",
+        "username": "tests",
+        "room": project_id,
+        "iat": now,
+        "exp": now + 3600,
+    }
     return jwt.encode(payload, secret, algorithm="HS256")
 
 
 @pytest.fixture(scope="function")
-def auth_headers(jwt_for_project):
-    return {"Authorization": f"Bearer {jwt_for_project}", "Content-Type": "application/json"}
+def auth_headers(jwt_for_project: str) -> dict[str, str]:
+    """Headers estándar de autenticación para REST."""
+    return {
+        "Authorization": f"Bearer {jwt_for_project}",
+        "Content-Type": "application/json",
+    }

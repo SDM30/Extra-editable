@@ -1,0 +1,416 @@
+{
+  "timestamp": "2026-05-21T07:25:53.064481+00:00",
+  "config": {
+    "mode": "dev",
+    "phase2": true,
+    "frontend_url": "http://localhost:4200",
+    "backend_url": "http://localhost:8000",
+    "workers": 8,
+    "duration_s": 180.0,
+    "cycle_sec": 2.0,
+    "headless": true,
+    "worker_configs": [
+      {
+        "username": "p2-user-1",
+        "password": "User1234!",
+        "project_name": "p2-proj-0-python",
+        "language": "python"
+      },
+      {
+        "username": "p2-user-2",
+        "password": "User1234!",
+        "project_name": "p2-proj-0-python",
+        "language": "python"
+      },
+      {
+        "username": "p2-user-3",
+        "password": "User1234!",
+        "project_name": "p2-proj-0-python",
+        "language": "python"
+      },
+      {
+        "username": "p2-user-4",
+        "password": "User1234!",
+        "project_name": "p2-proj-0-python",
+        "language": "python"
+      },
+      {
+        "username": "p2-user-5",
+        "password": "User1234!",
+        "project_name": "p2-proj-1-typescript",
+        "language": "typescript"
+      },
+      {
+        "username": "p2-user-6",
+        "password": "User1234!",
+        "project_name": "p2-proj-1-typescript",
+        "language": "typescript"
+      },
+      {
+        "username": "p2-user-7",
+        "password": "User1234!",
+        "project_name": "p2-proj-1-typescript",
+        "language": "typescript"
+      },
+      {
+        "username": "p2-user-8",
+        "password": "User1234!",
+        "project_name": "p2-proj-1-typescript",
+        "language": "typescript"
+      }
+    ]
+  },
+  "summary": {
+    "total_cycles": 76,
+    "successful_cycles": 69,
+    "availability_pct": 90.79,
+    "duration_s": 180.0,
+    "workers": [
+      {
+        "total_cycles": 10,
+        "successful_cycles": 9,
+        "by_step": {
+          "login": {
+            "success": 10,
+            "error": 0,
+            "success_rate": 100.0,
+            "avg_ms": 5015.47
+          },
+          "editor_load": {
+            "success": 10,
+            "error": 0,
+            "success_rate": 100.0,
+            "avg_ms": 5547.54
+          },
+          "write_code": {
+            "success": 9,
+            "error": 1,
+            "success_rate": 90.0,
+            "avg_ms": 2790.55
+          },
+          "lsp_completion": {
+            "success": 10,
+            "error": 0,
+            "success_rate": 100.0,
+            "avg_ms": 602.65
+          },
+          "execution": {
+            "success": 10,
+            "error": 0,
+            "success_rate": 100.0,
+            "avg_ms": 41.84
+          },
+          "logout": {
+            "success": 10,
+            "error": 0,
+            "success_rate": 100.0,
+            "avg_ms": 325.7
+          }
+        },
+        "screenshots": []
+      },
+      {
+        "total_cycles": 10,
+        "successful_cycles": 10,
+        "by_step": {
+          "login": {
+            "success": 10,
+            "error": 0,
+            "success_rate": 100.0,
+            "avg_ms": 4806.43
+          },
+          "editor_load": {
+            "success": 10,
+            "error": 0,
+            "success_rate": 100.0,
+            "avg_ms": 5468.94
+          },
+          "write_code": {
+            "success": 10,
+            "error": 0,
+            "success_rate": 100.0,
+            "avg_ms": 2529.73
+          },
+          "lsp_completion": {
+            "success": 10,
+            "error": 0,
+            "success_rate": 100.0,
+            "avg_ms": 571.32
+          },
+          "execution": {
+            "success": 10,
+            "error": 0,
+            "success_rate": 100.0,
+            "avg_ms": 56.98
+          },
+          "logout": {
+            "success": 10,
+            "error": 0,
+            "success_rate": 100.0,
+            "avg_ms": 352.85
+          }
+        },
+        "screenshots": []
+      },
+      {
+        "total_cycles": 10,
+        "successful_cycles": 10,
+        "by_step": {
+          "login": {
+            "success": 10,
+            "error": 0,
+            "success_rate": 100.0,
+            "avg_ms": 4872.44
+          },
+          "editor_load": {
+            "success": 10,
+            "error": 0,
+            "success_rate": 100.0,
+            "avg_ms": 5796.52
+          },
+          "write_code": {
+            "success": 10,
+            "error": 0,
+            "success_rate": 100.0,
+            "avg_ms": 2329.6
+          },
+          "lsp_completion": {
+            "success": 10,
+            "error": 0,
+            "success_rate": 100.0,
+            "avg_ms": 549.87
+          },
+          "execution": {
+            "success": 10,
+            "error": 0,
+            "success_rate": 100.0,
+            "avg_ms": 59.26
+          },
+          "logout": {
+            "success": 10,
+            "error": 0,
+            "success_rate": 100.0,
+            "avg_ms": 368.67
+          }
+        },
+        "screenshots": []
+      },
+      {
+        "total_cycles": 10,
+        "successful_cycles": 9,
+        "by_step": {
+          "login": {
+            "success": 10,
+            "error": 0,
+            "success_rate": 100.0,
+            "avg_ms": 5015.39
+          },
+          "editor_load": {
+            "success": 10,
+            "error": 0,
+            "success_rate": 100.0,
+            "avg_ms": 5458.39
+          },
+          "write_code": {
+            "success": 9,
+            "error": 1,
+            "success_rate": 90.0,
+            "avg_ms": 2531.99
+          },
+          "lsp_completion": {
+            "success": 10,
+            "error": 0,
+            "success_rate": 100.0,
+            "avg_ms": 472.19
+          },
+          "execution": {
+            "success": 10,
+            "error": 0,
+            "success_rate": 100.0,
+            "avg_ms": 59.64
+          },
+          "logout": {
+            "success": 10,
+            "error": 0,
+            "success_rate": 100.0,
+            "avg_ms": 306.65
+          }
+        },
+        "screenshots": []
+      },
+      {
+        "total_cycles": 9,
+        "successful_cycles": 7,
+        "by_step": {
+          "login": {
+            "success": 9,
+            "error": 0,
+            "success_rate": 100.0,
+            "avg_ms": 5212.34
+          },
+          "editor_load": {
+            "success": 9,
+            "error": 0,
+            "success_rate": 100.0,
+            "avg_ms": 4913.17
+          },
+          "write_code": {
+            "success": 7,
+            "error": 2,
+            "success_rate": 77.78,
+            "avg_ms": 3427.61
+          },
+          "lsp_completion": {
+            "success": 9,
+            "error": 0,
+            "success_rate": 100.0,
+            "avg_ms": 678.13
+          },
+          "execution": {
+            "success": 9,
+            "error": 0,
+            "success_rate": 100.0,
+            "avg_ms": 88.41
+          },
+          "logout": {
+            "success": 9,
+            "error": 0,
+            "success_rate": 100.0,
+            "avg_ms": 497.48
+          }
+        },
+        "screenshots": []
+      },
+      {
+        "total_cycles": 9,
+        "successful_cycles": 7,
+        "by_step": {
+          "login": {
+            "success": 9,
+            "error": 0,
+            "success_rate": 100.0,
+            "avg_ms": 5707.03
+          },
+          "editor_load": {
+            "success": 9,
+            "error": 0,
+            "success_rate": 100.0,
+            "avg_ms": 5457.36
+          },
+          "write_code": {
+            "success": 7,
+            "error": 2,
+            "success_rate": 77.78,
+            "avg_ms": 3046.31
+          },
+          "lsp_completion": {
+            "success": 9,
+            "error": 0,
+            "success_rate": 100.0,
+            "avg_ms": 819.92
+          },
+          "execution": {
+            "success": 9,
+            "error": 0,
+            "success_rate": 100.0,
+            "avg_ms": 69.29
+          },
+          "logout": {
+            "success": 9,
+            "error": 0,
+            "success_rate": 100.0,
+            "avg_ms": 400.15
+          }
+        },
+        "screenshots": []
+      },
+      {
+        "total_cycles": 9,
+        "successful_cycles": 8,
+        "by_step": {
+          "login": {
+            "success": 9,
+            "error": 0,
+            "success_rate": 100.0,
+            "avg_ms": 4862.97
+          },
+          "editor_load": {
+            "success": 9,
+            "error": 0,
+            "success_rate": 100.0,
+            "avg_ms": 5032.0
+          },
+          "write_code": {
+            "success": 8,
+            "error": 1,
+            "success_rate": 88.89,
+            "avg_ms": 3507.54
+          },
+          "lsp_completion": {
+            "success": 9,
+            "error": 0,
+            "success_rate": 100.0,
+            "avg_ms": 680.73
+          },
+          "execution": {
+            "success": 9,
+            "error": 0,
+            "success_rate": 100.0,
+            "avg_ms": 71.16
+          },
+          "logout": {
+            "success": 9,
+            "error": 0,
+            "success_rate": 100.0,
+            "avg_ms": 446.41
+          }
+        },
+        "screenshots": []
+      },
+      {
+        "total_cycles": 9,
+        "successful_cycles": 9,
+        "by_step": {
+          "login": {
+            "success": 9,
+            "error": 0,
+            "success_rate": 100.0,
+            "avg_ms": 5217.54
+          },
+          "editor_load": {
+            "success": 9,
+            "error": 0,
+            "success_rate": 100.0,
+            "avg_ms": 5249.6
+          },
+          "write_code": {
+            "success": 9,
+            "error": 0,
+            "success_rate": 100.0,
+            "avg_ms": 3318.32
+          },
+          "lsp_completion": {
+            "success": 9,
+            "error": 0,
+            "success_rate": 100.0,
+            "avg_ms": 675.08
+          },
+          "execution": {
+            "success": 9,
+            "error": 0,
+            "success_rate": 100.0,
+            "avg_ms": 89.73
+          },
+          "logout": {
+            "success": 9,
+            "error": 0,
+            "success_rate": 100.0,
+            "avg_ms": 443.33
+          }
+        },
+        "screenshots": []
+      }
+    ],
+    "screenshots": []
+  }
+}

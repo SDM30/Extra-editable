@@ -1,0 +1,68 @@
+{
+  "timestamp": "2026-05-21T06:47:07.581797+00:00",
+  "config": {
+    "mode": "dev",
+    "frontend_url": "http://localhost:4200",
+    "backend_url": "http://localhost:8000",
+    "workers": 1,
+    "duration_s": 120.0,
+    "cycle_sec": 2.0,
+    "headless": false,
+    "username": "simon",
+    "project_name": "test-playwright-python",
+    "language": "python",
+    "project_id": 4
+  },
+  "summary": {
+    "total_cycles": 13,
+    "successful_cycles": 12,
+    "availability_pct": 92.31,
+    "duration_s": 120.0,
+    "workers": [
+      {
+        "total_cycles": 13,
+        "successful_cycles": 12,
+        "by_step": {
+          "login": {
+            "success": 13,
+            "error": 0,
+            "success_rate": 100.0,
+            "avg_ms": 1325.15
+          },
+          "editor_load": {
+            "success": 13,
+            "error": 0,
+            "success_rate": 100.0,
+            "avg_ms": 3912.43
+          },
+          "write_code": {
+            "success": 12,
+            "error": 1,
+            "success_rate": 92.31,
+            "avg_ms": 782.88
+          },
+          "lsp_completion": {
+            "success": 13,
+            "error": 0,
+            "success_rate": 100.0,
+            "avg_ms": 133.22
+          },
+          "execution": {
+            "success": 13,
+            "error": 0,
+            "success_rate": 100.0,
+            "avg_ms": 6.3
+          },
+          "logout": {
+            "success": 13,
+            "error": 0,
+            "success_rate": 100.0,
+            "avg_ms": 80.39
+          }
+        },
+        "screenshots": []
+      }
+    ],
+    "screenshots": []
+  }
+}

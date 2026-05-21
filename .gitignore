@@ -107,3 +107,6 @@ opencode.json
 # ==== Logs ====
 logs/*
 !logs/.gitkeep
+
+results/*
+!results/.gitkeep

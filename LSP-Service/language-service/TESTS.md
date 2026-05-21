@@ -6,6 +6,31 @@ Rutas de interés:
 - Tests: [LSP-Service/tests](LSP-Service/tests)
 - Router principal modificado: [LSP-Service/language-service/app/routers/lsp.py](LSP-Service/language-service/app/routers/lsp.py)
 
+## Runner único (recomendado)
+
+Se consolidó la ejecución de pruebas del Plan §5 en un solo script:
+
+```bash
+python3 LSP-Service/tests/run_lsp_tests.py --env-file LSP-Service/tests/.env.dev
+```
+
+El runner:
+- carga un `.env` (dev/prod),
+- valida `GET $LSP_BASE_URL/health`,
+- ejecuta pytest sobre `test_lsp_rest.py`, `test_lsp_ws.py`, `test_lsp_lifecycle.py`,
+- hace limpieza best-effort de contenedores del project_id de prueba.
+
+### Variables soportadas en `.env`
+
+En `LSP-Service/tests/.env.dev.example` y `LSP-Service/tests/.env.prod.example` están
+documentadas las variables:
+- `ENVIRONMENT=dev|prod` (informativo)
+- `LSP_BASE_URL` (base URL del LSP Load Balancer; default `http://127.0.0.1:8085`)
+- `JWT_SECRET` (para generar `TEST_JWT` si no se provee)
+- `LSP_TEST_PROJECT` (opcional)
+- `TEST_JWT` (opcional; recomendado en prod)
+- `CONTAINER_IDLE_TIMEOUT_MS=30000` (solo referencia; el servicio debe aplicarlo)
+
 Requisitos previos
 - macOS / Linux (instrucciones Unix). 
 - Python 3.11+ (se probó con Python 3.13 en este entorno).
@@ -63,11 +88,14 @@ tail -n 50 /tmp/lsp-service-8135.log
 7) Ejecutar los tests (desde la raíz del repo o desde `LSP-Service/language-service`):
 
 ```bash
-# Desde el directorio del servicio:
-LSP_BASE_URL=http://127.0.0.1:8135 python3 -m pytest -q /Users/admin/Documents/ArquitecturaSoftware/Extra-editable/LSP-Service/tests/test_lsp_ws.py /Users/admin/Documents/ArquitecturaSoftware/Extra-editable/LSP-Service/tests/test_lsp_rest.py /Users/admin/Documents/ArquitecturaSoftware/Extra-editable/LSP-Service/tests/test_lsp_lifecycle.py
+# Ejecutar solo Plan §5:
+LSP_BASE_URL=http://127.0.0.1:8085 python3 -m pytest -q \
+  LSP-Service/tests/test_lsp_ws.py \
+  LSP-Service/tests/test_lsp_rest.py \
+  LSP-Service/tests/test_lsp_lifecycle.py
 
-# O ejecutar todos los tests del paquete:
-LSP_BASE_URL=http://127.0.0.1:8135 python3 -m pytest -q /Users/admin/Documents/ArquitecturaSoftware/Extra-editable/LSP-Service/tests
+# O ejecutar todos los tests del paquete (incluye multi-machine si aplica):
+LSP_BASE_URL=http://127.0.0.1:8085 python3 -m pytest -q LSP-Service/tests
 ```
 
 Notas y troubleshooting
@@ -83,4 +111,12 @@ Qué hice al ajustar el servicio (contexto)
 - Se añadió un endpoint WebSocket en `/lsp/{project_id}/ws` para aceptar el handshake en tests.
 - `GET /lsp/` devuelve una lista de entradas en lugar de un objeto con `containers/total` (los tests esperan una lista).
 
-¿Quieres que cree un `Makefile` o script `scripts/run-tests.sh` con estos pasos automatizados?
+## Mapeo Plan §5 ↔ tests
+
+| Plan | Caso | Test (pytest) |
+|---|---|---|
+| §5.1 | CRUD contenedores (python/cpp/typescript) | `LSP-Service/tests/test_lsp_rest.py` |
+| §5.1 | Unsupported language | `test_unsupported_language` |
+| §5.1 | Body vacío `{}` | `test_missing_language_defaults_to_python` (nota: el servicio aplica defaults) |
+| §5.2 | initialize/didOpen/completion/hover/definition/diagnostics/didChange/didClose | `LSP-Service/tests/test_lsp_ws.py` |
+| §5.3 | idle timeout, max_clients, multiplexing | `LSP-Service/tests/test_lsp_lifecycle.py` |

@@ -1,0 +1,11 @@
+# Dependencias para ejecutar el runner único de pruebas LSP (Plan §5).
+# Instalación sugerida (desde repo root):
+#   python3 -m venv .venv-tests && source .venv-tests/bin/activate
+#   pip install -r LSP-Service/tests/requirements.txt
+
+pytest>=8.0
+python-dotenv>=1.0
+requests>=2.31
+PyJWT>=2.8.0
+websocket-client>=1.8.0
+

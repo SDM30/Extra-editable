@@ -173,8 +173,9 @@ class TestListAll:
         r = httpx.get(f"{MACHINE_A}/lsp/", timeout=10)
         assert r.status_code == 200
         data = r.json()
-        assert data["total"] >= 2
+        assert isinstance(data, list)
+        assert len(data) >= 2
 
-        hosts = {c.get("host") for c in data["containers"]}
+        hosts = {c.get("host") for c in data if isinstance(c, dict)}
         assert _extract_host(MACHINE_A) in hosts
         assert _extract_host(MACHINE_B) in hosts

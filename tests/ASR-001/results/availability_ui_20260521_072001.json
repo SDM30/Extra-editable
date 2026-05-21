@@ -1,0 +1,416 @@
+{
+  "timestamp": "2026-05-21T07:20:01.518355+00:00",
+  "config": {
+    "mode": "dev",
+    "phase2": true,
+    "frontend_url": "http://localhost:4200",
+    "backend_url": "http://localhost:8000",
+    "workers": 8,
+    "duration_s": 180.0,
+    "cycle_sec": 2.0,
+    "headless": true,
+    "worker_configs": [
+      {
+        "username": "p2-user-1",
+        "password": "User1234!",
+        "project_name": "p2-proj-0-python",
+        "language": "python"
+      },
+      {
+        "username": "p2-user-2",
+        "password": "User1234!",
+        "project_name": "p2-proj-0-python",
+        "language": "python"
+      },
+      {
+        "username": "p2-user-3",
+        "password": "User1234!",
+        "project_name": "p2-proj-0-python",
+        "language": "python"
+      },
+      {
+        "username": "p2-user-4",
+        "password": "User1234!",
+        "project_name": "p2-proj-0-python",
+        "language": "python"
+      },
+      {
+        "username": "p2-user-5",
+        "password": "User1234!",
+        "project_name": "p2-proj-1-typescript",
+        "language": "typescript"
+      },
+      {
+        "username": "p2-user-6",
+        "password": "User1234!",
+        "project_name": "p2-proj-1-typescript",
+        "language": "typescript"
+      },
+      {
+        "username": "p2-user-7",
+        "password": "User1234!",
+        "project_name": "p2-proj-1-typescript",
+        "language": "typescript"
+      },
+      {
+        "username": "p2-user-8",
+        "password": "User1234!",
+        "project_name": "p2-proj-1-typescript",
+        "language": "typescript"
+      }
+    ]
+  },
+  "summary": {
+    "total_cycles": 0,
+    "successful_cycles": 0,
+    "availability_pct": 0,
+    "duration_s": 180.0,
+    "workers": [
+      {
+        "total_cycles": 0,
+        "successful_cycles": 0,
+        "by_step": {
+          "login": {
+            "success": 0,
+            "error": 0,
+            "success_rate": 0,
+            "avg_ms": 0
+          },
+          "editor_load": {
+            "success": 0,
+            "error": 0,
+            "success_rate": 0,
+            "avg_ms": 0
+          },
+          "write_code": {
+            "success": 0,
+            "error": 0,
+            "success_rate": 0,
+            "avg_ms": 0
+          },
+          "lsp_completion": {
+            "success": 0,
+            "error": 0,
+            "success_rate": 0,
+            "avg_ms": 0
+          },
+          "execution": {
+            "success": 0,
+            "error": 0,
+            "success_rate": 0,
+            "avg_ms": 0
+          },
+          "logout": {
+            "success": 0,
+            "error": 0,
+            "success_rate": 0,
+            "avg_ms": 0
+          }
+        },
+        "screenshots": []
+      },
+      {
+        "total_cycles": 0,
+        "successful_cycles": 0,
+        "by_step": {
+          "login": {
+            "success": 0,
+            "error": 0,
+            "success_rate": 0,
+            "avg_ms": 0
+          },
+          "editor_load": {
+            "success": 0,
+            "error": 0,
+            "success_rate": 0,
+            "avg_ms": 0
+          },
+          "write_code": {
+            "success": 0,
+            "error": 0,
+            "success_rate": 0,
+            "avg_ms": 0
+          },
+          "lsp_completion": {
+            "success": 0,
+            "error": 0,
+            "success_rate": 0,
+            "avg_ms": 0
+          },
+          "execution": {
+            "success": 0,
+            "error": 0,
+            "success_rate": 0,
+            "avg_ms": 0
+          },
+          "logout": {
+            "success": 0,
+            "error": 0,
+            "success_rate": 0,
+            "avg_ms": 0
+          }
+        },
+        "screenshots": []
+      },
+      {
+        "total_cycles": 0,
+        "successful_cycles": 0,
+        "by_step": {
+          "login": {
+            "success": 0,
+            "error": 0,
+            "success_rate": 0,
+            "avg_ms": 0
+          },
+          "editor_load": {
+            "success": 0,
+            "error": 0,
+            "success_rate": 0,
+            "avg_ms": 0
+          },
+          "write_code": {
+            "success": 0,
+            "error": 0,
+            "success_rate": 0,
+            "avg_ms": 0
+          },
+          "lsp_completion": {
+            "success": 0,
+            "error": 0,
+            "success_rate": 0,
+            "avg_ms": 0
+          },
+          "execution": {
+            "success": 0,
+            "error": 0,
+            "success_rate": 0,
+            "avg_ms": 0
+          },
+          "logout": {
+            "success": 0,
+            "error": 0,
+            "success_rate": 0,
+            "avg_ms": 0
+          }
+        },
+        "screenshots": []
+      },
+      {
+        "total_cycles": 0,
+        "successful_cycles": 0,
+        "by_step": {
+          "login": {
+            "success": 0,
+            "error": 0,
+            "success_rate": 0,
+            "avg_ms": 0
+          },
+          "editor_load": {
+            "success": 0,
+            "error": 0,
+            "success_rate": 0,
+            "avg_ms": 0
+          },
+          "write_code": {
+            "success": 0,
+            "error": 0,
+            "success_rate": 0,
+            "avg_ms": 0
+          },
+          "lsp_completion": {
+            "success": 0,
+            "error": 0,
+            "success_rate": 0,
+            "avg_ms": 0
+          },
+          "execution": {
+            "success": 0,
+            "error": 0,
+            "success_rate": 0,
+            "avg_ms": 0
+          },
+          "logout": {
+            "success": 0,
+            "error": 0,
+            "success_rate": 0,
+            "avg_ms": 0
+          }
+        },
+        "screenshots": []
+      },
+      {
+        "total_cycles": 0,
+        "successful_cycles": 0,
+        "by_step": {
+          "login": {
+            "success": 0,
+            "error": 0,
+            "success_rate": 0,
+            "avg_ms": 0
+          },
+          "editor_load": {
+            "success": 0,
+            "error": 0,
+            "success_rate": 0,
+            "avg_ms": 0
+          },
+          "write_code": {
+            "success": 0,
+            "error": 0,
+            "success_rate": 0,
+            "avg_ms": 0
+          },
+          "lsp_completion": {
+            "success": 0,
+            "error": 0,
+            "success_rate": 0,
+            "avg_ms": 0
+          },
+          "execution": {
+            "success": 0,
+            "error": 0,
+            "success_rate": 0,
+            "avg_ms": 0
+          },
+          "logout": {
+            "success": 0,
+            "error": 0,
+            "success_rate": 0,
+            "avg_ms": 0
+          }
+        },
+        "screenshots": []
+      },
+      {
+        "total_cycles": 0,
+        "successful_cycles": 0,
+        "by_step": {
+          "login": {
+            "success": 0,
+            "error": 0,
+            "success_rate": 0,
+            "avg_ms": 0
+          },
+          "editor_load": {
+            "success": 0,
+            "error": 0,
+            "success_rate": 0,
+            "avg_ms": 0
+          },
+          "write_code": {
+            "success": 0,
+            "error": 0,
+            "success_rate": 0,
+            "avg_ms": 0
+          },
+          "lsp_completion": {
+            "success": 0,
+            "error": 0,
+            "success_rate": 0,
+            "avg_ms": 0
+          },
+          "execution": {
+            "success": 0,
+            "error": 0,
+            "success_rate": 0,
+            "avg_ms": 0
+          },
+          "logout": {
+            "success": 0,
+            "error": 0,
+            "success_rate": 0,
+            "avg_ms": 0
+          }
+        },
+        "screenshots": []
+      },
+      {
+        "total_cycles": 0,
+        "successful_cycles": 0,
+        "by_step": {
+          "login": {
+            "success": 0,
+            "error": 0,
+            "success_rate": 0,
+            "avg_ms": 0
+          },
+          "editor_load": {
+            "success": 0,
+            "error": 0,
+            "success_rate": 0,
+            "avg_ms": 0
+          },
+          "write_code": {
+            "success": 0,
+            "error": 0,
+            "success_rate": 0,
+            "avg_ms": 0
+          },
+          "lsp_completion": {
+            "success": 0,
+            "error": 0,
+            "success_rate": 0,
+            "avg_ms": 0
+          },
+          "execution": {
+            "success": 0,
+            "error": 0,
+            "success_rate": 0,
+            "avg_ms": 0
+          },
+          "logout": {
+            "success": 0,
+            "error": 0,
+            "success_rate": 0,
+            "avg_ms": 0
+          }
+        },
+        "screenshots": []
+      },
+      {
+        "total_cycles": 0,
+        "successful_cycles": 0,
+        "by_step": {
+          "login": {
+            "success": 0,
+            "error": 0,
+            "success_rate": 0,
+            "avg_ms": 0
+          },
+          "editor_load": {
+            "success": 0,
+            "error": 0,
+            "success_rate": 0,
+            "avg_ms": 0
+          },
+          "write_code": {
+            "success": 0,
+            "error": 0,
+            "success_rate": 0,
+            "avg_ms": 0
+          },
+          "lsp_completion": {
+            "success": 0,
+            "error": 0,
+            "success_rate": 0,
+            "avg_ms": 0
+          },
+          "execution": {
+            "success": 0,
+            "error": 0,
+            "success_rate": 0,
+            "avg_ms": 0
+          },
+          "logout": {
+            "success": 0,
+            "error": 0,
+            "success_rate": 0,
+            "avg_ms": 0
+          }
+        },
+        "screenshots": []
+      }
+    ],
+    "screenshots": []
+  }
+}
