@@ -10,6 +10,7 @@
   "dependencies": {
     "ws": "^8.16.0",
     "vscode-ws-jsonrpc": "^3.3.0",
-    "vscode-jsonrpc": "^8.2.0"
+    "vscode-jsonrpc": "^8.2.0",
+    "jsonwebtoken": "^9.0.2"
   }
 }

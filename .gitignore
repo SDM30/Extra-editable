@@ -103,3 +103,7 @@ opencode.json
 *.pyo
 *.pyd
 .venv_lsp/
+
+# ==== Logs ====
+logs/*
+!logs/.gitkeep

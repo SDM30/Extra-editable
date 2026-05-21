@@ -92,7 +92,8 @@ class ProyectoColaborador(models.Model):
     fecha_agregado = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        managed = False
+        # Ahora gestionado por Django (usar PostgreSQL en entorno de despliegue)
+        managed = True
         db_table = 'proyecto_colaboradores'
         unique_together = ('proyecto', 'usuario')
         ordering = ['fecha_agregado']

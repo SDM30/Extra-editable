@@ -16,6 +16,7 @@ services:
       - "8135"                                # puerto dinámico con --scale
     environment:
       - PORT=${PORT:-8135}
+      - JWT_SECRET=${JWT_SECRET:-jwt-secreto}
       - REDIS_HOST=${REDIS_HOST:-127.0.0.1}
       - REDIS_PORT=${REDIS_PORT:-6379}
       - REDIS_DB=${REDIS_DB:-0}

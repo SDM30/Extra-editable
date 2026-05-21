@@ -322,7 +322,6 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit, OnChanges 
   private collabUndoManager: Y.UndoManager | null = null;
   private boundCollabConnectionVersion = -1;
   private boundCollabDocumentName: string | null = null;
-  private pendingRoomSwitch = false;
   private suppressValueEmission = false;
 
   /**
@@ -433,7 +432,6 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit, OnChanges 
     if (languageChanged) this.languageExt = null;
 
     if (projectChanged || fileChanged || roomChanged) {
-      this.pendingRoomSwitch = true;
       this.suppressValueEmission = true;
       this.resetCollabBinding();
       this.initializeCollab();
@@ -509,28 +507,16 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit, OnChanges 
 
     try {
       const sharedText = shared.toString();
-      const shouldForceRoomHydration = this.pendingRoomSwitch && sharedText.length > 0;
 
-      // Si ya existe contenido remoto, hidratar el editor local desde el Y.Text
-      // compartido antes de adjuntar yCollab. Para evitar sobrescribir trabajo
-      // local en curso, solo hidratamos cuando el editor local está vacío.
-      // Esto previene que un documento sincronizado tarde reescriba el archivo
-      // activo al cambiar de proyecto/archivo.
-      if (sharedText.length > 0 && (localText.length === 0 || shouldForceRoomHydration)) {
-        console.log('[CodeSection] Hydrating editor from remote (local empty)');
+      // El documento compartido es la fuente autoritativa.
+      // Si el shared tiene contenido y difiere del buffer local, hidratamos
+      // el editor desde el remoto. Esto evita que yCollab mezcle buffers
+      // inconsistentes y cause crashes de posición (RangeError).
+      if (sharedText.length > 0 && sharedText !== localText) {
         this._value = sharedText;
         this.replaceEditorContent(sharedText);
-        this.pendingRoomSwitch = false;
         this.suppressValueEmission = true;
         queueMicrotask(() => this.cdr.markForCheck());
-      } else if (sharedText.length > 0 && sharedText !== localText) {
-        // Log a warning for mismatches so we can diagnose unexpected overwrites.
-        if (!this.pendingRoomSwitch) {
-          console.warn(
-            '[CodeSection] Remote document differs from local buffer; skipping hydration to avoid overwrite.',
-            { sharedLen: sharedText.length, localLen: localText.length },
-          );
-        }
       }
     } catch (e) {
       console.warn('[CodeSection] Error comprobando/inicializando shared text:', e);
@@ -542,7 +528,6 @@ export class CodeSection implements OnInit, OnDestroy, AfterViewInit, OnChanges 
     this.refreshEditorExtensions();
     this.boundCollabConnectionVersion = currentConnectionVersion;
     this.boundCollabDocumentName = currentDocumentName;
-    this.pendingRoomSwitch = false;
 
     queueMicrotask(() => {
       this.suppressValueEmission = false;

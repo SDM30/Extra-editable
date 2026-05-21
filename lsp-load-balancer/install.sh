@@ -39,8 +39,11 @@ command -v redis-cli >/dev/null 2>&1 || {
 }
 echo -e "${GREEN}✓ redis-cli encontrado${NC}"
 
-# Buscar Python del venv del proyecto
-if [ -f "$PROJECT_DIR/.venv/bin/python3" ]; then
+# Buscar Python del venv local (creado con `python3 -m venv venv`)
+LOCAL_VENV="$SCRIPT_DIR/venv/bin/python3"
+if [ -f "$LOCAL_VENV" ]; then
+    PYTHON_BIN="$LOCAL_VENV"
+elif [ -f "$PROJECT_DIR/.venv/bin/python3" ]; then
     PYTHON_BIN="$PROJECT_DIR/.venv/bin/python3"
 elif [ -f "$HOME/Development/ARQ/Proyecto_ARQ/.venv_lsp/bin/python3" ]; then
     PYTHON_BIN="$HOME/Development/ARQ/Proyecto_ARQ/.venv_lsp/bin/python3"
@@ -55,7 +58,7 @@ echo -e "${YELLOW}[*] Verificando dependencias Python...${NC}"
 REQUIRED_MODULES="redis"
 for module in $REQUIRED_MODULES; do
     if ! $PYTHON_BIN -c "import $module" 2>/dev/null; then
-        echo "   Instalando $module..."
+        echo "   Instalando $module en $PYTHON_BIN..."
         $PYTHON_BIN -m pip install $module
     else
         echo -e "   ${GREEN}✓ $module ya instalado${NC}"
@@ -108,12 +111,12 @@ SERVICE_FILE="/etc/systemd/system/lsp-watcher.service"
 cat > /tmp/lsp-watcher.service << EOF
 [Unit]
 Description=LSP Load Balancer Watcher
-After=network.target redis.service docker.service
+After=network.target redis.service
 Wants=redis.service
 
 [Service]
 Type=simple
-User=$USER
+User=root
 WorkingDirectory=$SCRIPT_DIR
 ExecStart=$PYTHON_BIN $SCRIPT_DIR/update_nginx.py
 Restart=always
@@ -122,6 +125,7 @@ StandardOutput=journal
 StandardError=journal
 
 # Variables de entorno
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 Environment=REDIS_HOST=localhost
 Environment=REDIS_PORT=6379
 Environment=NGINX_TEMPLATE_PATH=$SCRIPT_DIR/nginx_template.conf
@@ -158,7 +162,7 @@ sleep 1
 
 # Levantar Nginx
 nginx -c "$SCRIPT_DIR/nginx.conf"
-echo -e "${GREEN}✓ Nginx balanceador levantado en puerto 8082${NC}"
+echo -e "${GREEN}✓ Nginx balanceador levantado en puerto 8085${NC}"
 
 echo -e "${YELLOW}[5/5] Iniciando watcher...${NC}"
 sudo systemctl start lsp-watcher
@@ -182,6 +186,9 @@ fi
 # Watcher status
 if systemctl is-active --quiet lsp-watcher; then
     echo -e "${GREEN}✅ Watcher: corriendo${NC}"
+    echo ""
+    echo -e "${BLUE}Últimas líneas del watcher:${NC}"
+    sudo journalctl -u lsp-watcher -n 5 --no-pager 2>/dev/null || true
 else
     echo -e "${RED}❌ Watcher no está corriendo${NC}"
 fi
@@ -191,7 +198,6 @@ echo -e "${BLUE}Comandos útiles:${NC}"
 echo "  sudo systemctl status lsp-watcher   # Estado del watcher"
 echo "  sudo systemctl restart lsp-watcher  # Reiniciar watcher"
 echo "  sudo journalctl -u lsp-watcher -f   # Logs del watcher"
-echo "  nginx -c $(pwd)/nginx.conf -s reload  # Recargar Nginx"
-echo "  nginx -c $(pwd)/nginx.conf -s quit    # Detener Nginx"
+echo "  sudo systemctl stop lsp-watcher     # Detener watcher"
 echo ""
 echo -e "${GREEN}✅ Instalación completada${NC}"
