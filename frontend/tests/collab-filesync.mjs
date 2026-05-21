@@ -253,6 +253,7 @@ async function main() {
   } finally {
     await cleanupProjects();
   }
+  process.exit(0);
 }
 
 main().catch(async (error) => {

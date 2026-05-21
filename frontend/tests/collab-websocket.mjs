@@ -521,6 +521,9 @@ async function main() {
   if (passed !== 7) {
     process.exitCode = 1;
   }
+  else{
+    process.exit(0);
+  }
 }
 
 main().catch(async (error) => {
