@@ -43,6 +43,14 @@
   environment:
     DJANGO_SETTINGS_MODULE: config.settings
 
+- name: Poblar usuarios iniciales (seed)
+  command: "{{ project_dir }}/backend/venv/bin/python manage.py seed --force"
+  args:
+    chdir: "{{ project_dir }}/backend"
+  become_user: estudiante
+  environment:
+    DJANGO_SETTINGS_MODULE: config.settings
+
 - name: Instalar servicio systemd del backend
   template:
     src: extra-backend.service.j2
