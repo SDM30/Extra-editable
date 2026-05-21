@@ -70,6 +70,7 @@ export class Editor implements OnInit, OnDestroy {
   private collaboratorsSub?: Subscription;
   private selectionRequestId = 0;
   private roomContentCache = new Map<string, string>();
+  private outputAccumulated = '';  // Acumula output durante la ejecución
 
   constructor(
     private executionService: ExecutionService,
@@ -79,7 +80,7 @@ export class Editor implements OnInit, OnDestroy {
     private workspace: WorkspaceService,
     private router: Router,
     private route: ActivatedRoute,
-  ) {}
+  ) { }
 
   async ngOnInit() {
     console.log('[Editor] ngOnInit starting');
@@ -624,6 +625,12 @@ export class Editor implements OnInit, OnDestroy {
   }
 
   enviarEntrada(input: string): void {
+    // Mostrar el input en el output (echo)
+    this.outputAccumulated += input + '\n';
+    this.resultado = this.outputAccumulated;
+    this.cdr.detectChanges();
+
+    // Enviar la entrada al servidor (sendInput ya agrega \n)
     this.executionService.sendInput(input);
   }
 
@@ -631,51 +638,117 @@ export class Editor implements OnInit, OnDestroy {
     this.resultado = undefined;
     this.resultadoOk = undefined;
     this.cargando = true;
+    this.outputAccumulated = '';  // Reiniciar acumulación
     this.cdr.detectChanges();
 
     const sharedCode = this.collab.getSharedText('codemirror')?.toString();
-    const codeToRun = sharedCode && sharedCode.length > 0 ? sharedCode : this.value;
-    let accumulated = '';
+
+    const codeToRun =
+      sharedCode && sharedCode.length > 0
+        ? sharedCode
+        : this.value;
+
+    // Cerrar conexión previa si existe
+    this.executionService.disconnect();
 
     this.executionService.connect(
+      // onMessage
       (message) => {
         switch (message.type) {
-          case 'output':
-            accumulated += message.data;
-            this.resultado = accumulated;
+
+          case 'connected':
+            this.outputAccumulated += `[connected] ${message.data}\n`;
+            this.resultado = this.outputAccumulated;
             break;
+
+          case 'queued':
+            this.outputAccumulated += `[queued] Posición: ${message.position}\n`;
+            this.resultado = this.outputAccumulated;
+            break;
+
           case 'dequeued':
-            accumulated += message.data || '';
+            if (message.data) {
+              this.outputAccumulated += message.data;
+              this.resultado = this.outputAccumulated;
+            }
             break;
+
+          case 'started':
+            this.outputAccumulated += '\n[execution started]\n';
+            this.resultado = this.outputAccumulated;
+            break;
+
+          case 'output':
+            this.outputAccumulated += message.data;
+            this.resultado = this.outputAccumulated;
+            break;
+
           case 'error':
-            accumulated += '\n[error] ' + message.data;
+            this.outputAccumulated += `\n[error] ${message.data}\n`;
+            this.resultado = this.outputAccumulated;
+            this.resultadoOk = false;
             break;
+
+          case 'timeout':
+            this.outputAccumulated += `\n[timeout] ${message.data}\n`;
+            this.resultado = this.outputAccumulated;
+            this.resultadoOk = false;
+            break;
+
           case 'finished':
-            this.cargando = false;
-            this.resultado = accumulated;
+            this.outputAccumulated += `\n[finished] Exit code: ${message.exitCode}\n`;
+
+            this.resultado = this.outputAccumulated;
             this.resultadoOk = message.exitCode === 0;
+            this.cargando = false;
+
             this.cdr.detectChanges();
             break;
+
           default:
-            // otros mensajes: queued, started, timeout
+            console.warn('[Editor] Mensaje desconocido:', message);
             break;
         }
-      },
-      () => {
-        // onError
-        this.cargando = false;
-        this.resultado = 'Error: conexión de ejecución fallida';
+
         this.cdr.detectChanges();
       },
+
+      // onError
       () => {
-        // onClose
+        this.cargando = false;
+        this.resultadoOk = false;
+        this.resultado = '[ERROR] No se pudo conectar al servicio de ejecución';
+
+        this.cdr.detectChanges();
+      },
+
+      // onClose
+      () => {
         this.cargando = false;
         this.cdr.detectChanges();
+      },
+
+      // onOpen
+      (socket: WebSocket) => {
+        console.log('[Editor] WebSocket abierto, enviando código...');
+
+        if (socket.readyState !== WebSocket.OPEN) {
+          console.error('[Editor] Socket no está abierto');
+          this.resultado = '[ERROR] Socket no disponible';
+          this.cargando = false;
+          this.cdr.detectChanges();
+          return;
+        }
+
+        socket.send(
+          JSON.stringify({
+            type: 'run',
+            language: this.language,
+            code: codeToRun,
+          }),
+        );
       },
     );
-
-    // Enviar petición de ejecución
-    this.executionService.runCode(this.language, codeToRun);
   }
 
   private limpiarResultado(resultado: string): string {
