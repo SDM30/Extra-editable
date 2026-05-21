@@ -25,9 +25,12 @@ export GABRIEL_SSH_PASS="Gorila/32Ard"
 export SIMON_SSH_PASS="F0c4-16M4p4c"
 export CAMPOS_SSH_PASS="C4m4l30n+26C"
 
-# ── Credenciales de la app Django (usuario seeded) ───────────────────────────────
-export API_USER="samuel"
-export API_PASS="User1234!"
+# ── Credenciales del usuario de prueba (se registra automáticamente) ─────────────
+# Los scripts crean este usuario via POST /api/auth/register/ si no existe.
+export API_USER="probe_test"
+export API_PASS="ProbeTest123!"
+export API_EMAIL="probe_test@test.local"
+export API_NOMBRE="Probe Test"
 
 echo "✓ Variables de entorno cargadas."
 echo "  Backend  : $BACKEND_URL"
@@ -37,7 +40,7 @@ echo "  API user : $API_USER"
 echo ""
 echo "Verificando conectividad y credenciales..."
 
-# Verificar que el backend responde
+# 1. Intentar login directo
 echo -n "  Backend login ... "
 HTTP_CODE=$(curl -s -o /tmp/_jwt_check.json -w "%{http_code}" \
     -X POST "$BACKEND_URL/api/auth/login/" \
@@ -46,20 +49,51 @@ HTTP_CODE=$(curl -s -o /tmp/_jwt_check.json -w "%{http_code}" \
     --max-time 8 2>/dev/null)
 
 if [ "$HTTP_CODE" = "200" ]; then
-    echo "OK (HTTP 200) ✓"
-    echo "  Token obtenido: $(python3 -c "import json; d=json.load(open('/tmp/_jwt_check.json')); print(d.get('access','')[:30]+'...')" 2>/dev/null)"
+    echo "OK ✓"
 else
-    echo "FALLO (HTTP $HTTP_CODE)"
-    echo ""
-    echo "  ⚠ El backend no responde o las credenciales son incorrectas."
-    echo "  Prueba manualmente:"
-    echo "    curl -X POST $BACKEND_URL/api/auth/login/ \\"
-    echo "         -H 'Content-Type: application/json' \\"
-    echo "         -d '{\"username\":\"$API_USER\",\"password\":\"$API_PASS\"}'"
-    echo ""
-    echo "  Si las credenciales son distintas, ajusta API_USER y API_PASS:"
-    echo "    export API_USER='tu_usuario'"
-    echo "    export API_PASS='tu_password'"
+    echo "usuario no existe (HTTP $HTTP_CODE) — registrando..."
+
+    # 2. Registrar usuario de prueba
+    echo -n "  Backend register ... "
+    REG_CODE=$(curl -s -o /tmp/_reg_check.json -w "%{http_code}" \
+        -X POST "$BACKEND_URL/api/auth/register/" \
+        -H "Content-Type: application/json" \
+        -d "{\"username\":\"$API_USER\",\"email\":\"$API_EMAIL\",\"password\":\"$API_PASS\",\"nombre\":\"$API_NOMBRE\"}" \
+        --max-time 8 2>/dev/null)
+
+    if [ "$REG_CODE" = "201" ]; then
+        echo "OK ✓ (usuario creado)"
+    else
+        REG_BODY=$(cat /tmp/_reg_check.json 2>/dev/null)
+        if echo "$REG_BODY" | grep -qi "already\|exists\|unique"; then
+            echo "OK ✓ (ya existía)"
+        else
+            echo "FALLO (HTTP $REG_CODE): $REG_BODY"
+            echo ""
+            echo "  ⚠ El backend en $BACKEND_URL no está disponible."
+            echo "  Verifica que el servicio esté corriendo en David (10.43.98.3)."
+        fi
+    fi
+
+    # 3. Login tras registro
+    echo -n "  Login tras registro ... "
+    HTTP_CODE=$(curl -s -o /tmp/_jwt_check.json -w "%{http_code}" \
+        -X POST "$BACKEND_URL/api/auth/login/" \
+        -H "Content-Type: application/json" \
+        -d "{\"username\":\"$API_USER\",\"password\":\"$API_PASS\"}" \
+        --max-time 8 2>/dev/null)
+
+    if [ "$HTTP_CODE" = "200" ]; then
+        echo "OK ✓"
+    else
+        echo "FALLO (HTTP $HTTP_CODE)"
+        echo "  ⚠ No se pudo autenticar. Revisa que el backend esté activo."
+    fi
+fi
+
+if [ "$HTTP_CODE" = "200" ]; then
+    TOKEN=$(python3 -c "import json; d=json.load(open('/tmp/_jwt_check.json')); print(d.get('access','')[:40]+'...')" 2>/dev/null)
+    echo "  JWT: $TOKEN"
 fi
 
 # Verificar sshpass

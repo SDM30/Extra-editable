@@ -81,8 +81,11 @@ BACKEND_URL   = os.environ.get("BACKEND_URL",   f"http://{DAVID_IP}:8000")
 LSP_LB_URL    = os.environ.get("LSP_LB_URL",    f"http://{CAMPOS_IP}:8085")
 COLLAB_LB_URL = os.environ.get("COLLAB_LB_URL", f"http://{DAVID_IP}:8083")
 
-API_USER = os.environ.get("API_USER", "samuel")
-API_PASS = os.environ.get("API_PASS", "User1234!")
+# Credenciales del usuario de prueba (se crea automáticamente si no existe)
+API_USER   = os.environ.get("API_USER",   "probe_resilience")
+API_PASS   = os.environ.get("API_PASS",   "ProbeTest123!")
+API_EMAIL  = os.environ.get("API_EMAIL",  "probe_resilience@test.local")
+API_NOMBRE = os.environ.get("API_NOMBRE", "Probe Resilience")
 
 RECOVERY_TIMEOUT = int(os.environ.get("RECOVERY_TIMEOUT", "30"))
 POLL_INTERVAL    = int(os.environ.get("POLL_INTERVAL",    "5"))
@@ -142,7 +145,7 @@ def ssh_ok(host: str, command: str, timeout: int = 30) -> bool:
 
 # ── HTTP ────────────────────────────────────────────────────────────────────────
 
-def get_jwt(timeout: float = 10.0) -> Optional[str]:
+def _try_login(timeout: float = 10.0) -> Optional[str]:
     try:
         r = httpx.post(
             f"{BACKEND_URL}/api/auth/login/",
@@ -153,6 +156,54 @@ def get_jwt(timeout: float = 10.0) -> Optional[str]:
             return r.json().get("access")
     except Exception:
         pass
+    return None
+
+
+def _try_register(timeout: float = 10.0) -> bool:
+    """Registra el usuario de prueba. Retorna True si tuvo éxito o ya existe."""
+    try:
+        r = httpx.post(
+            f"{BACKEND_URL}/api/auth/register/",
+            json={
+                "username": API_USER,
+                "email":    API_EMAIL,
+                "password": API_PASS,
+                "nombre":   API_NOMBRE,
+            },
+            timeout=timeout,
+        )
+        if r.status_code == 201:
+            print(f"  Usuario de prueba '{API_USER}' registrado.")
+            return True
+        if r.status_code == 400:
+            body = r.text.lower()
+            if "already" in body or "exists" in body or "unique" in body:
+                print(f"  Usuario de prueba '{API_USER}' ya existe.")
+                return True
+            print(f"  Register 400: {r.text[:200]}")
+    except Exception as exc:
+        print(f"  Register error: {exc}")
+    return False
+
+
+def get_jwt(timeout: float = 10.0) -> Optional[str]:
+    """Login con usuario de prueba; si no existe, lo registra primero."""
+    # Intento 1: login directo
+    token = _try_login(timeout)
+    if token:
+        print(f"  Login OK con usuario '{API_USER}'.")
+        return token
+
+    # Intento 2: registrar y login
+    print(f"  Login fallido. Registrando usuario '{API_USER}'...")
+    if _try_register(timeout):
+        token = _try_login(timeout)
+        if token:
+            print(f"  Login OK tras registro.")
+            return token
+
+    print(f"  ERROR: no se pudo obtener JWT. "
+          f"Verifica que el backend ({BACKEND_URL}) esté activo.")
     return None
 
 

@@ -81,8 +81,11 @@ BACKEND_URL   = os.environ.get("BACKEND_URL",   f"http://{DAVID_IP}:8000")
 LSP_LB_URL    = os.environ.get("LSP_LB_URL",    f"http://{CAMPOS_IP}:8085")
 COLLAB_LB_URL = os.environ.get("COLLAB_LB_URL", f"http://{DAVID_IP}:8083")
 
-API_USER = os.environ.get("API_USER", "samuel")
-API_PASS = os.environ.get("API_PASS", "User1234!")
+# Credenciales del usuario de prueba (se crea automáticamente si no existe)
+API_USER  = os.environ.get("API_USER",  "probe_lb_test")
+API_PASS  = os.environ.get("API_PASS",  "ProbeTest123!")
+API_EMAIL = os.environ.get("API_EMAIL", "probe_lb@test.local")
+API_NOMBRE = os.environ.get("API_NOMBRE", "Probe LB")
 
 # Mapa IP → nombre legible para los nodos LSP
 LSP_NODE_NAMES: Dict[str, str] = {
@@ -142,10 +145,8 @@ def ssh_ok(host: str, command: str, timeout: int = 30) -> bool:
 _jwt_token: Optional[str] = None
 
 
-def get_jwt() -> Optional[str]:
-    global _jwt_token
-    if _jwt_token:
-        return _jwt_token
+def _try_login() -> Optional[str]:
+    """Intenta login; retorna token o None."""
     try:
         r = httpx.post(
             f"{BACKEND_URL}/api/auth/login/",
@@ -153,10 +154,64 @@ def get_jwt() -> Optional[str]:
             timeout=10,
         )
         if r.status_code == 200:
-            _jwt_token = r.json().get("access")
-            return _jwt_token
+            return r.json().get("access")
     except Exception:
         pass
+    return None
+
+
+def _try_register() -> bool:
+    """Registra el usuario de prueba. Retorna True si tuvo éxito o ya existe."""
+    try:
+        r = httpx.post(
+            f"{BACKEND_URL}/api/auth/register/",
+            json={
+                "username": API_USER,
+                "email":    API_EMAIL,
+                "password": API_PASS,
+                "nombre":   API_NOMBRE,
+            },
+            timeout=10,
+        )
+        # 201 = creado, 400 con "username already exists" = ya existe (OK también)
+        if r.status_code == 201:
+            print(f"  Usuario de prueba '{API_USER}' registrado.")
+            return True
+        if r.status_code == 400:
+            body = r.text.lower()
+            if "already" in body or "exists" in body or "unique" in body:
+                print(f"  Usuario de prueba '{API_USER}' ya existe.")
+                return True
+            print(f"  Register 400: {r.text[:200]}")
+    except Exception as exc:
+        print(f"  Register error: {exc}")
+    return False
+
+
+def get_jwt() -> Optional[str]:
+    """Login con el usuario de prueba; si no existe, lo registra primero."""
+    global _jwt_token
+    if _jwt_token:
+        return _jwt_token
+
+    # Intento 1: login directo
+    token = _try_login()
+    if token:
+        _jwt_token = token
+        print(f"  Login OK con usuario '{API_USER}'.")
+        return _jwt_token
+
+    # Intento 2: registrar y luego login
+    print(f"  Login fallido. Registrando usuario '{API_USER}'...")
+    if _try_register():
+        token = _try_login()
+        if token:
+            _jwt_token = token
+            print(f"  Login OK tras registro.")
+            return _jwt_token
+
+    print(f"  ERROR: no se pudo obtener JWT. "
+          f"Verifica que el backend ({BACKEND_URL}) esté activo.")
     return None
 
 
