@@ -70,6 +70,8 @@ export class Editor implements OnInit, OnDestroy {
   private collaboratorsSub?: Subscription;
   private selectionRequestId = 0;
   private roomContentCache = new Map<string, string>();
+  private collabKeepAliveTimer: ReturnType<typeof setInterval> | null = null;
+  private collabKeepAliveRoom: { projectId: number; archivoId: number } | null = null;
 
   constructor(
     private executionService: ExecutionService,
@@ -124,6 +126,7 @@ export class Editor implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.collaboratorsSub?.unsubscribe();
+    this.stopCollabKeepAlive();
   }
   // Método invocado desde la plantilla. Alias en español para compatibilidad.
   ejecutarCodigo(): void {
@@ -151,6 +154,7 @@ export class Editor implements OnInit, OnDestroy {
     if (requestId !== this.selectionRequestId) return;
 
     if (project.id < 0) {
+      this.stopCollabKeepAlive();
       this.selectedProjectId = project.id;
       this.selectedArchivoId = project.archivos?.[0]?.id ?? null;
       this.projectId = '';
@@ -179,6 +183,7 @@ export class Editor implements OnInit, OnDestroy {
       this.selectedRoom = '';
       this.value = '';
       this.lspEnabled = false;
+      this.stopCollabKeepAlive();
       this.cdr.detectChanges();
       return;
     }
@@ -267,6 +272,7 @@ export class Editor implements OnInit, OnDestroy {
     const { token, username, userId } = await this.auth.getCollabToken(project.id, archivo.id);
     if (requestId !== this.selectionRequestId) return;
     await this.connectCollab(token, username, userId);
+    this.startCollabKeepAlive(project.id, archivo.id);
   }
 
   startResize(ev: MouseEvent): void {
@@ -415,6 +421,7 @@ export class Editor implements OnInit, OnDestroy {
 
       const { token, username, userId } = await this.auth.getCollabToken(project.id, archivo.id);
       await this.connectCollab(token, username, userId);
+      this.startCollabKeepAlive(project.id, archivo.id);
 
       try {
         const pushed = this.collab.pushProjectFile(project.id, { id: archivo.id, nombre: archivo.nombre });
@@ -510,6 +517,7 @@ export class Editor implements OnInit, OnDestroy {
 
       if (this.selectedArchivoId === archivoId) {
         this.collab.disconnect();
+        this.stopCollabKeepAlive();
         const remaining = project.archivos;
         if (remaining.length > 0) {
           await this.selectArchivo(remaining[0].id);
@@ -534,6 +542,35 @@ export class Editor implements OnInit, OnDestroy {
 
   private async connectCollab(token: string, username: string, userId: string): Promise<void> {
     await this.collab.connect(this.selectedRoom, token, username, userId);
+  }
+
+  private startCollabKeepAlive(projectId: number, archivoId: number): void {
+    this.stopCollabKeepAlive();
+    this.collabKeepAliveRoom = { projectId, archivoId };
+
+    this.collabKeepAliveTimer = setInterval(() => {
+      const room = this.collabKeepAliveRoom;
+      if (!room) {
+        return;
+      }
+
+      if (this.selectedProjectId !== room.projectId || this.selectedArchivoId !== room.archivoId) {
+        this.stopCollabKeepAlive();
+        return;
+      }
+
+      this.auth.refreshCollabSession(room.projectId, room.archivoId).catch((error) => {
+        console.warn('[Editor] No se pudo renovar la sesión colaborativa:', error);
+      });
+    }, 30000);
+  }
+
+  private stopCollabKeepAlive(): void {
+    if (this.collabKeepAliveTimer) {
+      clearInterval(this.collabKeepAliveTimer);
+      this.collabKeepAliveTimer = null;
+    }
+    this.collabKeepAliveRoom = null;
   }
 
   private async saveCurrentArchivo(): Promise<void> {
@@ -620,6 +657,7 @@ export class Editor implements OnInit, OnDestroy {
     this.cacheCurrentRoomContent();
     this.saveCurrentArchivo();
     this.collab.disconnect();
+    this.stopCollabKeepAlive();
     this.auth.logout();
   }
 

@@ -6,7 +6,9 @@
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test",
+    "test:collab-ws": "python ../tests/test_collab_ws.py",
+    "test:collab-filesync": "python ../tests/test_collab_filesync.py"
   },
   "prettier": {
     "printWidth": 100,
