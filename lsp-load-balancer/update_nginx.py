@@ -111,12 +111,26 @@ def maybe_spawn(live_instances: list[str]):
         _EMPTY_STREAK = 0
 
 
+def ensure_nginx_running():
+    """Asegura que el contenedor nginx esté corriendo antes de validar/recargar."""
+    result = subprocess.run(
+        ["docker", "inspect", "-f", "{{.State.Running}}", NGINX_CONTAINER],
+        capture_output=True, text=True
+    )
+    if result.stdout.strip() != "true":
+        logger.warning("Contenedor %s no está corriendo, intentando docker start...", NGINX_CONTAINER)
+        subprocess.run(["docker", "start", NGINX_CONTAINER], capture_output=True)
+        time.sleep(1)
+
+
 def generate_and_reload(template: str, instances: list[str]):
     """
     Reemplaza el marcador en el template con los servidores activos,
     valida la configuración y recarga Nginx.
     Si no hay instancias, el upstream queda sin backends (nginx responde 502).
     """
+    ensure_nginx_running()
+
     if instances:
         server_lines = "\n".join(
             f"        server {instance} max_fails=3 fail_timeout=30s;"

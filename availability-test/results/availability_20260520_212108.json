@@ -1,0 +1,38 @@
+{
+  "timestamp": "2026-05-20T21:21:08.132101",
+  "config": {
+    "duration_s": 360.0,
+    "interval_s": 30.0,
+    "threshold_pct": 90.0,
+    "endpoints": {
+      "collab_lb": "http://localhost:8083/health",
+      "lsp_lb": "http://localhost:8085/health"
+    }
+  },
+  "summary": {
+    "total": 24,
+    "success": 24,
+    "error": 0,
+    "success_rate": 100.0,
+    "p50_ms": 5.29,
+    "p95_ms": 7.79,
+    "p99_ms": 10.48,
+    "by_service": {
+      "collab_lb": {
+        "total": 12,
+        "success": 12,
+        "error": 0,
+        "success_rate": 100.0,
+        "avg_ms": 6.26
+      },
+      "lsp_lb": {
+        "total": 12,
+        "success": 12,
+        "error": 0,
+        "success_rate": 100.0,
+        "avg_ms": 2.21
+      }
+    },
+    "errors": {}
+  }
+}

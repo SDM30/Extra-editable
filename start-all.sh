@@ -36,8 +36,7 @@ stop_previous() {
   sudo pkill -f "node src/server.js" 2>/dev/null || true
   sudo pkill -f "ng serve" 2>/dev/null || true
   sudo pkill -f "Angular CLI" 2>/dev/null || true
-  # Cerrar túneles SSH que ocupen puertos del stack (collab-lb, LSP)
-  sudo pkill -f "ssh -L 8080" 2>/dev/null || true
+  sudo pkill -f "health_sidecar.py" 2>/dev/null || true
   sudo pkill -f "ssh -L 8083" 2>/dev/null || true
   sudo pkill -f "ssh -L 8050" 2>/dev/null || true
   sleep 2
@@ -134,6 +133,14 @@ start_docker_nginx collab-lb "$ROOT_DIR/collab-load-balancer/nginx.config" 8083
 LSP_DIR="$ROOT_DIR/LSP-Service"
 if [ -f "$LSP_DIR/deploy-dev.sh" ]; then
   echo "Starting LSP Service (3 instances + agent)"
+  # Asegurar que los contenedores LSP usen el gateway docker0 para alcanzar Redis en el host
+  REDIS_HOST=$(ip addr show docker0 2>/dev/null | grep 'inet ' | awk '{print $2}' | cut -d/ -f1)
+  [ -z "$REDIS_HOST" ] && REDIS_HOST="127.0.0.1"
+  export REDIS_HOST
+  # En single-machine dev, forzar WS_PUBLIC_HOST=127.0.0.1 para que las URLs WebSocket
+  # sean alcanzables desde el navegador en la misma máquina.
+  export WS_PUBLIC_HOST=127.0.0.1
+  echo "  REDIS_HOST=$REDIS_HOST (docker0)  WS_PUBLIC_HOST=$WS_PUBLIC_HOST"
   if docker image inspect lsp-service-language-service:latest &>/dev/null 2>&1; then
     (cd "$LSP_DIR" && bash deploy-dev.sh 3)
   else
@@ -147,22 +154,37 @@ if [ -f "$LSP_DIR/deploy-dev.sh" ]; then
     echo "  Building lsp-multiplexor image..."
     (cd "$LSP_DIR/lsp-container" && docker build -t lsp-multiplexor:latest -t lsp-server:latest .)
   fi
-  # LSP LB necesita alcanzar los contenedores LSP en lsp-service_lsp-network
-  # Se crea después de deploy-dev.sh para que la red ya exista
-  docker rm -f lsp-lb >/dev/null 2>&1 || true
-  docker run -d --name lsp-lb \
-    --network lsp-service_lsp-network \
-    -p 8085:8085 \
-    -v "$ROOT_DIR/lsp-load-balancer/nginx.conf:/etc/nginx/nginx.conf:ro" \
-    nginx:alpine >/dev/null
-  # Conectar también a la red bridge para que el gateway (extra-editable-gateway) lo alcance
-  docker network connect bridge lsp-lb 2>/dev/null || true
   # Crear venv del watcher si no existe (requiere el paquete redis)
   if [ ! -f "$ROOT_DIR/lsp-load-balancer/venv/bin/python3" ]; then
     echo "  Creating LSP watcher venv..."
     python3 -m venv "$ROOT_DIR/lsp-load-balancer/venv"
     "$ROOT_DIR/lsp-load-balancer/venv/bin/pip" install redis
   fi
+  # Health sidecar: expone estado de instancias LSP desde Redis en puerto 9090.
+  # Debe iniciarse antes que lsp-lb para que el proxy_pass de /health ya tenga destino.
+  echo "Starting LSP health sidecar"
+  (cd "$ROOT_DIR/lsp-load-balancer" && ./venv/bin/python3 health_sidecar.py) \
+    &> "$ROOT_DIR/logs/lsp-health-sidecar.log" &
+  # LSP LB necesita alcanzar los contenedores LSP en lsp-service_lsp-network
+  # Se crea después de deploy-dev.sh para que la red ya exista.
+  # La config inicial incluye un server dummy (127.0.0.1:1 down) para que nginx arranque
+  # sin backends reales; update_nginx.py lo reemplazará al detectar instancias.
+  docker rm -f lsp-lb >/dev/null 2>&1 || true
+  docker run -d --name lsp-lb \
+    --network lsp-service_lsp-network \
+    --add-host=host.docker.internal:host-gateway \
+    -p 8085:8085 \
+    -v "$ROOT_DIR/lsp-load-balancer/nginx.conf:/etc/nginx/nginx.conf:ro" \
+    nginx:alpine >/dev/null
+  sleep 1
+  if [ "$(docker inspect -f '{{.State.Running}}' lsp-lb 2>/dev/null)" != "true" ]; then
+    echo "  ERROR: lsp-lb no arrancó. Últimas líneas del log:"
+    docker logs lsp-lb --tail 5 2>&1 || true
+  else
+    echo "  lsp-lb corriendo en puerto 8085"
+  fi
+  # Conectar también a la red bridge para que el gateway (extra-editable-gateway) lo alcance
+  docker network connect bridge lsp-lb 2>/dev/null || true
   echo "Starting LSP Load Balancer watcher"
   (cd "$ROOT_DIR/lsp-load-balancer" && ./venv/bin/python3 update_nginx.py) \
     &> "$ROOT_DIR/logs/lsp-watcher.log" &
@@ -193,4 +215,10 @@ for port in 1234 1235 1236; do
   ) &> "$ROOT_DIR/logs/collab-$port.log" &
 done
 
-echo "Started backend, frontend, Postgres, gateway, collab LB, collab instances, LSP service, LSP agent, and LSP watcher. Logs: $ROOT_DIR/logs"
+# Health sidecar: sondea collab :1234-1236/health y expone estado en puerto 9091
+echo "Starting collab health sidecar"
+python3 -m pip install requests -q 2>/dev/null || true
+(cd "$ROOT_DIR/collab-load-balancer" && python3 health_sidecar.py) \
+  &> "$ROOT_DIR/logs/collab-health-sidecar.log" &
+
+echo "Started backend, frontend, Postgres, gateway, collab LB, collab instances, LSP service, LSP agent, LSP watcher, LSP health sidecar, and collab health sidecar. Logs: $ROOT_DIR/logs"

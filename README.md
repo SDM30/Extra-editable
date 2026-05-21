@@ -257,14 +257,11 @@ Frontend → POST /auth/login/ → access_token
          → WS ws://host:port?token=lsp_token → multiplexor valida JWT + room == PROJECT_ID
 ```
 
-## Cambios recientes en `start-all.sh`
+## Documentación de diseño
 
-- **Verificación de prerrequisitos**: ahora `start-all.sh` comprueba `docker`, `python3`, `node` y `npm` antes de arrancar. Si falta alguno, aborta con un mensaje.
-- **LSP Load Balancer en red LSP**: el contenedor `lsp-lb` se crea con `--network lsp-service_lsp-network` y se conecta también a `bridge` para que el gateway (8080) pueda alcanzarlo.
-- **Watcher con venv**: `update_nginx.py` se ejecuta con `./venv/bin/python3` (entorno virtual local) en vez del `python3` del sistema.
-- **Watcher recarga nginx del contenedor**: usa `docker exec lsp-lb nginx -s reload` en lugar de requerir nginx instalado en el host.
-- **Build automático de `lsp-multiplexor`**: si la imagen no existe, `start-all.sh` la construye desde `LSP-Service/lsp-container/` antes de levantar el watcher.
-- **API gateway corrige proxy_pass**: `/api/` ahora apunta a `host.docker.internal:8000` (Django) en vez de `:8080`.
+La arquitectura del Servicio de Lenguaje, balanceadores de carga, health sidecars,
+flujo de variables de entorno en dev/producción y el mecanismo de recuperación automática
+están documentados en la [wiki del proyecto](Extra-editable.wiki/Home.md).
 
 # Distribuición VM
 | Name | Username | Password | IP_Address | Servicios |

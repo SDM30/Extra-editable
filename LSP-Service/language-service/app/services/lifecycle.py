@@ -104,7 +104,7 @@ def create_container(project_id: str, language: str, max_clients: int = 4):
                 logger.warning(f"Contenedor encontrado por labels pero no está corriendo ({container.status}); eliminando...")
                 container.remove(force=True)
     except Exception as e:
-        logger.warning(f"No se pudo recuperar contenedor por labels: {e}")
+        logger.warning("No se pudo recuperar contenedor por labels: %s", e)
 
     # Si ya existe entrada en registry, verificar si es local o remoto
     if registry.exists(project_id, language):
@@ -124,7 +124,10 @@ def create_container(project_id: str, language: str, max_clients: int = 4):
                 logger.warning(f"Contenedor existente para {project_id} ({language}) no está corriendo, recreando...")
                 destroy_container_local(project_id, language)
         except Exception as e:
-            logger.error(f"Error verificando contenedor existente: {e}")
+            # Contenedor no existe o Docker no responde — limpiar registro stale
+            # y permitir que el flujo normal recree el contenedor.
+            logger.exception("Error verificando contenedor existente para %s (%s): %s",
+                           project_id, language, e)
             registry.remove(project_id, language)
 
     # Crea la carpeta del proyecto si no existe

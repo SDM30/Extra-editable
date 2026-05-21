@@ -211,22 +211,38 @@ export class LspService {
   }
 
   /**
-   * Conecta el WebSocket al multiplexor LSP
+   * Conecta el WebSocket al multiplexor LSP con reintentos.
    */
   private connectWebSocket(session: LSPSession): Promise<void> {
-    return new Promise((resolve, reject) => {
+    return this._connectWebSocketAttempt(session, 0);
+  }
+
+  private _connectWebSocketAttempt(session: LSPSession, attempt: number): Promise<void> {
+    const MAX_ATTEMPTS = 3;
+    const RETRY_DELAY_MS = 2000;
+
+    return new Promise<void>((resolve, reject) => {
       const wsUrl = `${session.wsUrl}?token=${session.lspToken}`;
-      console.log(`[LSP] Conectando a ${wsUrl}`);
+      console.log(`[LSP] Conectando a ${wsUrl} (intento ${attempt + 1}/${MAX_ATTEMPTS})`);
 
       const socket = new WebSocket(wsUrl);
       session.socket = socket;
 
       const timeout = setTimeout(() => {
-        reject(new Error('Timeout conectando al LSP'));
-      }, 10000);
+        if (attempt + 1 < MAX_ATTEMPTS) {
+          console.warn(`[LSP] Timeout intento ${attempt + 1}, reintentando en ${RETRY_DELAY_MS}ms...`);
+          socket.close();
+          setTimeout(() => {
+            this._connectWebSocketAttempt(session, attempt + 1)
+              .then(resolve).catch(reject);
+          }, RETRY_DELAY_MS);
+        } else {
+          reject(new Error('Timeout conectando al LSP'));
+        }
+      }, 20000);
 
       socket.onopen = () => {
-        console.log(`[LSP] WebSocket conectado para ${session.projectId}`);
+        console.log(`[LSP] WebSocket conectado para ${session.projectId} (intento ${attempt + 1})`);
         session.connected = true;
         clearTimeout(timeout);
 
@@ -242,9 +258,19 @@ export class LspService {
         this.handleMessage(session, event.data);
       };
 
-      socket.onerror = (error) => {
-        console.error(`[LSP] Error WebSocket:`, error);
+      socket.onerror = () => {
+        console.error(`[LSP] Error WebSocket en intento ${attempt + 1}`);
         session.connected = false;
+        clearTimeout(timeout);
+        if (attempt + 1 < MAX_ATTEMPTS) {
+          console.warn(`[LSP] Error de conexión, reintentando en ${RETRY_DELAY_MS}ms...`);
+          setTimeout(() => {
+            this._connectWebSocketAttempt(session, attempt + 1)
+              .then(resolve).catch(reject);
+          }, RETRY_DELAY_MS);
+        } else {
+          reject(new Error('Error de conexión WebSocket al LSP'));
+        }
       };
 
       socket.onclose = (event) => {

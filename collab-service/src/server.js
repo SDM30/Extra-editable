@@ -177,6 +177,20 @@ const server = Server.configure({
 
       throw null;
     }
+
+    if (request.url === '/health' && request.method === 'GET') {
+      let activeRooms = 0;
+      for (const count of roomConnectionCounts.values()) {
+        activeRooms += count;
+      }
+      response.writeHead(200, { 'Content-Type': 'application/json' });
+      response.end(JSON.stringify({
+        status: 'ok',
+        port: PORT,
+        active_rooms: activeRooms,
+      }));
+      throw null;
+    }
   },
 
   async onAuthenticate({ token, connection }) {
